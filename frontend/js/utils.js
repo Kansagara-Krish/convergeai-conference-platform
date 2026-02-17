@@ -49,10 +49,10 @@ class NotificationManager {
 
   static getIcon(type) {
     const icons = {
-      success: "✓",
-      error: "✕",
-      warning: "⚠",
-      info: "ℹ",
+      success: '<i class="fas fa-check-circle"></i>',
+      error: '<i class="fas fa-exclamation-circle"></i>',
+      warning: '<i class="fas fa-exclamation-triangle"></i>',
+      info: '<i class="fas fa-info-circle"></i>',
     };
     return icons[type] || "";
   }

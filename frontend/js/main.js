@@ -99,10 +99,10 @@ class UserPanel {
       .map(
         (chatbot) => `
       <div class="chatbot-available-card">
-        <div class="chatbot-available-card-image">🤖</div>
+        <div class="chatbot-available-card-image"><i class="fas fa-robot"></i></div>
         <div class="chatbot-available-card-content">
           <h3 class="chatbot-available-card-title">${chatbot.name}</h3>
-          <div class="chatbot-available-card-date">📅 ${DateUtils.formatDate(chatbot.date)}</div>
+          <div class="chatbot-available-card-date"><i class="far fa-calendar-alt"></i> ${DateUtils.formatDate(chatbot.date)}</div>
           <p class="chatbot-available-card-desc">${chatbot.description}</p>
           <div class="chatbot-available-card-footer">
             <div class="chatbot-available-card-participants">
@@ -119,7 +119,7 @@ class UserPanel {
               ${chatbot.participants.length > 3 ? `<span>+${chatbot.participants.length - 3}</span>` : ""}
             </div>
             <button class="btn btn-sm btn-primary" onclick="joinChatbot(${chatbot.id})">
-              💬 Join
+              <i class="far fa-comments"></i> Join
             </button>
           </div>
         </div>
@@ -219,7 +219,7 @@ class ChatInterface {
     const messageEl = DomUtils.create("div", `message-group ${sender}`);
     messageEl.innerHTML = `
       <div class="message-avatar ${sender}">
-        ${sender === "user" ? "You" : "🤖"}
+        ${sender === "user" ? "You" : '<i class="fas fa-robot"></i>'}
       </div>
       <div class="message-bubble">
         <div class="message-text">${this.escapeHtml(text)}</div>
@@ -234,7 +234,7 @@ class ChatInterface {
   async showTypingIndicator() {
     const indicator = DomUtils.create("div", "message-group");
     indicator.innerHTML = `
-      <div class="message-avatar bot">🤖</div>
+      <div class="message-avatar bot"><i class="fas fa-robot"></i></div>
       <div class="typing-indicator">
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>

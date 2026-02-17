@@ -30,7 +30,8 @@ class AdminPanel {
       }
     });
 
-    // Sidebar toggle for mobile
+    // Sidebar toggle for mobile (keep existing logic for mobile overlay if needed, 
+    // but the new toggle works for desktop too)
     const hamburger = DomUtils.$(".hamburger-menu");
     if (hamburger) {
       hamburger.addEventListener("click", () => {
@@ -38,7 +39,7 @@ class AdminPanel {
       });
     }
 
-    // Close sidebar when menu item is clicked
+    // Close sidebar when menu item is clicked (only on mobile)
     menuItems.forEach((item) => {
       item.addEventListener("click", () => {
         if (window.innerWidth < 1024) {
@@ -105,11 +106,10 @@ class AdminPanel {
 
       // Update stat cards
       this.updateStatCard("total-chatbots", stats.totalChatbots);
-      this.updateStatCard("active-events", stats.activeEvents);
       this.updateStatCard("total-users", stats.totalUsers);
       this.updateStatCard("upcoming-events", stats.upcomingEvents);
 
-      NotificationManager.success("Dashboard loaded successfully");
+      // NotificationManager.success("Dashboard loaded successfully"); // Removed as requested
     } catch (error) {
       console.error("Error loading dashboard:", error);
       NotificationManager.error("Failed to load dashboard");
@@ -146,6 +146,8 @@ class AdminPanel {
       window.location.href = "/index.html";
     }, 500);
   }
+
+
 }
 
 // ============================================
@@ -395,7 +397,7 @@ class ImportExcelHandler {
         </table>
       </div>
       <button class="btn btn-primary mt-lg" onclick="downloadCredentials()">
-        📥 Download Credentials
+        <i class="fas fa-download"></i> Download Credentials
       </button>
     `;
 
@@ -486,11 +488,11 @@ class UserManagementHandler {
           <tr>
             <td>${user.name}</td>
             <td>${user.email}</td>
-            <td>${user.active ? "✓" : "✕"}</td>
+            <td>${user.active ? '<span class="badge badge-success"><i class="fas fa-check"></i></span>' : '<span class="badge badge-danger"><i class="fas fa-times"></i></span>'}</td>
             <td>
               <div class="table-actions">
                 <button class="btn btn-sm btn-secondary" data-action="reset-password" data-user-id="${user.id}">
-                  🔑 Reset
+                  <i class="fas fa-key"></i> Reset
                 </button>
                 <button class="btn btn-sm ${user.active ? "btn-danger" : "btn-success"}" data-action="toggle-user" data-user-id="${user.id}">
                   ${user.active ? "Deactivate" : "Activate"}

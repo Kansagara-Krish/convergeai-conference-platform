@@ -1,35 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/user.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js"></script>
     <script src="../js/main.js"></script>
 </head>
+
 <body>
     <div class="user-container">
         <!-- Header -->
         <header class="user-header">
             <div class="user-header-content">
                 <div class="user-logo">
-                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🤖</div>
+                    <div class="logo-icon"><i class="fas fa-robot"></i></div>
                     <span>ConvergeAI</span>
                 </div>
 
                 <nav class="user-nav">
-                    <a href="dashboard.html" class="user-nav-item active">Dashboard</a>
-                    <a href="profile.html" class="user-nav-item">Profile</a>
+                    <a href="dashboard.html" class="user-nav-item active"><i class="fas fa-th-large"></i> Dashboard</a>
+                    <a href="profile.html" class="user-nav-item"><i class="fas fa-user-circle"></i> Profile</a>
                     <div class="user-profile-menu">
                         <button class="user-profile-btn">
                             <div class="user-profile-avatar" data-user-name>U</div>
-                            <span>👤</span>
+                            <span class="dropdown-arrow"><i class="fas fa-chevron-down"></i></span>
                         </button>
                         <div class="dropdown-menu">
-                            <a href="profile.html" class="dropdown-item">👤 Profile</a>
-                            <a href="#" class="dropdown-item" data-action="logout">🚪 Logout</a>
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> Profile</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i>
+                                Logout</a>
                         </div>
                     </div>
                 </nav>
@@ -41,9 +46,11 @@
             <!-- Hero Section -->
             <div class="dashboard-hero">
                 <h1 class="dashboard-hero-title">Welcome to Conference Chatbot Platform</h1>
-                <p class="dashboard-hero-subtitle">Connect with experts, join discussions, and experience intelligent conversations powered by AI</p>
+                <p class="dashboard-hero-subtitle">Connect with experts, join discussions, and experience intelligent
+                    conversations powered by AI</p>
                 <div class="dashboard-search" style="margin-top: var(--spacing-xl);">
                     <div class="dashboard-search-input">
+                        <i class="fas fa-search search-icon"></i>
                         <input type="text" placeholder="Search for events or chatbots...">
                     </div>
                     <div class="dashboard-filters">
@@ -64,11 +71,12 @@
 
             <!-- Empty State (hidden by JS) -->
             <div class="empty-state" style="display: none;">
-                <div class="empty-state-icon">🔍</div>
+                <div class="empty-state-icon"><i class="fas fa-search"></i></div>
                 <h3 class="empty-state-title">No Chatbots Found</h3>
                 <p class="empty-state-text">There are no available chatbots at the moment. Please check back later.</p>
             </div>
         </div>
     </div>
 </body>
+
 </html>

@@ -1,59 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Professional Conference Chatbot Management System">
     <meta name="theme-color" content="#1a1a2e">
     <title>Conference Chatbot Management System - Login</title>
-    
+
     <!-- CSS - Correct relative paths -->
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/user.css">
-    
+    <link rel="stylesheet" href="css/style.css?v=4">
+    <link rel="stylesheet" href="css/user.css?v=4">
+
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%2300d4ff'>💬</text></svg>">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body class="login-page-body">
     <div class="login-page">
         <!-- Skip to main content (accessibility) -->
         <a href="#login-form" class="skip-link">Skip to login form</a>
-        
-        <!-- Hero Section -->
-        <section class="login-hero" aria-label="Welcome section">
-            <div class="login-hero-content">
-                <div class="login-hero-inner">
-                    <h1 class="login-hero-title">Conference Chatbot System</h1>
-                    <p class="login-hero-subtitle">Professional event management and intelligent chatbot solution for academic conferences</p>
-                    
-                    <div class="login-features" role="list">
-                        <article class="login-feature" role="listitem">
-                            <div class="login-feature-icon" aria-hidden="true">🤖</div>
-                            <div class="login-feature-text">
-                                <h3 class="login-feature-title">AI-Powered Chat</h3>
-                                <p class="login-feature-desc">Intelligent conversations with event experts</p>
-                            </div>
-                        </article>
-                        
-                        <article class="login-feature" role="listitem">
-                            <div class="login-feature-icon" aria-hidden="true">📊</div>
-                            <div class="login-feature-text">
-                                <h3 class="login-feature-title">Event Analytics</h3>
-                                <p class="login-feature-desc">Track engagement and interactions in real-time</p>
-                            </div>
-                        </article>
-                        
-                        <article class="login-feature" role="listitem">
-                            <div class="login-feature-icon" aria-hidden="true">👥</div>
-                            <div class="login-feature-text">
-                                <h3 class="login-feature-title">User Management</h3>
-                                <p class="login-feature-desc">Easily manage participants and access</p>
-                            </div>
-                        </article>
-                    </div>
-                </div>
-            </div>
-        </section>
+
+        <!-- Background Bubbles -->
+        <div class="bubbles-container">
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+        </div>
 
         <!-- Login Form Section -->
         <section class="login-form-section" aria-label="Login form section">
@@ -65,16 +43,8 @@
                     <!-- Username -->
                     <div class="login-form-group">
                         <label for="username">Username <span aria-label="required">*</span></label>
-                        <input 
-                            type="text" 
-                            id="username" 
-                            name="username" 
-                            placeholder="e.g., admin or user" 
-                            required 
-                            aria-required="true"
-                            aria-describedby="username-error"
-                            autocomplete="username"
-                        >
+                        <input type="text" id="username" name="username" placeholder="e.g., admin or user" required
+                            aria-required="true" aria-describedby="username-error" autocomplete="username">
                         <span id="username-error" class="form-error"></span>
                     </div>
 
@@ -82,23 +52,11 @@
                     <div class="login-form-group">
                         <label for="password">Password <span aria-label="required">*</span></label>
                         <div class="password-input-wrapper">
-                            <input 
-                                type="password" 
-                                id="password" 
-                                name="password" 
-                                placeholder="Enter your password" 
-                                required 
-                                aria-required="true"
-                                aria-describedby="password-error"
-                                autocomplete="current-password"
-                            >
-                            <button 
-                                type="button" 
-                                class="password-toggle" 
-                                id="password-toggle"
-                                aria-label="Toggle password visibility"
-                                tabindex="0"
-                            >
+                            <input type="password" id="password" name="password" placeholder="Enter your password"
+                                required aria-required="true" aria-describedby="password-error"
+                                autocomplete="current-password">
+                            <button type="button" class="password-toggle" id="password-toggle"
+                                aria-label="Toggle password visibility" tabindex="0">
                                 👁️
                             </button>
                         </div>
@@ -136,15 +94,15 @@
     <!-- Scripts - Load at end for performance -->
     <script src="js/utils.js" defer></script>
     <script src="js/main.js" defer></script>
-    
+
     <!-- Inline script for password visibility toggle -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const toggle = document.getElementById('password-toggle');
             const passwordInput = document.getElementById('password');
-            
+
             if (toggle && passwordInput) {
-                toggle.addEventListener('click', function() {
+                toggle.addEventListener('click', function () {
                     const isPassword = passwordInput.type === 'password';
                     passwordInput.type = isPassword ? 'text' : 'password';
                     this.textContent = isPassword ? '🙈' : '👁️';
@@ -159,4 +117,5 @@
         </p>
     </noscript>
 </body>
+
 </html>
