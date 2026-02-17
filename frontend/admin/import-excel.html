@@ -1,21 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Import Excel - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/admin.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js"></script>
     <script src="../js/admin.js"></script>
 </head>
+
 <body>
     <div class="admin-container">
         <!-- Sidebar -->
         <aside class="admin-sidebar">
             <div class="sidebar-brand">
-                <div class="brand-logo">
-                    <div class="brand-icon">🤖</div>
+                <div class="admin-sidebar-header">
+                    <div class="brand-icon"><i class="fas fa-robot"></i></div>
                     <div>ConvergeAI</div>
                 </div>
             </div>
@@ -24,7 +28,7 @@
                 <div class="menu-section">
                     <div class="menu-label">Main</div>
                     <a href="dashboard.html" class="menu-item">
-                        <span class="menu-icon">📊</span>
+                        <span class="menu-icon"><i class="fas fa-chart-line"></i></span>
                         <span>Dashboard</span>
                     </a>
                 </div>
@@ -32,11 +36,11 @@
                 <div class="menu-section">
                     <div class="menu-label">Chatbots</div>
                     <a href="create-chatbot.html" class="menu-item">
-                        <span class="menu-icon">➕</span>
+                        <span class="menu-icon"><i class="fas fa-plus-circle"></i></span>
                         <span>Create Chatbot</span>
                     </a>
                     <a href="chatbot-list.html" class="menu-item">
-                        <span class="menu-icon">📋</span>
+                        <span class="menu-icon"><i class="fas fa-list"></i></span>
                         <span>All Chatbots</span>
                         <span class="menu-badge">12</span>
                     </a>
@@ -45,26 +49,20 @@
                 <div class="menu-section">
                     <div class="menu-label">Users & Data</div>
                     <a href="user-management.html" class="menu-item">
-                        <span class="menu-icon">👨‍💼</span>
+                        <span class="menu-icon"><i class="fas fa-users-cog"></i></span>
                         <span>Users</span>
                         <span class="menu-badge">847</span>
                     </a>
                     <a href="import-excel.html" class="menu-item active">
-                        <span class="menu-icon">📥</span>
+                        <span class="menu-icon"><i class="fas fa-file-import"></i></span>
                         <span>Import Users</span>
                     </a>
                 </div>
             </nav>
 
-            <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <div class="user-avatar">A</div>
-                    <div class="user-info">
-                        <div class="user-name">Admin</div>
-                        <div class="user-role">Administrator</div>
-                    </div>
-                </div>
-                <button class="btn btn-ghost" data-action="logout" style="width: 100%;">🚪 Logout</button>
+            <div class="admin-sidebar-footer">
+                <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
+                        class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
         </aside>
 
@@ -88,7 +86,7 @@
                     <!-- Instructions -->
                     <div class="card mb-lg">
                         <div class="card-body">
-                            <h3>📋 Import Instructions</h3>
+                            <h3><i class="fas fa-clipboard-list"></i> Import Instructions</h3>
                             <ul style="margin-left: var(--spacing-lg); color: var(--text-secondary);">
                                 <li>Upload an Excel file (.xlsx) with user emails and names</li>
                                 <li>Required columns: Name, Email</li>
@@ -108,8 +106,9 @@
                                 <div class="form-group">
                                     <label for="excel-file">Excel File (.xlsx)</label>
                                     <div class="file-upload">
-                                        <input type="file" id="excel-file" name="excel_file" accept=".xlsx" style="display: none;" required>
-                                        <div class="file-upload-icon">📊</div>
+                                        <input type="file" id="excel-file" name="excel_file" accept=".xlsx"
+                                            style="display: none;" required>
+                                        <div class="file-upload-icon"><i class="fas fa-file-excel"></i></div>
                                         <div class="file-upload-text">Click or drag Excel file here</div>
                                         <div class="file-upload-hint">Maximum file size: 10 MB</div>
                                     </div>
@@ -140,7 +139,8 @@
                                 </div>
                             </div>
 
-                            <div class="import-preview" style="margin-top: var(--spacing-lg); padding: var(--spacing-lg); background: rgba(79, 70, 229, 0.1); border-radius: var(--radius-md); border: 1px dashed var(--border-color); color: var(--text-secondary);">
+                            <div class="import-preview"
+                                style="margin-top: var(--spacing-lg); padding: var(--spacing-lg); background: rgba(79, 70, 229, 0.1); border-radius: var(--radius-md); border: 1px dashed var(--border-color); color: var(--text-secondary);">
                                 No file selected
                             </div>
                         </div>
@@ -148,7 +148,7 @@
                         <div class="form-actions">
                             <a href="user-management.html" class="btn btn-secondary">Cancel</a>
                             <button type="submit" class="btn btn-primary btn-lg">
-                                📥 Import & Generate Credentials
+                                <i class="fas fa-file-import"></i> Import & Generate Credentials
                             </button>
                         </div>
                     </form>
@@ -179,7 +179,8 @@
                                     <td>icai_users.xlsx</td>
                                     <td><span class="badge badge-success">Completed</span></td>
                                     <td>
-                                        <button class="btn btn-sm btn-secondary">📥 Download List</button>
+                                        <button class="btn btn-sm btn-secondary"><i class="fas fa-download"></i>
+                                            Download List</button>
                                     </td>
                                 </tr>
                                 <tr>
@@ -189,7 +190,8 @@
                                     <td>ml_users.xlsx</td>
                                     <td><span class="badge badge-success">Completed</span></td>
                                     <td>
-                                        <button class="btn btn-sm btn-secondary">📥 Download List</button>
+                                        <button class="btn btn-sm btn-secondary"><i class="fas fa-download"></i>
+                                            Download List</button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -200,4 +202,5 @@
         </div>
     </div>
 </body>
+
 </html>

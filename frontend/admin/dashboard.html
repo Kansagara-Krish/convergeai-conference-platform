@@ -1,21 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/admin.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js"></script>
     <script src="../js/admin.js"></script>
 </head>
+
 <body>
     <div class="admin-container">
         <!-- Sidebar -->
         <aside class="admin-sidebar">
             <div class="sidebar-brand">
-                <div class="brand-logo">
-                    <div class="brand-icon">🤖</div>
+                <div class="admin-sidebar-header">
+                    <div class="brand-icon"><i class="fas fa-robot"></i></div>
                     <div>ConvergeAI</div>
                 </div>
             </div>
@@ -24,7 +28,7 @@
                 <div class="menu-section">
                     <div class="menu-label">Main</div>
                     <a href="dashboard.html" class="menu-item active">
-                        <span class="menu-icon">📊</span>
+                        <span class="menu-icon"><i class="fas fa-chart-line"></i></span>
                         <span>Dashboard</span>
                     </a>
                 </div>
@@ -32,11 +36,11 @@
                 <div class="menu-section">
                     <div class="menu-label">Chatbots</div>
                     <a href="create-chatbot.html" class="menu-item">
-                        <span class="menu-icon">➕</span>
+                        <span class="menu-icon"><i class="fas fa-plus-circle"></i></span>
                         <span>Create Chatbot</span>
                     </a>
                     <a href="chatbot-list.html" class="menu-item">
-                        <span class="menu-icon">📋</span>
+                        <span class="menu-icon"><i class="fas fa-list"></i></span>
                         <span>All Chatbots</span>
                         <span class="menu-badge">12</span>
                     </a>
@@ -49,12 +53,12 @@
                 <div class="menu-section">
                     <div class="menu-label">Users & Data</div>
                     <a href="user-management.html" class="menu-item">
-                        <span class="menu-icon">👨‍💼</span>
+                        <span class="menu-icon"><i class="fas fa-users-cog"></i></span>
                         <span>Users</span>
                         <span class="menu-badge">847</span>
                     </a>
                     <a href="import-excel.html" class="menu-item">
-                        <span class="menu-icon">📥</span>
+                        <span class="menu-icon"><i class="fas fa-file-import"></i></span>
                         <span>Import Users</span>
                     </a>
                 </div>
@@ -62,7 +66,7 @@
                 <div class="menu-section">
                     <div class="menu-label">Settings</div>
                     <a href="#" class="menu-item">
-                        <span class="menu-icon">⚙️</span>
+                        <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
                         <span>System Settings</span>
                     </a>
                     <a href="#" class="menu-item">
@@ -80,7 +84,10 @@
                         <div class="user-role">Administrator</div>
                     </div>
                 </div>
-                <button class="btn btn-ghost" data-action="logout" style="width: 100%;">🚪 Logout</button>
+                <div class="admin-sidebar-footer">
+                    <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
             </div>
         </aside>
 
@@ -102,7 +109,8 @@
                     </div>
                     <div class="header-user-menu">
                         <button class="header-user-btn">
-                            <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
+                            <span
+                                style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
                             <span>👤</span>
                         </button>
                         <div class="dropdown-menu">
@@ -194,7 +202,8 @@
                                         <td>AI Research Summit</td>
                                         <td>ICAI 2024</td>
                                         <td>2024-06-15</td>
-                                        <td><span class="status-indicator status-active"><span class="status-dot"></span> Active</span></td>
+                                        <td><span class="status-indicator status-active"><span
+                                                    class="status-dot"></span> Active</span></td>
                                         <td>234</td>
                                         <td>
                                             <div class="table-actions">
@@ -207,7 +216,8 @@
                                         <td>ML Conference</td>
                                         <td>ML Expo 2024</td>
                                         <td>2024-07-20</td>
-                                        <td><span class="status-indicator status-pending"><span class="status-dot"></span> Pending</span></td>
+                                        <td><span class="status-indicator status-pending"><span
+                                                    class="status-dot"></span> Pending</span></td>
                                         <td>156</td>
                                         <td>
                                             <div class="table-actions">
@@ -220,7 +230,8 @@
                                         <td>Data Science Workshop</td>
                                         <td>Data Con 2024</td>
                                         <td>2024-08-10</td>
-                                        <td><span class="status-indicator status-inactive"><span class="status-dot"></span> Inactive</span></td>
+                                        <td><span class="status-indicator status-inactive"><span
+                                                    class="status-dot"></span> Inactive</span></td>
                                         <td>89</td>
                                         <td>
                                             <div class="table-actions">
@@ -238,4 +249,5 @@
         </div>
     </div>
 </body>
+
 </html>
