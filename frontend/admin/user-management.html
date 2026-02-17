@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <script src="../js/utils.js"></script>
+    <script src="../js/admin.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <div class="brand-icon">🤖</div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item">
+                        <span class="menu-icon">📊</span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item active">
+                        <span class="menu-icon">👨‍💼</span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item">
+                        <span class="menu-icon">📥</span>
+                        <span>Import Users</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <button class="btn btn-ghost" data-action="logout" style="width: 100%;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>User Management</h1>
+                    <div class="header-breadcrumb">
+                        <a href="dashboard.html">Home</a>
+                        <span>/</span>
+                        <span>Users</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: var(--spacing-md);">
+                    <input type="text" placeholder="Search users..." style="width: 250px;">
+                    <select style="width: 150px;">
+                        <option>Filter by role</option>
+                        <option>Admin</option>
+                        <option>User</option>
+                    </select>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="admin-content">
+                <!-- Statistics -->
+                <div class="stats-grid mb-lg">
+                    <div class="stat-card">
+                        <div class="stat-icon primary">👥</div>
+                        <div class="stat-value">847</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon success">✓</div>
+                        <div class="stat-value">812</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon warning">⏸</div>
+                        <div class="stat-value">35</div>
+                        <div class="stat-label">Inactive</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon danger">🆕</div>
+                        <div class="stat-value">125</div>
+                        <div class="stat-label">New This Month</div>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>All Users</h2>
+                        <a href="import-excel.html" class="btn btn-sm btn-primary">📥 Import More</a>
+                    </div>
+                    <div class="table-container">
+                        <table class="table" data-table="users">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Event</th>
+                                    <th>Joined</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                            <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">JD</div>
+                                            <div>John Doe</div>
+                                        </div>
+                                    </td>
+                                    <td>john.doe@example.com</td>
+                                    <td>AI Research Summit</td>
+                                    <td>2024-06-10</td>
+                                    <td><span class="status-indicator status-active"><span class="status-dot"></span> Active</span></td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <button class="btn btn-sm btn-secondary" data-action="reset-password" data-user-id="1">🔑</button>
+                                            <button class="btn btn-sm btn-success" data-action="toggle-user" data-user-id="1">✓</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                            <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">JS</div>
+                                            <div>Jane Smith</div>
+                                        </div>
+                                    </td>
+                                    <td>jane.smith@example.com</td>
+                                    <td>ML Conference</td>
+                                    <td>2024-06-15</td>
+                                    <td><span class="status-indicator status-active"><span class="status-dot"></span> Active</span></td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <button class="btn btn-sm btn-secondary" data-action="reset-password" data-user-id="2">🔑</button>
+                                            <button class="btn btn-sm btn-success" data-action="toggle-user" data-user-id="2">✓</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                            <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">MB</div>
+                                            <div>Mike Brown</div>
+                                        </div>
+                                    </td>
+                                    <td>mike.brown@example.com</td>
+                                    <td>Data Science Workshop</td>
+                                    <td>2024-05-20</td>
+                                    <td><span class="status-indicator status-inactive"><span class="status-dot"></span> Inactive</span></td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <button class="btn btn-sm btn-secondary" data-action="reset-password" data-user-id="3">🔑</button>
+                                            <button class="btn btn-sm btn-danger" data-action="toggle-user" data-user-id="3">✕</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div class="flex-between mt-lg">
+                    <p style="color: var(--text-secondary);">Showing 1-3 of 847 users</p>
+                    <div class="flex" gap="var(--spacing-md)">
+                        <button class="btn btn-ghost btn-sm">← Previous</button>
+                        <button class="btn btn-primary btn-sm">1</button>
+                        <button class="btn btn-ghost btn-sm">2</button>
+                        <button class="btn btn-ghost btn-sm">3</button>
+                        <button class="btn btn-ghost btn-sm">Next →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/user.css">
+    <script src="../js/utils.js"></script>
+    <script src="../js/main.js"></script>
+</head>
+<body>
+    <div class="user-container">
+        <!-- Header -->
+        <header class="user-header">
+            <div class="user-header-content">
+                <div class="user-logo">
+                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🤖</div>
+                    <span>ConvergeAI</span>
+                </div>
+
+                <nav class="user-nav">
+                    <a href="dashboard.html" class="user-nav-item">Dashboard</a>
+                    <a href="profile.html" class="user-nav-item active">Profile</a>
+                    <div class="user-profile-menu">
+                        <button class="user-profile-btn">
+                            <div class="user-profile-avatar" data-user-name>U</div>
+                            <span>👤</span>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="profile.html" class="dropdown-item">👤 Profile</a>
+                            <a href="#" class="dropdown-item" data-action="logout">🚪 Logout</a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="user-main">
+            <div class="profile-container">
+                <!-- Profile Header -->
+                <div class="profile-header">
+                    <div class="profile-avatar" data-profile-avatar>JD</div>
+                    <h1 class="profile-name" data-profile-name>John Doe</h1>
+                    <p class="profile-role" data-profile-role>User</p>
+                </div>
+
+                <!-- Account Information -->
+                <div class="profile-section">
+                    <h3 class="profile-section-title">🔐 Account Information</h3>
+                    
+                    <div class="profile-item">
+                        <div class="profile-item-label">Email Address</div>
+                        <div class="profile-item-value" data-profile-email>john.doe@example.com</div>
+                    </div>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Username</div>
+                        <div class="profile-item-value">john.doe</div>
+                    </div>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Account Status</div>
+                        <div class="profile-item-value">
+                            <span class="status-indicator status-active">
+                                <span class="status-dot"></span> Active
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Member Since</div>
+                        <div class="profile-item-value">June 10, 2024</div>
+                    </div>
+                </div>
+
+                <!-- Events & Participation -->
+                <div class="profile-section">
+                    <h3 class="profile-section-title">📅 Events & Participation</h3>
+                    
+                    <div class="profile-item">
+                        <div class="profile-item-label">Joined Events</div>
+                        <div class="profile-item-value">3 events</div>
+                    </div>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Active Conversations</div>
+                        <div class="profile-item-value">245 messages</div>
+                    </div>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Current Events</div>
+                        <div class="profile-item-value">AI Research Summit</div>
+                    </div>
+                </div>
+
+                <!-- Security & Password -->
+                <div class="profile-section">
+                    <h3 class="profile-section-title">🔒 Security</h3>
+
+                    <form data-form="change-password" style="display: flex; flex-direction: column; gap: var(--spacing-lg);">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="current-password">Current Password</label>
+                            <input type="password" id="current-password" name="current-password" placeholder="Enter your current password" required>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="new-password">New Password</label>
+                            <input type="password" id="new-password" name="new-password" placeholder="Enter a new password" required>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="confirm-password">Confirm Password</label>
+                            <input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm your new password" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            🔄 Change Password
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Preferences -->
+                <div class="profile-section">
+                    <h3 class="profile-section-title">⚙️ Preferences</h3>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Email Notifications</div>
+                        <label class="checkbox" style="margin: 0;">
+                            <input type="checkbox" checked>
+                            <span>Receive email updates</span>
+                        </label>
+                    </div>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Theme</div>
+                        <select style="width: auto; min-width: 150px;">
+                            <option>Dark (Current)</option>
+                            <option>Light</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="profile-section" style="border-left: 3px solid var(--danger);">
+                    <h3 class="profile-section-title" style="color: var(--danger);">⚠️ Danger Zone</h3>
+
+                    <div class="profile-item">
+                        <div class="profile-item-label">Delete Account</div>
+                        <button class="btn btn-danger btn-sm">Delete Permanently</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .user-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .user-main {
+            flex: 1;
+            padding: var(--spacing-xl);
+        }
+    </style>
+</body>
+</html>

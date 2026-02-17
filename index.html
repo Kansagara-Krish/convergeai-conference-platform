@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conference Chatbot Management System - Login</title>
+    <link rel="stylesheet" href="frontend/css/style.css">
+    <link rel="stylesheet" href="frontend/css/user.css">
+    <script src="frontend/js/utils.js"></script>
+    <script src="frontend/js/main.js"></script>
+</head>
+<body>
+    <div class="login-page">
+        <!-- Hero Section -->
+        <div class="login-hero">
+            <div class="login-hero-content">
+                <h1 class="login-hero-title">Conference Chatbot System</h1>
+                <p class="login-hero-subtitle">Professional event management and intelligent chatbot solution for academic conferences</p>
+                
+                <div class="login-features">
+                    <div class="login-feature">
+                        <div class="login-feature-icon">🤖</div>
+                        <div class="login-feature-text">
+                            <div class="login-feature-title">AI-Powered Chat</div>
+                            <div class="login-feature-desc">Intelligent conversations with event experts</div>
+                        </div>
+                    </div>
+                    
+                    <div class="login-feature">
+                        <div class="login-feature-icon">📊</div>
+                        <div class="login-feature-text">
+                            <div class="login-feature-title">Event Analytics</div>
+                            <div class="login-feature-desc">Track engagement and interactions in real-time</div>
+                        </div>
+                    </div>
+                    
+                    <div class="login-feature">
+                        <div class="login-feature-icon">👥</div>
+                        <div class="login-feature-text">
+                            <div class="login-feature-title">User Management</div>
+                            <div class="login-feature-desc">Easily manage participants and access</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Form Section -->
+        <div class="login-form-container">
+            <form class="login-form" data-form="login">
+                <h2 class="login-form-title">Welcome Back</h2>
+                <p class="login-form-subtitle">Enter your credentials to access the system</p>
+
+                <div class="login-form-group">
+                    <label for="role">Select Role</label>
+                    <select name="role" id="role" required>
+                        <option value="">Choose your role...</option>
+                        <option value="admin">Administrator</option>
+                        <option value="user">User</option>
+                    </select>
+                </div>
+
+                <div class="login-form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                </div>
+
+                <div class="login-form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+
+                <div class="login-form-remember">
+                    <label class="checkbox">
+                        <input type="checkbox" name="remember">
+                        Remember me
+                    </label>
+                    <a href="#" class="login-form-forgot">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg login-form-btn">
+                    Sign In
+                </button>
+
+                <div class="login-form-divider">Or continue as</div>
+
+                <div style="display: flex; gap: var(--spacing-md);">
+                    <button type="button" class="btn btn-ghost" style="flex: 1;" onclick="this.parentElement.querySelector('select').value='admin'">
+                        Admin
+                    </button>
+                    <button type="button" class="btn btn-ghost" style="flex: 1;" onclick="this.parentElement.querySelector('select').value='user'">
+                        User
+                    </button>
+                </div>
+
+                <div class="login-form-footer">
+                    Demo credentials:<br>
+                    Admin: admin / password | User: user / password
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add animation for slideOut -->
+    <style>
+        @keyframes slideOut {
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+    </style>
+</body>
+</html>

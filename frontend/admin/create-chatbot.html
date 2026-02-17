@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Chatbot - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <script src="../js/utils.js"></script>
+    <script src="../js/admin.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <div class="brand-icon">🤖</div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item">
+                        <span class="menu-icon">📊</span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item active">
+                        <span class="menu-icon">➕</span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item">
+                        <span class="menu-icon">📋</span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon">👥</span>
+                        <span>Guest Management</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item">
+                        <span class="menu-icon">👨‍💼</span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item">
+                        <span class="menu-icon">📥</span>
+                        <span>Import Users</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <button class="btn btn-ghost" data-action="logout" style="width: 100%;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>Create New Chatbot</h1>
+                    <div class="header-breadcrumb">
+                        <a href="dashboard.html">Home</a>
+                        <span>/</span>
+                        <span>Create Chatbot</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div style="text-align: center; color: var(--text-secondary);">
+                        <p style="margin: 0;">Need help? Check our <a href="#" style="color: var(--accent-blue);">documentation</a></p>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="admin-content">
+                <div class="form-layout">
+                    <form data-form="chatbot" data-action="create">
+                        <!-- Basic Information -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">Basic Information</h3>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="chatbot-name">
+                                        Chatbot Name
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="chatbot-name" 
+                                        name="name" 
+                                        placeholder="e.g., AI Summit 2024"
+                                        data-rules="required"
+                                        required
+                                    >
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="event-name">
+                                        Event Name
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="event-name" 
+                                        name="event_name" 
+                                        placeholder="e.g., ICAI 2024"
+                                        data-rules="required"
+                                        required
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="event-start">
+                                        Event Start Date
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input 
+                                        type="date" 
+                                        id="event-start" 
+                                        name="start_date"
+                                        data-rules="required"
+                                        required
+                                    >
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="event-end">
+                                        Event End Date
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input 
+                                        type="date" 
+                                        id="event-end" 
+                                        name="end_date"
+                                        data-rules="required"
+                                        required
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="description">
+                                        Description
+                                        <span class="required">*</span>
+                                    </label>
+                                    <textarea 
+                                        id="description" 
+                                        name="description" 
+                                        placeholder="Enter a detailed description of the event and chatbot purpose..."
+                                        data-rules="required"
+                                        required
+                                    ></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI Configuration -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">AI Configuration</h3>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="prompt">
+                                        System Prompt
+                                        <span class="required">*</span>
+                                    </label>
+                                    <textarea 
+                                        id="prompt" 
+                                        name="prompt" 
+                                        class="rich-editor"
+                                        placeholder="Enter the AI system prompt that defines the chatbot's behavior and knowledge base..."
+                                        data-rules="required"
+                                        required
+                                    ></textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Prompt Mode</label>
+                                    <div class="checkbox">
+                                        <input type="checkbox" id="single-mode" name="single_mode" value="1">
+                                        <label for="single-mode" style="margin: 0;">Single Person Prompt Mode</label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label style="visibility: hidden;">Placeholder</label>
+                                    <div class="checkbox">
+                                        <input type="checkbox" id="multiple-mode" name="multiple_mode" value="1">
+                                        <label for="multiple-mode" style="margin: 0;">Multiple Person Prompt Mode</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Media & Assets -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">Media & Assets</h3>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="background-image">Background Image</label>
+                                    <div class="file-upload">
+                                        <input type="file" id="background-image" name="background_image" accept="image/*" style="display: none;">
+                                        <div class="file-upload-icon">🖼️</div>
+                                        <div class="file-upload-text">Click or drag image here</div>
+                                        <div class="file-upload-hint">Recommended: 1920x1080px, PNG or JPG</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="guest-list">Guest List (with photos)</label>
+                                    <div class="file-upload">
+                                        <input type="file" id="guest-list" name="guest_list" accept=".xlsx,.csv" style="display: none;">
+                                        <div class="file-upload-icon">📋</div>
+                                        <div class="file-upload-text">Click or drag file here</div>
+                                        <div class="file-upload-hint">Upload Excel or CSV with guest information</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="form-actions">
+                            <a href="chatbot-list.html" class="btn btn-secondary">Cancel</a>
+                            <button type="reset" class="btn btn-ghost">Reset</button>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                ✨ Create Chatbot
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

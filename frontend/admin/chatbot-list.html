@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot List - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <script src="../js/utils.js"></script>
+    <script src="../js/admin.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <div class="brand-icon">🤖</div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item">
+                        <span class="menu-icon">📊</span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item">
+                        <span class="menu-icon">➕</span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item active">
+                        <span class="menu-icon">📋</span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon">👥</span>
+                        <span>Guest Management</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item">
+                        <span class="menu-icon">👨‍💼</span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item">
+                        <span class="menu-icon">📥</span>
+                        <span>Import Users</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <button class="btn btn-ghost" data-action="logout" style="width: 100%;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>All Chatbots</h1>
+                    <div class="header-breadcrumb">
+                        <a href="dashboard.html">Home</a>
+                        <span>/</span>
+                        <span>Chatbots</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <a href="create-chatbot.html" class="btn btn-primary">➕ New Chatbot</a>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="admin-content">
+                <!-- Filter & Search -->
+                <div class="card mb-lg">
+                    <div class="card-body">
+                        <div class="flex">
+                            <input type="text" placeholder="Search chatbots..." style="flex: 1; margin-right: var(--spacing-md);">
+                            <select style="width: 200px;">
+                                <option>All Status</option>
+                                <option>Active</option>
+                                <option>Pending</option>
+                                <option>Expired</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chatbot Cards Grid -->
+                <div class="grid grid-3">
+                    <!-- Card 1 -->
+                    <div class="chatbot-card">
+                        <div class="chatbot-card-header">
+                            <div>
+                                <h3 class="chatbot-card-title">AI Research Summit</h3>
+                                <div class="chatbot-card-status">ICAI 2024</div>
+                            </div>
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                        <div class="chatbot-card-body">
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">📅</span>
+                                <span>Jun 15 - Jun 18, 2024</span>
+                            </div>
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">👥</span>
+                                <span>234 participants</span>
+                            </div>
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">💬</span>
+                                <span>1,245 conversations</span>
+                            </div>
+                        </div>
+                        <div class="chatbot-card-footer">
+                            <button class="btn btn-sm btn-secondary">✏️ Edit</button>
+                            <button class="btn btn-sm btn-secondary">⚙️ Settings</button>
+                            <button class="btn btn-sm btn-danger" data-action="delete" data-id="1" data-name="AI Research Summit">🗑️ Delete</button>
+                        </div>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div class="chatbot-card">
+                        <div class="chatbot-card-header">
+                            <div>
+                                <h3 class="chatbot-card-title">ML Conference</h3>
+                                <div class="chatbot-card-status">ML Expo 2024</div>
+                            </div>
+                            <span class="badge badge-info">Pending</span>
+                        </div>
+                        <div class="chatbot-card-body">
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">📅</span>
+                                <span>Jul 20 - Jul 22, 2024</span>
+                            </div>
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">👥</span>
+                                <span>156 participants</span>
+                            </div>
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">💬</span>
+                                <span>Setup in progress</span>
+                            </div>
+                        </div>
+                        <div class="chatbot-card-footer">
+                            <button class="btn btn-sm btn-secondary">✏️ Edit</button>
+                            <button class="btn btn-sm btn-secondary">⚙️ Settings</button>
+                            <button class="btn btn-sm btn-danger" data-action="delete" data-id="2" data-name="ML Conference">🗑️ Delete</button>
+                        </div>
+                    </div>
+
+                    <!-- Card 3 -->
+                    <div class="chatbot-card">
+                        <div class="chatbot-card-header">
+                            <div>
+                                <h3 class="chatbot-card-title">Data Science Workshop</h3>
+                                <div class="chatbot-card-status">Data Con 2024</div>
+                            </div>
+                            <span class="badge badge-warning">Expired</span>
+                        </div>
+                        <div class="chatbot-card-body">
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">📅</span>
+                                <span>Aug 10 - Aug 12, 2024</span>
+                            </div>
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">👥</span>
+                                <span>89 participants</span>
+                            </div>
+                            <div class="chatbot-card-item">
+                                <span class="chatbot-card-item-icon">💬</span>
+                                <span>342 conversations</span>
+                            </div>
+                        </div>
+                        <div class="chatbot-card-footer">
+                            <button class="btn btn-sm btn-secondary">✏️ Edit</button>
+                            <button class="btn btn-sm btn-secondary">⚙️ Settings</button>
+                            <button class="btn btn-sm btn-danger" data-action="delete" data-id="3" data-name="Data Science Workshop">🗑️ Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table View Alternative -->
+                <div class="card mt-2xl">
+                    <div class="card-header">
+                        <h2>Detailed View</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Event</th>
+                                    <th>Date Range</th>
+                                    <th>Status</th>
+                                    <th>Users</th>
+                                    <th>Conversations</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>AI Research Summit</td>
+                                    <td>ICAI 2024</td>
+                                    <td>Jun 15 - Jun 18</td>
+                                    <td><span class="status-indicator status-active"><span class="status-dot"></span> Active</span></td>
+                                    <td>234</td>
+                                    <td>1,245</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon btn-secondary">✏️</button>
+                                        <button class="btn btn-sm btn-icon btn-danger">🗑️</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>ML Conference</td>
+                                    <td>ML Expo 2024</td>
+                                    <td>Jul 20 - Jul 22</td>
+                                    <td><span class="status-indicator status-pending"><span class="status-dot"></span> Pending</span></td>
+                                    <td>156</td>
+                                    <td>—</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon btn-secondary">✏️</button>
+                                        <button class="btn btn-sm btn-icon btn-danger">🗑️</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Data Science Workshop</td>
+                                    <td>Data Con 2024</td>
+                                    <td>Aug 10 - Aug 12</td>
+                                    <td><span class="status-indicator status-inactive"><span class="status-dot"></span> Expired</span></td>
+                                    <td>89</td>
+                                    <td>342</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-icon btn-secondary">✏️</button>
+                                        <button class="btn btn-sm btn-icon btn-danger">🗑️</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

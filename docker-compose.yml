@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # Frontend Service
+  frontend:
+    image: node:18-alpine
+    container_name: convergeai-frontend
+    working_dir: /app/frontend
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c 'npx http-server -p 8000 --cors'
+    environment:
+      - API_URL=http://backend:5000/api
+    depends_on:
+      - backend
+    networks:
+      - convergeai-network
+
+  # Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: convergeai-backend
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=False
+      - DATABASE_URL=sqlite:///./chat_system.db
+      - SECRET_KEY=docker-secret-key-change-in-production
+      - JWT_SECRET_KEY=docker-jwt-secret-change-in-production
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app/backend
+      - ./database:/app/database
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      - db
+    networks:
+      - convergeai-network
+    restart: unless-stopped
+
+  # Database Service (Optional - SQLite runs in file)
+  # Uncomment for PostgreSQL or MySQL
+  
+  # PostgreSQL Example:
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: convergeai-db
+  #   environment:
+  #     POSTGRES_DB: convergeai_chatbot
+  #     POSTGRES_USER: convergeai
+  #     POSTGRES_PASSWORD: change-in-production
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - db_data:/var/lib/postgresql/data
+  #   networks:
+  #     - convergeai-network
+  #   restart: unless-stopped
+  
+  # SQLite runs file-based, no separate service needed
+  db:
+    image: alpine:latest
+    container_name: convergeai-db-init
+    command: echo "Using SQLite - no separate database container needed"
+    networks:
+      - convergeai-network
+
+  # Redis (Optional - for caching/sessions)
+  # Uncomment to enable Redis
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: convergeai-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - convergeai-network
+  #   restart: unless-stopped
+
+  # Nginx Reverse Proxy (Optional - for production)
+  # Uncomment to enable Nginx
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: convergeai-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - backend
+  #     - frontend
+  #   networks:
+  #     - convergeai-network
+  #   restart: unless-stopped
+
+networks:
+  convergeai-network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# Usage Instructions:
+# 
+# Build images:
+#   docker-compose build
+#
+# Start services:
+#   docker-compose up -d
+#
+# View logs:
+#   docker-compose logs -f backend
+#   docker-compose logs -f frontend
+#
+# Stop services:
+#   docker-compose down
+#
+# Stop and remove volumes:
+#   docker-compose down -v
+#
+# Execute commands in container:
+#   docker-compose exec backend python database/init_db.py
+#
+# Access application:
+#   Frontend: http://localhost:8000
+#   Backend API: http://localhost:5000/api
