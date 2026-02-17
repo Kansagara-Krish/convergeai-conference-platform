@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <script src="../js/utils.js"></script>
+    <script src="../js/admin.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <div class="brand-icon">🤖</div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item active">
+                        <span class="menu-icon">📊</span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item">
+                        <span class="menu-icon">➕</span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item">
+                        <span class="menu-icon">📋</span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon">👥</span>
+                        <span>Guest Management</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item">
+                        <span class="menu-icon">👨‍💼</span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item">
+                        <span class="menu-icon">📥</span>
+                        <span>Import Users</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Settings</div>
+                    <a href="#" class="menu-item">
+                        <span class="menu-icon">⚙️</span>
+                        <span>System Settings</span>
+                    </a>
+                    <a href="#" class="menu-item">
+                        <span class="menu-icon">🔐</span>
+                        <span>Security</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <button class="btn btn-ghost" data-action="logout" style="width: 100%;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>Dashboard</h1>
+                    <div class="header-breadcrumb">
+                        <a href="dashboard.html">Home</a>
+                        <span>/</span>
+                        <span>Dashboard</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="header-search">
+                        <input type="text" placeholder="Search chatbots...">
+                    </div>
+                    <div class="header-user-menu">
+                        <button class="header-user-btn">
+                            <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
+                            <span>👤</span>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="#" class="dropdown-item">👤 My Profile</a>
+                            <a href="#" class="dropdown-item">⚙️ Settings</a>
+                            <a href="#" class="dropdown-item" data-action="logout">🚪 Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="admin-content">
+                <!-- Statistics -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon primary">🤖</div>
+                        <div class="stat-value" id="total-chatbots">0</div>
+                        <div class="stat-label">Total Chatbots</div>
+                        <div class="stat-change positive">↑ 2 this week</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon success">📅</div>
+                        <div class="stat-value" id="active-events">0</div>
+                        <div class="stat-label">Active Events</div>
+                        <div class="stat-change positive">✓ Live now</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon warning">👥</div>
+                        <div class="stat-value" id="total-users">0</div>
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-change positive">↑ 125 new</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon danger">📆</div>
+                        <div class="stat-value" id="upcoming-events">0</div>
+                        <div class="stat-label">Upcoming Events</div>
+                        <div class="stat-change positive">Next 30 days</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card mt-2xl">
+                    <div class="card-header">
+                        <h2>Quick Actions</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="grid grid-4">
+                            <a href="create-chatbot.html" class="btn btn-primary" style="text-align: center;">
+                                ➕ New Chatbot
+                            </a>
+                            <a href="import-excel.html" class="btn btn-secondary" style="text-align: center;">
+                                📥 Import Users
+                            </a>
+                            <a href="chatbot-list.html" class="btn btn-secondary" style="text-align: center;">
+                                📋 View All
+                            </a>
+                            <a href="user-management.html" class="btn btn-secondary" style="text-align: center;">
+                                👥 Manage Users
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Chatbots -->
+                <div class="card mt-2xl">
+                    <div class="card-header">
+                        <h2>Recent Chatbots</h2>
+                        <a href="chatbot-list.html" class="btn btn-sm btn-ghost">View All</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Event</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Users</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>AI Research Summit</td>
+                                        <td>ICAI 2024</td>
+                                        <td>2024-06-15</td>
+                                        <td><span class="status-indicator status-active"><span class="status-dot"></span> Active</span></td>
+                                        <td>234</td>
+                                        <td>
+                                            <div class="table-actions">
+                                                <button class="btn btn-sm btn-icon btn-secondary">✏️</button>
+                                                <button class="btn btn-sm btn-icon btn-danger">🗑️</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>ML Conference</td>
+                                        <td>ML Expo 2024</td>
+                                        <td>2024-07-20</td>
+                                        <td><span class="status-indicator status-pending"><span class="status-dot"></span> Pending</span></td>
+                                        <td>156</td>
+                                        <td>
+                                            <div class="table-actions">
+                                                <button class="btn btn-sm btn-icon btn-secondary">✏️</button>
+                                                <button class="btn btn-sm btn-icon btn-danger">🗑️</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Data Science Workshop</td>
+                                        <td>Data Con 2024</td>
+                                        <td>2024-08-10</td>
+                                        <td><span class="status-indicator status-inactive"><span class="status-dot"></span> Inactive</span></td>
+                                        <td>89</td>
+                                        <td>
+                                            <div class="table-actions">
+                                                <button class="btn btn-sm btn-icon btn-secondary">✏️</button>
+                                                <button class="btn btn-sm btn-icon btn-danger">🗑️</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

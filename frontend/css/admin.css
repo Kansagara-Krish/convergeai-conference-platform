@@ -1,0 +1,784 @@
+/* ============================================
+   ADMIN PANEL STYLES
+   ============================================ */
+
+/* ============================================
+   1. ADMIN LAYOUT
+   ============================================ */
+
+.admin-container {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  gap: 0;
+}
+
+.admin-sidebar {
+  background: linear-gradient(180deg, rgba(15, 20, 33, 0.95), rgba(26, 31, 46, 0.95));
+  border-right: 1px solid var(--border-color);
+  padding: var(--spacing-xl) 0;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 100vh;
+  overflow-y: auto;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-main {
+  margin-left: 260px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.admin-header {
+  background: linear-gradient(90deg, rgba(26, 31, 46, 0.8), rgba(30, 41, 59, 0.8));
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.admin-content {
+  flex: 1;
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+}
+
+/* ============================================
+   2. SIDEBAR STYLING
+   ============================================ */
+
+.sidebar-brand {
+  padding: 0 var(--spacing-lg) var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.brand-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.sidebar-menu {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--spacing-md);
+}
+
+.menu-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.menu-label {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-xs);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  color: var(--text-secondary);
+  text-decoration: none;
+  position: relative;
+  font-weight: 500;
+}
+
+.menu-item:hover {
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--text-primary);
+  transform: translateX(4px);
+}
+
+.menu-item.active {
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.2), transparent);
+  color: var(--accent-blue);
+  border-left: 3px solid var(--accent-blue);
+  padding-left: calc(var(--spacing-lg) - 3px);
+}
+
+.menu-icon {
+  font-size: 1.25rem;
+  width: 24px;
+}
+
+.menu-badge {
+  margin-left: auto;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.sidebar-footer {
+  padding: var(--spacing-lg) var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: rgba(79, 70, 229, 0.1);
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   3. ADMIN HEADER
+   ============================================ */
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.header-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.header-breadcrumb a {
+  color: var(--accent-blue);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.header-search {
+  position: relative;
+  width: 300px;
+}
+
+.header-search input {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  padding-left: var(--spacing-xl);
+  background: rgba(79, 70, 229, 0.1);
+  border: 1px solid var(--border-color);
+}
+
+.header-search::before {
+  content: '🔍';
+  position: absolute;
+  left: var(--spacing-md);
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.5;
+}
+
+.header-user-menu {
+  position: relative;
+}
+
+.header-user-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  background: rgba(79, 70, 229, 0.1);
+  border: 1px solid var(--border-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.header-user-btn:hover {
+  background: rgba(79, 70, 229, 0.2);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-sm);
+  min-width: 200px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transition: all var(--transition-base);
+  z-index: 50;
+}
+
+.dropdown-menu.active {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: rgba(79, 70, 229, 0.1);
+}
+
+/* ============================================
+   4. DASHBOARD STATS
+   ============================================ */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-2xl);
+}
+
+.stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.15), transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.stat-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.stat-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  margin-bottom: var(--spacing-lg);
+  position: relative;
+  z-index: 1;
+}
+
+.stat-icon.primary {
+  background: rgba(79, 70, 229, 0.2);
+}
+
+.stat-icon.success {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.stat-icon.warning {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.stat-icon.danger {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-sm);
+  position: relative;
+  z-index: 1;
+}
+
+.stat-label {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  position: relative;
+  z-index: 1;
+}
+
+.stat-change {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-change.positive {
+  color: var(--success);
+}
+
+.stat-change.negative {
+  color: var(--danger);
+}
+
+/* ============================================
+   5. CHATBOT CARDS
+   ============================================ */
+
+.chatbot-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-base);
+  display: flex;
+  flex-direction: column;
+}
+
+.chatbot-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(79, 70, 229, 0.3);
+  box-shadow: 0 20px 40px rgba(79, 70, 229, 0.15);
+}
+
+.chatbot-card-header {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(147, 51, 234, 0.1));
+  padding: var(--spacing-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.chatbot-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.chatbot-card-status {
+  margin-top: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.chatbot-card-body {
+  padding: var(--spacing-lg);
+  flex: 1;
+}
+
+.chatbot-card-item {
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 0.95rem;
+}
+
+.chatbot-card-item-icon {
+  width: 20px;
+  color: var(--accent-blue);
+}
+
+.chatbot-card-footer {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+}
+
+.chatbot-card-footer .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ============================================
+   6. FORM LAYOUTS
+   ============================================ */
+
+.form-layout {
+  max-width: 900px;
+}
+
+.form-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.form-section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-row.full {
+  grid-template-columns: 1fr;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+  margin-top: var(--spacing-2xl);
+  padding-top: var(--spacing-xl);
+  border-top: 1px solid var(--border-color);
+}
+
+/* ============================================
+   7. SPECIAL FORM ELEMENTS
+   ============================================ */
+
+.rich-editor {
+  height: 400px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: rgba(30, 41, 59, 0.5);
+  padding: var(--spacing-md);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+
+.file-upload {
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.file-upload:hover {
+  border-color: var(--accent-blue);
+  background: rgba(79, 70, 229, 0.1);
+}
+
+.file-upload-icon {
+  font-size: 2.5rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.file-upload-text {
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.file-upload-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.date-range-picker {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--spacing-md);
+  align-items: end;
+}
+
+.date-range-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* ============================================
+   8. DATA TABLES
+   ============================================ */
+
+.table-container {
+  overflow-x: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.table thead tr {
+  border-bottom: 2px solid var(--border-color);
+}
+
+.table th {
+  padding: var(--spacing-md) var(--spacing-lg);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.table td {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.table tbody tr:hover {
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.table-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.table-action-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+/* ============================================
+   9. EMPTY STATES
+   ============================================ */
+
+.empty-state {
+  padding: var(--spacing-2xl);
+  text-align: center;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  background: rgba(79, 70, 229, 0.02);
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-lg);
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+}
+
+.empty-state-text {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* ============================================
+   10. RESPONSIVE - ADMIN
+   ============================================ */
+
+@media (max-width: 1024px) {
+  .admin-container {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: absolute;
+    left: -260px;
+    transition: left var(--transition-base);
+    z-index: 200;
+  }
+
+  .admin-sidebar.active {
+    left: 0;
+  }
+
+  .admin-main {
+    margin-left: 0;
+  }
+
+  .header-search {
+    width: 200px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .header-search {
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chatbot-card-footer .btn {
+    flex: initial;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .table {
+    min-width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar-brand {
+    padding: 0 var(--spacing-md) var(--spacing-lg);
+  }
+
+  .menu-label {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .menu-item {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .admin-header {
+    padding: var(--spacing-md);
+  }
+
+  .header-title {
+    width: 100%;
+  }
+
+  .admin-content {
+    padding: var(--spacing-md);
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    left: -100%;
+  }
+}

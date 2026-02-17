@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/user.css">
+    <link rel="stylesheet" href="../css/chat.css">
+    <script src="../js/utils.js"></script>
+    <script src="../js/main.js"></script>
+</head>
+<body>
+    <div class="user-container">
+        <!-- Header -->
+        <header class="user-header">
+            <div class="user-header-content">
+                <div class="user-logo">
+                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🤖</div>
+                    <span>ConvergeAI Chat</span>
+                </div>
+
+                <nav class="user-nav">
+                    <a href="dashboard.html" class="user-nav-item">Dashboard</a>
+                    <a href="profile.html" class="user-nav-item">Profile</a>
+                    <div class="user-profile-menu">
+                        <button class="user-profile-btn">
+                            <div class="user-profile-avatar" data-user-name>U</div>
+                            <span>👤</span>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="profile.html" class="dropdown-item">👤 Profile</a>
+                            <a href="#" class="dropdown-item" data-action="logout">🚪 Logout</a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <div style="flex: 1; display: grid; grid-template-columns: 1fr;">
+            <div class="chat-wrapper">
+                <!-- Chat Header -->
+                <div class="chat-header-bar">
+                    <div class="chat-header-info">
+                        <div class="chat-header-avatar">AI</div>
+                        <div class="chat-header-details">
+                            <div class="chat-header-name">AI Research Summit</div>
+                            <div class="chat-header-status">🟢 Online</div>
+                        </div>
+                    </div>
+                    <div class="chat-header-actions">
+                        <button class="btn btn-icon btn-secondary">ℹ️</button>
+                        <button class="btn btn-icon btn-secondary">🔔</button>
+                    </div>
+                </div>
+
+                <!-- Messages Area -->
+                <div class="messages-area">
+                    <!-- Initial Welcome Message -->
+                    <div class="message-group">
+                        <div class="message-avatar bot">🤖</div>
+                        <div class="message-bubble">
+                            <div class="message-text">👋 Welcome to the AI Research Summit Chat! I'm here to help answer your questions about the conference. Feel free to ask about speakers, schedule, or any topics related to AI research.</div>
+                            <div class="message-time">10:30 AM</div>
+                        </div>
+                    </div>
+
+                    <!-- Sample Messages -->
+                    <div class="message-group sent">
+                        <div class="message-bubble">
+                            <div class="message-text">Hi! When is the opening ceremony?</div>
+                            <div class="message-time">10:32 AM</div>
+                        </div>
+                    </div>
+
+                    <div class="message-group">
+                        <div class="message-avatar bot">🤖</div>
+                        <div class="message-bubble">
+                            <div class="message-text">The opening ceremony will take place on June 15, 2024 at 9:00 AM in the Grand Hall. We'll have opening remarks from the conference chair followed by keynote speeches from leading researchers in AI.</div>
+                            <div class="message-time">10:33 AM</div>
+                        </div>
+                    </div>
+
+                    <!-- Date Divider -->
+                    <div class="message-date-divider">
+                        <span>Today</span>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area">
+                    <div class="input-wrapper">
+                        <input type="text" class="input-field" placeholder="Type your message...">
+                    </div>
+                    <div class="input-actions">
+                        <button class="input-action-btn" title="Attach file">📎</button>
+                        <button class="input-action-btn" title="Emoji">😊</button>
+                        <button class="send-btn">📤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .user-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .user-main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+    </style>
+</body>
+</html>

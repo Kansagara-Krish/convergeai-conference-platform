@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Excel - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <script src="../js/utils.js"></script>
+    <script src="../js/admin.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <div class="brand-icon">🤖</div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item">
+                        <span class="menu-icon">📊</span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item">
+                        <span class="menu-icon">➕</span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item">
+                        <span class="menu-icon">📋</span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item">
+                        <span class="menu-icon">👨‍💼</span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item active">
+                        <span class="menu-icon">📥</span>
+                        <span>Import Users</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <button class="btn btn-ghost" data-action="logout" style="width: 100%;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>Import Users from Excel</h1>
+                    <div class="header-breadcrumb">
+                        <a href="dashboard.html">Home</a>
+                        <span>/</span>
+                        <span>Import Excel</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="admin-content">
+                <div class="form-layout">
+                    <!-- Instructions -->
+                    <div class="card mb-lg">
+                        <div class="card-body">
+                            <h3>📋 Import Instructions</h3>
+                            <ul style="margin-left: var(--spacing-lg); color: var(--text-secondary);">
+                                <li>Upload an Excel file (.xlsx) with user emails and names</li>
+                                <li>Required columns: Name, Email</li>
+                                <li>System will auto-generate usernames and temporary passwords</li>
+                                <li>Credentials will be sent to users' email addresses</li>
+                                <li>You can download and print the credentials list</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Import Form -->
+                    <form data-form="import-excel">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Upload File</h3>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="excel-file">Excel File (.xlsx)</label>
+                                    <div class="file-upload">
+                                        <input type="file" id="excel-file" name="excel_file" accept=".xlsx" style="display: none;" required>
+                                        <div class="file-upload-icon">📊</div>
+                                        <div class="file-upload-text">Click or drag Excel file here</div>
+                                        <div class="file-upload-hint">Maximum file size: 10 MB</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="event-select">
+                                        Assign to Event
+                                        <span class="required">*</span>
+                                    </label>
+                                    <select id="event-select" name="event_id" required>
+                                        <option value="">Select an event...</option>
+                                        <option value="1">AI Research Summit</option>
+                                        <option value="2">ML Conference</option>
+                                        <option value="3">Data Science Workshop</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="role-select">Default User Role</label>
+                                    <select id="role-select" name="default_role">
+                                        <option value="user">User</option>
+                                        <option value="moderator">Moderator</option>
+                                        <option value="speaker">Speaker</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="import-preview" style="margin-top: var(--spacing-lg); padding: var(--spacing-lg); background: rgba(79, 70, 229, 0.1); border-radius: var(--radius-md); border: 1px dashed var(--border-color); color: var(--text-secondary);">
+                                No file selected
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <a href="user-management.html" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                📥 Import & Generate Credentials
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Previous Imports -->
+                <div class="card mt-2xl">
+                    <div class="card-header">
+                        <h2>Recent Imports</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Event</th>
+                                    <th>Users Imported</th>
+                                    <th>File</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>2024-02-10</td>
+                                    <td>AI Research Summit</td>
+                                    <td>250</td>
+                                    <td>icai_users.xlsx</td>
+                                    <td><span class="badge badge-success">Completed</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary">📥 Download List</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2024-01-25</td>
+                                    <td>ML Conference</td>
+                                    <td>180</td>
+                                    <td>ml_users.xlsx</td>
+                                    <td><span class="badge badge-success">Completed</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary">📥 Download List</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
