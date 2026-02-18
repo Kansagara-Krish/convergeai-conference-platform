@@ -128,6 +128,9 @@ class Chatbot(db.Model):
             'end_date': self.end_date.isoformat(),
             'status': self.status,
             'active': self.active,
+            'system_prompt': self.system_prompt,
+            'single_mode': self.single_mode,
+            'multiple_mode': self.multiple_mode,
             'guests_count': len(self.guests),
             'messages_count': len(self.messages),
             'created_at': self.created_at.isoformat(),
@@ -229,6 +232,9 @@ class SessionToken(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    user = db.relationship('User', backref=db.backref('tokens', lazy=True))
     
     @staticmethod
     def generate_token():

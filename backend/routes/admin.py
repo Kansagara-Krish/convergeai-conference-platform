@@ -27,6 +27,7 @@ def get_stats(user):
     stats = {
         'total_chatbots': Chatbot.query.count(),
         'active_chatbots': Chatbot.query.filter_by(active=True).count(),
+        'total_guests': Guest.query.count(),
         'total_users': User.query.count(),
         'active_users': User.query.filter_by(active=True).count(),
         'total_messages': Message.query.count(),
@@ -203,6 +204,8 @@ def delete_chatbot(user, chatbot_id):
         'message': 'Chatbot deleted successfully'
     }), 200
 
+
+
 # ============================================
 # Guest Management
 # ============================================
@@ -255,6 +258,39 @@ def add_guest(user, chatbot_id):
         'message': 'Guest added successfully',
         'data': guest.to_dict()
     }), 201
+
+@admin_bp.route('/guests', methods=['GET'])
+@token_required
+@admin_required
+def list_all_guests(user):
+    """List all guests across all chatbots"""
+    
+    guests = Guest.query.all()
+    
+    return jsonify({
+        'success': True,
+        'data': [guest.to_dict() for guest in guests],
+        'count': len(guests)
+    }), 200
+
+@admin_bp.route('/guests/<int:guest_id>', methods=['DELETE'])
+@token_required
+@admin_required
+def delete_guest(user, guest_id):
+    """Delete a guest"""
+    
+    guest = Guest.query.get(guest_id)
+    
+    if not guest:
+        return jsonify({'success': False, 'message': 'Guest not found'}), 404
+    
+    db.session.delete(guest)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Guest deleted successfully'
+    }), 200
 
 # ============================================
 # Import Users

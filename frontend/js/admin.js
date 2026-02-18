@@ -2,16 +2,45 @@
    ADMIN PANEL FUNCTIONALITY
    ============================================ */
 
+const AdminAuth = {
+  isAdminSession() {
+    if (typeof AppAuth !== "undefined" && AppAuth?.isAdminSession) {
+      return AppAuth.isAdminSession();
+    }
+
+    const token = Storage?.getToken ? Storage.getToken() : null;
+    const user = Storage?.getUser ? Storage.getUser() : null;
+    return Boolean(token && user && user.role === "admin");
+  },
+
+  redirectToLogin() {
+    if (typeof AppAuth !== "undefined" && AppAuth?.redirectToLogin) {
+      AppAuth.redirectToLogin();
+      return;
+    }
+
+    window.location.href = "../index.html";
+  },
+};
+
 class AdminPanel {
   constructor() {
     this.currentChatbotId = null;
+    this.sidebarRefreshInterval = null;
     this.init();
   }
 
   init() {
+    if (!AdminAuth.isAdminSession()) {
+      NotificationManager.warning("Please login as admin to continue");
+      AdminAuth.redirectToLogin();
+      return;
+    }
+
     this.setupSidebar();
     this.setupHeader();
     this.setupEventListeners();
+    this.startSidebarBadgeRefresh();
     this.loadDashboardData();
   }
 
@@ -30,7 +59,7 @@ class AdminPanel {
       }
     });
 
-    // Sidebar toggle for mobile (keep existing logic for mobile overlay if needed, 
+    // Sidebar toggle for mobile (keep existing logic for mobile overlay if needed,
     // but the new toggle works for desktop too)
     const hamburger = DomUtils.$(".hamburger-menu");
     if (hamburger) {
@@ -46,6 +75,72 @@ class AdminPanel {
           DomUtils.removeClass(sidebar, "active");
         }
       });
+    });
+
+    this.resetSidebarBadges();
+  }
+
+  resetSidebarBadges() {
+    const chatbotBadge = document.querySelector(
+      '.sidebar-menu a[href="chatbot-list.html"] .menu-badge',
+    );
+    const usersBadge = document.querySelector(
+      '.sidebar-menu a[href="user-management.html"] .menu-badge',
+    );
+
+    [chatbotBadge, usersBadge].forEach((badge) => {
+      if (!badge) return;
+      badge.textContent = "";
+      badge.style.display = "none";
+    });
+  }
+
+  setSidebarBadge(selector, value) {
+    const badge = document.querySelector(selector);
+    if (!badge) return;
+
+    const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0;
+    badge.textContent = safeValue;
+    badge.style.display = safeValue > 0 ? "inline-block" : "none";
+  }
+
+  updateSidebarBadges(stats) {
+    if (!stats) return;
+
+    this.setSidebarBadge(
+      '.sidebar-menu a[href="chatbot-list.html"] .menu-badge',
+      stats.total_chatbots,
+    );
+    this.setSidebarBadge(
+      '.sidebar-menu a[href="user-management.html"] .menu-badge',
+      stats.total_users,
+    );
+  }
+
+  async loadSidebarCounts() {
+    try {
+      const response = await API.get("/api/admin/dashboard/stats");
+      this.updateSidebarBadges(response.data);
+    } catch (error) {
+      console.error("Error loading sidebar counts:", error);
+    }
+  }
+
+  startSidebarBadgeRefresh() {
+    this.loadSidebarCounts();
+
+    if (this.sidebarRefreshInterval) {
+      clearInterval(this.sidebarRefreshInterval);
+    }
+
+    this.sidebarRefreshInterval = setInterval(() => {
+      this.loadSidebarCounts();
+    }, 30000);
+
+    window.addEventListener("beforeunload", () => {
+      if (this.sidebarRefreshInterval) {
+        clearInterval(this.sidebarRefreshInterval);
+      }
     });
   }
 
@@ -66,9 +161,14 @@ class AdminPanel {
     }
 
     // Logout handler
-    const logoutBtn = DomUtils.$('[data-action="logout"]');
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", () => this.logout());
+    const logoutBtns = DomUtils.$$('[data-action="logout"]');
+    if (logoutBtns) {
+      logoutBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          this.logout();
+        });
+      });
     }
   }
 
@@ -96,23 +196,26 @@ class AdminPanel {
 
   async loadDashboardStats() {
     try {
-      // Simulated data - replace with API call
-      const stats = {
-        totalChatbots: 12,
-        activeEvents: 5,
-        totalUsers: 847,
-        upcomingEvents: 3,
-      };
+      const response = await API.get("/api/admin/dashboard/stats");
+      const stats = response.data;
+      this.updateSidebarBadges(stats);
 
       // Update stat cards
-      this.updateStatCard("total-chatbots", stats.totalChatbots);
-      this.updateStatCard("total-users", stats.totalUsers);
-      this.updateStatCard("upcoming-events", stats.upcomingEvents);
+      this.updateStatCard("total-chatbots", stats.total_chatbots);
+      this.updateStatCard("total-users", stats.total_users);
+      // If there's a card for total guests, update it too.
+      // Note: Dashboard currently has total-users.
+      // If we want to show guests, we might need to change the HTML or ID.
+      // For now, let's assume total-users is what's displayed.
 
-      // NotificationManager.success("Dashboard loaded successfully"); // Removed as requested
+      this.updateStatCard("upcoming-events", stats.upcoming_events);
+
+      // Update other stats if elements exist
+      this.updateStatCard("active-chatbots", stats.active_chatbots);
+      this.updateStatCard("total-guests", stats.total_guests);
     } catch (error) {
       console.error("Error loading dashboard:", error);
-      NotificationManager.error("Failed to load dashboard");
+      NotificationManager.error("Failed to load dashboard stats");
     }
   }
 
@@ -130,7 +233,7 @@ class AdminPanel {
   async deleteChatbot(id) {
     try {
       // API call to delete
-      await API.delete(`/api/chatbots/${id}`);
+      await API.delete(`/api/admin/chatbots/${id}`);
       NotificationManager.success("Chatbot deleted successfully");
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
@@ -143,11 +246,9 @@ class AdminPanel {
     Storage.clear();
     NotificationManager.success("Logging out...");
     setTimeout(() => {
-      window.location.href = "/index.html";
+      AdminAuth.redirectToLogin();
     }, 500);
   }
-
-
 }
 
 // ============================================
@@ -166,7 +267,60 @@ class ChatbotFormHandler {
     this.form.addEventListener("submit", (e) => this.handleSubmit(e));
     this.setupFileUpload();
     this.setupRichEditor();
+    this.setupRichEditor();
     this.setupDatePicker();
+
+    // Check for edit mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get("id");
+    if (id) {
+      this.loadChatbotData(id);
+    }
+  }
+
+  async loadChatbotData(id) {
+    try {
+      const response = await API.get(`/api/chatbots/${id}`);
+      const bot = response.data;
+
+      // Switch to edit mode
+      this.form.dataset.action = "edit";
+      DomUtils.$(".header-title h1").textContent = "Edit Chatbot";
+      DomUtils.$(".header-breadcrumb span:last-child").textContent =
+        "Edit Chatbot";
+      DomUtils.$('button[type="submit"]').textContent = "💾 Save Changes";
+
+      // Add hidden ID field
+      const idInput = document.createElement("input");
+      idInput.type = "hidden";
+      idInput.name = "id";
+      idInput.value = bot.id;
+      this.form.appendChild(idInput);
+
+      // Populate fields
+      const fields = {
+        name: bot.name,
+        event_name: bot.event_name,
+        start_date: bot.start_date,
+        end_date: bot.end_date,
+        description: bot.description,
+        system_prompt: bot.system_prompt,
+      };
+
+      for (const [name, value] of Object.entries(fields)) {
+        const input = this.form.querySelector(`[name="${name}"]`);
+        if (input) input.value = value;
+      }
+
+      // checkboxes
+      if (bot.single_mode) DomUtils.$("#single-mode").checked = true;
+      if (bot.multiple_mode) DomUtils.$("#multiple-mode").checked = true;
+
+      NotificationManager.info("Loaded chatbot details for editing");
+    } catch (error) {
+      console.error("Error loading chatbot:", error);
+      NotificationManager.error("Failed to load chatbot details");
+    }
   }
 
   setupFileUpload() {
@@ -281,12 +435,13 @@ class ChatbotFormHandler {
         `Chatbot ${isEdit ? "updated" : "created"} successfully`,
       );
       setTimeout(
-        () => (window.location.href = "/admin/chatbot-list.html"),
-        1000,
+        () =>
+          (window.location.href = `chatbot-list.html?msg=${isEdit ? "updated" : "created"}`),
+        500,
       );
     } catch (error) {
       console.error("Form submission error:", error);
-      NotificationManager.error("Failed to save chatbot");
+      NotificationManager.error(error.message || "Failed to save chatbot");
     }
   }
 }
@@ -383,16 +538,16 @@ class ImportExcelHandler {
           </thead>
           <tbody>
             ${credentials
-        .map(
-          (cred) => `
+              .map(
+                (cred) => `
               <tr>
                 <td>${cred.username}</td>
                 <td style="font-family: var(--font-mono); font-size: 0.85rem;">${cred.password}</td>
                 <td>${cred.email}</td>
               </tr>
             `,
-        )
-        .join("")}
+              )
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -524,6 +679,352 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize form handlers
   window.chatbotForm = new ChatbotFormHandler();
+  window.chatbotList = new ChatbotListHandler();
   window.importExcel = new ImportExcelHandler();
   window.userManagement = new UserManagementHandler();
+  window.guestManagement = new GuestManagementHandler();
 });
+
+// ============================================
+// CHATBOT LIST HANDLER
+// ============================================
+
+class ChatbotListHandler {
+  constructor() {
+    // Check if we are on the chatbot list page
+    if (
+      document.getElementById("chatbot-grid") ||
+      document.querySelector('table[data-table="chatbots"]')
+    ) {
+      this.grid = document.getElementById("chatbot-grid");
+      this.table = document.querySelector('table[data-table="chatbots"]');
+      this.init();
+    }
+  }
+
+  init() {
+    this.loadChatbots();
+    this.setupEventListeners();
+    this.checkSuccessMessage();
+  }
+
+  checkSuccessMessage() {
+    const params = new URLSearchParams(window.location.search);
+    const msg = params.get("msg");
+    if (msg === "created") {
+      NotificationManager.success("✨ Chatbot created successfully!");
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (msg === "updated") {
+      NotificationManager.success("✅ Chatbot updated successfully!");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+
+  setupEventListeners() {
+    // Delegate delete events
+    const handleDelete = (e) => {
+      const btn = e.target.closest('[data-action="delete"]');
+      if (btn) {
+        e.preventDefault();
+        const id = btn.dataset.id;
+        const name = btn.dataset.name;
+        this.confirmDelete(id, name);
+      }
+    };
+
+    if (this.table) {
+      this.table.addEventListener("click", handleDelete);
+    }
+
+    if (this.grid) {
+      this.grid.addEventListener("click", handleDelete);
+    }
+  }
+
+  confirmDelete(id, name) {
+    ModalManager.confirm(`Are you sure you want to delete "${name}"?`, () =>
+      this.deleteChatbot(id),
+    );
+  }
+
+  async deleteChatbot(id) {
+    try {
+      await API.delete(`/api/admin/chatbots/${id}`);
+      NotificationManager.success("Chatbot deleted successfully");
+      this.loadChatbots(); // Reload list
+    } catch (error) {
+      console.error("Delete error:", error);
+      NotificationManager.error("Failed to delete chatbot");
+    }
+  }
+
+  async loadChatbots() {
+    try {
+      const response = await API.get("/api/admin/chatbots");
+      const chatbots = this.normalizeChatbots(response);
+      this.render(chatbots);
+
+      // Update sidebar badge if it exists
+      const badge = document.querySelector(".menu-item.active .menu-badge");
+      if (badge) {
+        badge.textContent = chatbots.length;
+        badge.style.display = chatbots.length > 0 ? "inline-block" : "none";
+      }
+    } catch (error) {
+      console.error("Error loading chatbots:", error);
+      NotificationManager.error("Failed to load chatbots");
+      this.renderLoadError(error?.message || "Unable to load chatbots");
+    }
+  }
+
+  normalizeChatbots(response) {
+    if (Array.isArray(response?.data)) {
+      return response.data;
+    }
+
+    if (Array.isArray(response?.data?.items)) {
+      return response.data.items;
+    }
+
+    if (Array.isArray(response?.items)) {
+      return response.items;
+    }
+
+    return [];
+  }
+
+  renderLoadError(message) {
+    if (this.grid) {
+      this.grid.innerHTML =
+        '<div class="col-span-3 text-center py-xl text-muted">Failed to load chatbots. Please refresh and try again.</div>';
+    }
+
+    if (this.table) {
+      const tbody = this.table.querySelector("tbody");
+      if (tbody) {
+        tbody.innerHTML =
+          '<tr><td colspan="7" class="text-center py-xl text-muted">Failed to load chatbots. Please refresh and try again.</td></tr>';
+      }
+    }
+
+    if (message) {
+      console.error("Chatbot list load error detail:", message);
+    }
+  }
+
+  render(chatbots) {
+    // Render Table
+    if (this.table) {
+      const tbody = this.table.querySelector("tbody");
+      if (tbody) {
+        if (chatbots.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="7" class="text-center">No chatbots found.</td></tr>';
+        } else {
+          tbody.innerHTML = chatbots
+            .map(
+              (bot) => `
+                    <tr>
+                        <td>
+                            <div class="chatbot-info">
+                                <div class="chatbot-name">${bot.name}</div>
+                            </div>
+                        </td>
+                  <td>${bot.event_name || "-"}</td>
+                        <td>${DateUtils.formatDateRange(bot.start_date, bot.end_date)}</td>
+                        <td><span class="status-indicator status-${bot.status}"><span class="status-dot"></span> ${bot.status}</span></td>
+                        <td>${bot.guests_count || 0}</td>
+                        <td>${bot.messages_count || 0}</td>
+                        <td>
+                            <div class="table-actions">
+                                <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-icon btn-secondary"><i class="fas fa-edit"></i></a>
+                                <button class="btn btn-sm btn-icon btn-danger" data-action="delete" data-id="${bot.id}" data-name="${bot.name}"><i class="fas fa-trash"></i></button>
+                                <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-icon btn-secondary"><i class="fas fa-cog"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                `,
+            )
+            .join("");
+        }
+      }
+    }
+
+    // Render Grid
+    if (this.grid) {
+      if (chatbots.length === 0) {
+        this.grid.innerHTML =
+          '<div class="col-span-3 text-center py-xl text-muted">No chatbots found. Create one to get started!</div>';
+      } else {
+        this.grid.innerHTML = chatbots
+          .map(
+            (bot) => `
+                <div class="chatbot-card">
+                    <div class="chatbot-card-header">
+                        <div>
+                            <h3 class="chatbot-card-title">${bot.name}</h3>
+                            <div class="chatbot-card-status">${bot.event_name}</div>
+                        </div>
+                        <span class="badge badge-${this.getStatusBadgeClass(bot.status)}">${bot.status}</span>
+                    </div>
+                    <div class="chatbot-card-body">
+                        <div class="chatbot-card-item">
+                            <span class="chatbot-card-item-icon"><i class="fas fa-calendar-alt"></i></span>
+                            <span>${DateUtils.formatDateRange(bot.start_date, bot.end_date)}</span>
+                        </div>
+                        <div class="chatbot-card-item">
+                            <span class="chatbot-card-item-icon"><i class="fas fa-users"></i></span>
+                            <span>${bot.guests_count || 0} participants</span>
+                        </div>
+                        <div class="chatbot-card-item">
+                            <span class="chatbot-card-item-icon"><i class="fas fa-comments"></i></span>
+                            <span>${bot.messages_count || 0} conversations</span>
+                        </div>
+                    </div>
+                    <div class="chatbot-card-footer">
+                        <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-secondary"><i class="fas fa-edit"></i> Edit</a>
+                        <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-secondary"><i class="fas fa-cog"></i> Settings</a>
+                        <button class="btn btn-sm btn-danger" data-action="delete" data-id="${bot.id}"
+                            data-name="${bot.name}"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            `,
+          )
+          .join("");
+      }
+    }
+  }
+
+  getStatusBadgeClass(status) {
+    switch (status) {
+      case "active":
+        return "success";
+      case "pending":
+        return "info";
+      case "expired":
+        return "warning";
+      default:
+        return "secondary";
+    }
+  }
+}
+
+// ============================================
+// GUEST MANAGEMENT HANDLER
+// ============================================
+
+class GuestManagementHandler {
+  constructor() {
+    this.table = document.querySelector('table[data-table="guests"]');
+    if (this.table) {
+      this.init();
+    }
+  }
+
+  init() {
+    this.loadGuests();
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    this.table.addEventListener("click", (e) => {
+      const btn = e.target.closest('[data-action="delete"]');
+      if (btn) {
+        const id = btn.dataset.id;
+        this.confirmDelete(id);
+      }
+    });
+  }
+
+  confirmDelete(id) {
+    ModalManager.confirm("Are you sure you want to delete this guest?", () =>
+      this.deleteGuest(id),
+    );
+  }
+
+  async deleteGuest(id) {
+    try {
+      await API.delete(`/api/admin/guests/${id}`);
+      NotificationManager.success("Guest deleted successfully");
+      this.loadGuests();
+    } catch (error) {
+      NotificationManager.error("Failed to delete guest");
+    }
+  }
+
+  async loadGuests() {
+    try {
+      const response = await API.get("/api/admin/guests");
+      const guests = response.data;
+      this.render(guests);
+
+      // Update stats
+      this.updateStats(guests);
+    } catch (error) {
+      console.error("Error loading guests:", error);
+      NotificationManager.error("Failed to load guests");
+    }
+  }
+
+  updateStats(guests) {
+    // Simple stats calculation
+    const total = guests.length;
+    // Mocking status logic since we don't have detailed status in the Guest model yet (only is_speaker, etc.)
+    // Assuming 'Active' for all for now, or based on properties if we add them.
+    // For demonstration, let's treat everyone as 'Active' unless we add a status field.
+    // In a real app we'd filter guests.filter(g => g.status === 'checked_in').length;
+
+    const active = guests.length;
+    const pending = 0; // Placeholder
+    const vip = guests.filter((g) => g.is_speaker).length; // Let's use speakers as VIPs for now
+
+    this.setText("total-guests-count", total);
+    this.setText("active-guests-count", active);
+    this.setText("pending-guests-count", pending);
+    this.setText("vip-guests-count", vip);
+  }
+
+  setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  render(guests) {
+    const tbody = this.table.querySelector("tbody");
+    if (!tbody) return;
+
+    if (guests.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="6" class="text-center">No guests found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = guests
+      .map(
+        (guest) => `
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">
+                            ${guest.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>${guest.name}</div>
+                    </div>
+                </td>
+                <td>${guest.email || "N/A"}</td>
+                <td>${guest.chatbot_id ? "Linked Chatbot" : "General"}</td> <!-- We might need chatbot name here -->
+                <td>${guest.is_speaker ? "Speaker" : "Standard"}</td>
+                <td><span class="status-indicator status-active"><span class="status-dot"></span> Active</span></td>
+                <td>
+                    <div class="table-actions">
+                        <button class="btn btn-sm btn-secondary"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger" data-action="delete" data-id="${guest.id}"><i class="fas fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `,
+      )
+      .join("");
+  }
+}
