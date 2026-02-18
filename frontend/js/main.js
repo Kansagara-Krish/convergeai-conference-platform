@@ -10,7 +10,7 @@ class UserPanel {
 
   init() {
     if (!this.currentUser) {
-      window.location.href = "/index.html";
+      AppAuth.redirectToLogin();
       return;
     }
 
@@ -107,15 +107,15 @@ class UserPanel {
           <div class="chatbot-available-card-footer">
             <div class="chatbot-available-card-participants">
               ${chatbot.participants
-            .slice(0, 3)
-            .map(
-              (p) => `
+                .slice(0, 3)
+                .map(
+                  (p) => `
                 <div class="chatbot-available-card-avatar" title="${p}">
                   ${p.substring(0, 1).toUpperCase()}
                 </div>
               `,
-            )
-            .join("")}
+                )
+                .join("")}
               ${chatbot.participants.length > 3 ? `<span>+${chatbot.participants.length - 3}</span>` : ""}
             </div>
             <button class="btn btn-sm btn-primary" onclick="joinChatbot(${chatbot.id})">
@@ -133,7 +133,7 @@ class UserPanel {
     Storage.clear();
     NotificationManager.success("Logging out...");
     setTimeout(() => {
-      window.location.href = "/index.html";
+      AppAuth.redirectToLogin();
     }, 500);
   }
 }
@@ -406,7 +406,9 @@ class LoginHandler {
   validateAllFields() {
     const usernameValid = this.validateField("username");
     const passwordValid = this.validateField("password");
-    console.log(`Validation result: User=${usernameValid}, Pass=${passwordValid}`); // DEBUG
+    console.log(
+      `Validation result: User=${usernameValid}, Pass=${passwordValid}`,
+    ); // DEBUG
     return usernameValid && passwordValid;
   }
 
@@ -455,10 +457,17 @@ class LoginHandler {
         setTimeout(() => {
           // Use the user role from the backend response
           const userRole = response.user.role;
+          const isFrontendPath = window.location.pathname
+            .toLowerCase()
+            .includes("/frontend/");
           const redirectUrl =
             userRole === "admin"
-              ? "/admin/dashboard.html"
-              : "/user/dashboard.html";
+              ? isFrontendPath
+                ? "admin/dashboard.html"
+                : "frontend/admin/dashboard.html"
+              : isFrontendPath
+                ? "user/dashboard.html"
+                : "frontend/user/dashboard.html";
           console.log(`Redirecting to: ${redirectUrl}`); // DEBUG
           window.location.href = redirectUrl;
         }, 500);
@@ -523,7 +532,7 @@ class ProfilePage {
 
   init() {
     if (!this.currentUser) {
-      window.location.href = "/index.html";
+      AppAuth.redirectToLogin();
       return;
     }
 

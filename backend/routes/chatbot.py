@@ -14,6 +14,27 @@ except ImportError:
 
 chatbot_bp = Blueprint('chatbot', __name__)
 
+
+def to_bool(value, default=False):
+    """Normalize common request boolean formats to real booleans."""
+    if value is None:
+        return default
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, (int, float)):
+        return bool(value)
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ('1', 'true', 'yes', 'on'):
+            return True
+        if normalized in ('0', 'false', 'no', 'off', ''):
+            return False
+
+    return default
+
 # ============================================
 # Create Chatbot
 # ============================================
@@ -25,6 +46,8 @@ def create_chatbot(user):
     """Create a new chatbot"""
     
     data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'message': 'Invalid request body'}), 400
     
     # Validate required fields
     required_fields = ['name', 'event_name', 'start_date', 'end_date', 'system_prompt']
@@ -39,10 +62,10 @@ def create_chatbot(user):
             start_date=datetime.fromisoformat(data['start_date']).date(),
             end_date=datetime.fromisoformat(data['end_date']).date(),
             system_prompt=data['system_prompt'],
-            single_mode=data.get('single_mode', False),
-            multiple_mode=data.get('multiple_mode', True),
-            public=data.get('public', True),
-            active=data.get('active', True),
+            single_mode=to_bool(data.get('single_mode'), False),
+            multiple_mode=to_bool(data.get('multiple_mode'), True),
+            public=to_bool(data.get('public'), True),
+            active=to_bool(data.get('active'), True),
             created_by_id=user.id
         )
         
@@ -88,13 +111,13 @@ def update_chatbot(user, chatbot_id):
     if 'system_prompt' in data:
         chatbot.system_prompt = data['system_prompt']
     if 'public' in data:
-        chatbot.public = data['public']
+        chatbot.public = to_bool(data['public'], chatbot.public)
     if 'active' in data:
-        chatbot.active = data['active']
+        chatbot.active = to_bool(data['active'], chatbot.active)
     if 'single_mode' in data:
-        chatbot.single_mode = data['single_mode']
+        chatbot.single_mode = to_bool(data['single_mode'], chatbot.single_mode)
     if 'multiple_mode' in data:
-        chatbot.multiple_mode = data['multiple_mode']
+        chatbot.multiple_mode = to_bool(data['multiple_mode'], chatbot.multiple_mode)
     
     if 'start_date' in data:
         chatbot.start_date = datetime.fromisoformat(data['start_date']).date()

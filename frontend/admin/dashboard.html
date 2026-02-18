@@ -45,7 +45,7 @@
                         <span class="menu-badge">12</span>
                     </a>
                     <a href="guest-management.html" class="menu-item">
-                        <span class="menu-icon">👥</span>
+                        <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
                         <span>Guest Management</span>
                     </a>
                 </div>
@@ -97,26 +97,21 @@
             <header class="admin-header">
                 <div class="header-title">
                     <h1>Dashboard</h1>
-                    <div class="header-breadcrumb">
-                        <a href="dashboard.html">Home</a>
-                        <span>/</span>
-                        <span>Dashboard</span>
-                    </div>
+
                 </div>
                 <div class="header-actions">
-                    <div class="header-search">
-                        <input type="text" placeholder="Search chatbots...">
-                    </div>
+
                     <div class="header-user-menu">
                         <button class="header-user-btn">
                             <span
                                 style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
-                            <span>👤</span>
+                            <i class="fas fa-chevron-down"></i>
                         </button>
                         <div class="dropdown-menu">
-                            <a href="#" class="dropdown-item">👤 My Profile</a>
-                            <a href="#" class="dropdown-item">⚙️ Settings</a>
-                            <a href="#" class="dropdown-item" data-action="logout">🚪 Logout</a>
+                            <a href="#" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                            <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i>
+                                Logout</a>
                         </div>
                     </div>
                 </div>
@@ -127,28 +122,28 @@
                 <!-- Statistics -->
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-icon primary">🤖</div>
+                        <div class="stat-icon primary"><i class="fas fa-robot"></i></div>
                         <div class="stat-value" id="total-chatbots">0</div>
                         <div class="stat-label">Total Chatbots</div>
                         <div class="stat-change positive">↑ 2 this week</div>
                     </div>
 
                     <div class="stat-card">
-                        <div class="stat-icon success">📅</div>
+                        <div class="stat-icon success"><i class="fas fa-calendar-check"></i></div>
                         <div class="stat-value" id="active-events">0</div>
                         <div class="stat-label">Active Events</div>
                         <div class="stat-change positive">✓ Live now</div>
                     </div>
 
                     <div class="stat-card">
-                        <div class="stat-icon warning">👥</div>
+                        <div class="stat-icon warning"><i class="fas fa-users"></i></div>
                         <div class="stat-value" id="total-users">0</div>
                         <div class="stat-label">Total Users</div>
                         <div class="stat-change positive">↑ 125 new</div>
                     </div>
 
                     <div class="stat-card">
-                        <div class="stat-icon danger">📆</div>
+                        <div class="stat-icon danger"><i class="fas fa-calendar-alt"></i></div>
                         <div class="stat-value" id="upcoming-events">0</div>
                         <div class="stat-label">Upcoming Events</div>
                         <div class="stat-change positive">Next 30 days</div>

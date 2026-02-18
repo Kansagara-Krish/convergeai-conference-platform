@@ -258,18 +258,33 @@
 .header-search input {
   width: 100%;
   padding: var(--spacing-md) var(--spacing-lg);
-  padding-left: var(--spacing-xl);
-  background: rgba(79, 70, 229, 0.1);
+  padding-left: var(--spacing-2xl);
+  /* Increased padding for icon */
+  background: rgba(15, 23, 42, 0.6);
+  /* Slightly darker/cleaner background */
   border: 1px solid var(--border-color);
+  border-radius: 50px;
+  /* Pill shape */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+  transition: all var(--transition-base);
+}
+
+.header-search input:focus {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 
 .header-search::before {
   content: '🔍';
   position: absolute;
-  left: var(--spacing-md);
+  left: var(--spacing-lg);
+  /* Adjusted position */
   top: 50%;
   transform: translateY(-50%);
   opacity: 0.5;
+  pointer-events: none;
 }
 
 .header-user-menu {
@@ -282,8 +297,12 @@
   gap: var(--spacing-sm);
   background: rgba(79, 70, 229, 0.1);
   border: 1px solid var(--border-color);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
+  padding: 4px;
+  /* Reduced padding for cleaner look */
+  padding-right: var(--spacing-sm);
+  /* Add breathing room for chevron */
+  border-radius: 50px;
+  /* Pill shape */
   cursor: pointer;
   transition: all var(--transition-base);
 }
@@ -378,13 +397,16 @@
 }
 
 .stat-icon {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  /* Reduced size */
+  height: 50px;
+  /* Reduced size */
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
+  /* Reduced font size */
   margin-bottom: var(--spacing-lg);
   position: relative;
   z-index: 1;
@@ -392,22 +414,31 @@
 
 .stat-icon.primary {
   background: rgba(79, 70, 229, 0.2);
+  color: var(--accent-blue);
+  /* Ensure icon color */
 }
 
 .stat-icon.success {
   background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+  /* Ensure icon color */
 }
 
 .stat-icon.warning {
   background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+  /* Ensure icon color */
 }
 
 .stat-icon.danger {
   background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  /* Ensure icon color */
 }
 
 .stat-value {
-  font-size: 2rem;
+  font-size: 1.8rem;
+  /* Reduced from 2rem */
   font-weight: 700;
   margin-bottom: var(--spacing-sm);
   position: relative;
@@ -415,10 +446,12 @@
 }
 
 .stat-label {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  /* Reduced from 0.95rem */
   color: var(--text-secondary);
   position: relative;
   z-index: 1;
+
 }
 
 .stat-change {

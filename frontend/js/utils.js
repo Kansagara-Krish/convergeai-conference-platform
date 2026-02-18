@@ -75,22 +75,23 @@ class ModalManager {
         <div class="modal-body">
           ${content}
         </div>
-        ${actions.length > 0
-        ? `
+        ${
+          actions.length > 0
+            ? `
           <div class="modal-footer">
             ${actions
-          .map(
-            (action) => `
+              .map(
+                (action) => `
               <button class="btn ${action.class || "btn-secondary"}" data-action="${action.id}">
                 ${action.label}
               </button>
             `,
-          )
-          .join("")}
+              )
+              .join("")}
           </div>
         `
-        : ""
-      }
+            : ""
+        }
       </div>
     `;
 
@@ -144,7 +145,7 @@ class ModalManager {
         id: "close",
         label: "Close",
         class: "btn-primary",
-        callback: onClose || (() => { }),
+        callback: onClose || (() => {}),
       },
     ]);
   }
@@ -253,6 +254,13 @@ class DateUtils {
     });
   }
 
+  static formatDateRange(start, end) {
+    if (!start || !end) return "N/A";
+    const s = new Date(start);
+    const e = new Date(end);
+    return `${this.formatDate(s)} - ${this.formatDate(e)}`;
+  }
+
   static isToday(date) {
     const today = new Date();
     const d = new Date(date);
@@ -276,12 +284,21 @@ class DateUtils {
 // ============================================
 
 class API {
+  static getHeaders() {
+    const headers = { "Content-Type": "application/json" };
+    const token = Storage.getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
   static async get(url) {
     try {
       const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
       const response = await fetch(fullUrl, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
       });
       return this.handleResponse(response);
     } catch (error) {
@@ -295,7 +312,7 @@ class API {
       const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
       const response = await fetch(fullUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
         body: JSON.stringify(data),
       });
       return this.handleResponse(response);
@@ -310,7 +327,7 @@ class API {
       const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
       const response = await fetch(fullUrl, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
         body: JSON.stringify(data),
       });
       return this.handleResponse(response);
@@ -325,7 +342,7 @@ class API {
       const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
       const response = await fetch(fullUrl, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
       });
       return this.handleResponse(response);
     } catch (error) {
@@ -336,7 +353,16 @@ class API {
 
   static async handleResponse(response) {
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (response.status === 401) {
+        // Token expired or invalid
+        Storage.clear();
+        AppAuth.redirectToLogin();
+        throw new Error("Session expired. Please login again.");
+      }
+      const data = await response.json().catch(() => ({}));
+      throw new Error(
+        data.message || `HTTP ${response.status}: ${response.statusText}`,
+      );
     }
     const data = await response.json();
     return data;
@@ -381,6 +407,36 @@ class Storage {
     return this.get("authToken");
   }
 }
+
+class AppAuth {
+  static getLoginUrl() {
+    const pagePath = window.location.pathname.toLowerCase();
+
+    if (pagePath.includes("/admin/") || pagePath.includes("/user/")) {
+      return "../index.html";
+    }
+
+    if (pagePath.includes("/frontend/")) {
+      return "/frontend/index.html";
+    }
+
+    return "/index.html";
+  }
+
+  static redirectToLogin() {
+    window.location.href = this.getLoginUrl();
+  }
+
+  static isAdminSession() {
+    const token = Storage.getToken();
+    const user = Storage.getUser();
+    const role = user?.role?.toLowerCase?.() || "";
+
+    return Boolean(token && user && role === "admin");
+  }
+}
+
+window.AppAuth = AppAuth;
 
 // ============================================
 // 7. DEBOUNCE & THROTTLE

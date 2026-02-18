@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatbot List - Conference Chatbot System</title>
+    <title>Guest Management - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/admin.css">
     <!-- FontAwesome -->
@@ -39,12 +39,12 @@
                         <span class="menu-icon"><i class="fas fa-plus-circle"></i></span>
                         <span>Create Chatbot</span>
                     </a>
-                    <a href="chatbot-list.html" class="menu-item active">
+                    <a href="chatbot-list.html" class="menu-item">
                         <span class="menu-icon"><i class="fas fa-list"></i></span>
                         <span>All Chatbots</span>
-                        <span class="menu-badge" style="display: none;"></span>
+                        <span class="menu-badge">12</span>
                     </a>
-                    <a href="guest-management.html" class="menu-item">
+                    <a href="guest-management.html" class="menu-item active">
                         <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
                         <span>Guest Management</span>
                     </a>
@@ -64,7 +64,7 @@
                 </div>
             </nav>
 
-            <div class="admin-sidebar-footer">
+            <div class="sidebar-footer">
                 <div class="sidebar-user">
                     <div class="user-avatar">A</div>
                     <div class="user-info">
@@ -72,8 +72,10 @@
                         <div class="user-role">Administrator</div>
                     </div>
                 </div>
-                <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
-                        class="fas fa-sign-out-alt"></i> Logout</button>
+                <div class="admin-sidebar-footer">
+                    <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
             </div>
         </aside>
 
@@ -82,61 +84,66 @@
             <!-- Header -->
             <header class="admin-header">
                 <div class="header-title">
-                    <h1>All Chatbots</h1>
-
+                    <h1>Guest Management</h1>
                 </div>
-                <div class="header-actions">
-                    <a href="create-chatbot.html" class="btn btn-primary"><i class="fas fa-plus"></i> New Chatbot</a>
+                <div style="display: flex; gap: var(--spacing-md);">
+                    <select style="width: 150px;">
+                        <option>Filter by status</option>
+                        <option>Registered</option>
+                        <option>Checked In</option>
+                    </select>
                 </div>
             </header>
 
             <!-- Content Area -->
             <div class="admin-content">
-                <!-- Filter & Search -->
-                <div class="card mb-lg">
-                    <div class="card-body">
-                        <div class="flex">
-                            <input type="text" placeholder="Search chatbots..."
-                                style="flex: 1; margin-right: var(--spacing-md);">
-                            <select style="width: 200px;">
-                                <option>All Status</option>
-                                <option>Active</option>
-                                <option>Pending</option>
-                                <option>Expired</option>
-                            </select>
-                        </div>
+                <!-- Statistics -->
+                <div class="stats-grid mb-lg">
+                    <div class="stat-card">
+                        <div class="stat-icon primary"><i class="fas fa-user-friends"></i></div>
+                        <div class="stat-value" id="total-guests-count">0</div>
+                        <div class="stat-label">Total Guests</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon success"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-value" id="active-guests-count">0</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon warning"><i class="fas fa-clock"></i></div>
+                        <div class="stat-value" id="pending-guests-count">0</div>
+                        <div class="stat-label">Pending (Mock)</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon danger"><i class="fas fa-star"></i></div>
+                        <div class="stat-value" id="vip-guests-count">0</div>
+                        <div class="stat-label">VIP (Mock)</div>
                     </div>
                 </div>
 
-                <!-- Chatbot Cards Grid -->
-                <div class="grid grid-3" id="chatbot-grid">
-                    <!-- Dynamic Content -->
-                    <div class="col-span-3 text-center py-xl text-muted">Loading chatbots...</div>
-                </div>
-
-                <!-- Table View Alternative -->
-                <div class="card mt-2xl">
+                <!-- Guests Table -->
+                <div class="card">
                     <div class="card-header">
-                        <h2>Detailed View</h2>
+                        <h2>All Guests</h2>
+                        <button class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add Guest</button>
                     </div>
                     <div class="table-container">
-                        <table class="table" data-table="chatbots">
+                        <table class="table" data-table="guests">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Event</th>
-                                    <th>Date Range</th>
+                                    <th>Guest Name</th>
+                                    <th>Email</th>
+                                    <th>Conference</th>
+                                    <th>Ticket Type</th>
                                     <th>Status</th>
-                                    <th>Users</th>
-                                    <th>Conversations</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <!-- Dynamic Content -->
-                                <tr>
-                                    <td colspan="7" class="text-center py-xl text-muted">Loading chatbots...</td>
-                                </tr>
+                                <!-- Data will be loaded via JavaScript -->
                             </tbody>
                         </table>
                     </div>

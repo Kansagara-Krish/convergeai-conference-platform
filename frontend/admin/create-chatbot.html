@@ -45,7 +45,7 @@
                         <span class="menu-badge">12</span>
                     </a>
                     <a href="guest-management.html" class="menu-item">
-                        <span class="menu-icon">👥</span>
+                        <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
                         <span>Guest Management</span>
                     </a>
                 </div>
@@ -150,11 +150,9 @@
                                 <div class="form-group">
                                     <label for="description">
                                         Description
-                                        <span class="required">*</span>
                                     </label>
                                     <textarea id="description" name="description"
-                                        placeholder="Enter a detailed description of the event and chatbot purpose..."
-                                        data-rules="required" required></textarea>
+                                        placeholder="Enter a detailed description of the event and chatbot purpose..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -169,7 +167,7 @@
                                         System Prompt
                                         <span class="required">*</span>
                                     </label>
-                                    <textarea id="prompt" name="prompt" class="rich-editor"
+                                    <textarea id="prompt" name="system_prompt" class="rich-editor"
                                         placeholder="Enter the AI system prompt that defines the chatbot's behavior and knowledge base..."
                                         data-rules="required" required></textarea>
                                 </div>

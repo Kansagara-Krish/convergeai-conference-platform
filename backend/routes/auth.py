@@ -28,15 +28,19 @@ def token_required(f):
             try:
                 token = auth_header.split(" ")[1]
             except IndexError:
+                print("DEBUG: Invalid token format")
                 return jsonify({'success': False, 'message': 'Invalid token format'}), 401
         
         if not token:
+            print("DEBUG: Token is missing")
             return jsonify({'success': False, 'message': 'Token is missing'}), 401
         
         user = SessionToken.verify_token(token)
         if not user:
+            print(f"DEBUG: Token verification failed for token: {token[:10]}...")
             return jsonify({'success': False, 'message': 'Invalid or expired token'}), 401
         
+        print(f"DEBUG: User authenticated: {user.username} ({user.role})")
         return f(user, *args, **kwargs)
     
     return decorated
