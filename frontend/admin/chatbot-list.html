@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="../css/admin.css">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="../js/utils.js"></script>
-    <script src="../js/admin.js"></script>
+    <script src="../js/utils.js?v=3"></script>
+    <script src="../js/admin.js?v=3"></script>
 </head>
 
 <body>
@@ -96,13 +96,12 @@
                 <div class="card mb-lg">
                     <div class="card-body">
                         <div class="flex">
-                            <input type="text" placeholder="Search chatbots..."
+                            <input type="text" id="chatbot-search" placeholder="Search chatbots..."
                                 style="flex: 1; margin-right: var(--spacing-md);">
-                            <select style="width: 200px;">
-                                <option>All Status</option>
-                                <option>Active</option>
-                                <option>Pending</option>
-                                <option>Expired</option>
+                            <select id="chatbot-status-filter" style="width: 200px;">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
                             </select>
                         </div>
                     </div>
@@ -127,6 +126,7 @@
                                     <th>Event</th>
                                     <th>Date Range</th>
                                     <th>Status</th>
+                                    <th>Admin Status</th>
                                     <th>Users</th>
                                     <th>Conversations</th>
                                     <th>Actions</th>
@@ -135,7 +135,7 @@
                             <tbody>
                                 <!-- Dynamic Content -->
                                 <tr>
-                                    <td colspan="7" class="text-center py-xl text-muted">Loading chatbots...</td>
+                                    <td colspan="8" class="text-center py-xl text-muted">Loading chatbots...</td>
                                 </tr>
                             </tbody>
                         </table>

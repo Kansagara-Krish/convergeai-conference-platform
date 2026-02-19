@@ -3,7 +3,7 @@
 # ============================================
 
 from flask import Blueprint, request, jsonify
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 try:
     from models import db, Chatbot, Message, ChatbotParticipant, User
@@ -213,7 +213,7 @@ def send_message(user, chatbot_id):
     # Simulate bot response
     bot_response = Message(
         chatbot_id=chatbot_id,
-        user_id=None,
+        user_id=user.id,
         content="Thank you for your message. This is a simulated bot response.",
         is_user_message=False
     )

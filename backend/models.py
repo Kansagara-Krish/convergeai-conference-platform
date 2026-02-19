@@ -67,6 +67,7 @@ class User(db.Model):
 class Chatbot(db.Model):
     """Chatbot model for event chatbots"""
     __tablename__ = 'chatbots'
+    INFINITE_END_DATE = datetime(9999, 12, 31).date()
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False, index=True)
@@ -75,7 +76,7 @@ class Chatbot(db.Model):
     
     # Dates
     start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False, default=INFINITE_END_DATE)
     
     # AI Configuration
     system_prompt = db.Column(db.Text, nullable=False)
@@ -106,10 +107,15 @@ class Chatbot(db.Model):
         today = datetime.now().date()
         if today < self.start_date:
             return 'pending'
-        elif today > self.end_date:
+        elif self.end_date and self.end_date != self.INFINITE_END_DATE and today > self.end_date:
             return 'expired'
         else:
             return 'active'
+
+    @property
+    def is_infinite_end_date(self):
+        """Whether chatbot has no explicit end date."""
+        return self.end_date == self.INFINITE_END_DATE
     
     @property
     def days_until_event(self):
@@ -125,12 +131,14 @@ class Chatbot(db.Model):
             'event_name': self.event_name,
             'description': self.description,
             'start_date': self.start_date.isoformat(),
-            'end_date': self.end_date.isoformat(),
+            'end_date': None if self.is_infinite_end_date else self.end_date.isoformat(),
+            'has_infinite_end_date': self.is_infinite_end_date,
             'status': self.status,
             'active': self.active,
             'system_prompt': self.system_prompt,
             'single_mode': self.single_mode,
             'multiple_mode': self.multiple_mode,
+            'background_image': self.background_image,
             'guests_count': len(self.guests),
             'messages_count': len(self.messages),
             'created_at': self.created_at.isoformat(),

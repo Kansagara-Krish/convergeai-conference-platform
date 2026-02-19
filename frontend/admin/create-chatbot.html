@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="../css/admin.css">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="../js/utils.js"></script>
-    <script src="../js/admin.js"></script>
+    <script src="../js/utils.js?v=4"></script>
+    <script src="../js/admin.js?v=4"></script>
 </head>
 
 <body>
@@ -140,9 +140,8 @@
                                 <div class="form-group">
                                     <label for="event-end">
                                         Event End Date
-                                        <span class="required">*</span>
                                     </label>
-                                    <input type="date" id="event-end" name="end_date" data-rules="required" required>
+                                    <input type="date" id="event-end" name="end_date">
                                 </div>
                             </div>
 
@@ -161,7 +160,7 @@
                         <div class="form-section">
                             <h3 class="form-section-title">AI Configuration</h3>
 
-                            <div class="form-row full">
+                            <div class="form-row">
                                 <div class="form-group">
                                     <label for="prompt">
                                         System Prompt
@@ -191,6 +190,19 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Chatbot Status</label>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="chatbot-active" name="active" value="1" checked style="display: none;">
+                                        <label for="chatbot-active" class="toggle-label">
+                                            <span class="toggle-slider"></span>
+                                            <span class="toggle-text" data-active="Active" data-inactive="Inactive">Active</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Media & Assets -->
@@ -199,7 +211,7 @@
 
                             <div class="form-row full">
                                 <div class="form-group">
-                                    <label for="background-image">Background Image</label>
+                                    <label for="background-image">Background Image <span class="required">*</span></label>
                                     <div class="file-upload">
                                         <input type="file" id="background-image" name="background_image"
                                             accept="image/*" style="display: none;">
