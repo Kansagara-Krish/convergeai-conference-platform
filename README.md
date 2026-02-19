@@ -2,11 +2,25 @@
 
 A modern, professional web application for managing AI-powered chatbots at academic conferences. Features include event management, user administration, intelligent chat interfaces, and comprehensive analytics.
 
+## ✅ Current Working Status
+
+The following features are implemented and working:
+
+- Chatbot create flow with required background image upload
+- Background image preview on create and edit forms
+- Edit mode current image display, replace, and clear (delete) support
+- Uploaded image serving from backend uploads directory
+- Chatbot Active/Inactive admin toggle in create and edit
+- Active/Inactive state persistence in database and API responses
+- Chatbot list search by chatbot name, event name, and description
+- Chatbot list filter by admin status only: Active / Inactive
+
 ## 🎯 Features
 
 ### Admin Panel
 - **Dashboard Overview**: Real-time statistics (total chatbots, active events, users, upcoming events)
 - **Chatbot Management**: Create, edit, delete, and configure chatbots
+- **Chatbot Status Control**: Toggle chatbot state between Active and Inactive
 - **Guest Management**: Add expert speakers and moderators
 - **User Management**: Manage users, reset passwords, activate/deactivate accounts
 - **Excel Import**: Bulk import users with auto-generated credentials

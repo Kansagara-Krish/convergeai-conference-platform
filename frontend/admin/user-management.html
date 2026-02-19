@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="../css/admin.css">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="../js/utils.js"></script>
-    <script src="../js/admin.js"></script>
+    <script src="../js/utils.js?v=6"></script>
+    <script src="../js/admin.js?v=6"></script>
 </head>
 
 <body>
@@ -34,6 +34,23 @@
                 </div>
 
                 <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-plus-circle"></i></span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-list"></i></span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
+                        <span>Guest Management</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
                     <div class="menu-label">Users & Data</div>
                     <a href="user-management.html" class="menu-item active">
                         <span class="menu-icon"><i class="fas fa-users-cog"></i></span>
@@ -43,6 +60,18 @@
                     <a href="import-excel.html" class="menu-item">
                         <span class="menu-icon"><i class="fas fa-file-import"></i></span>
                         <span>Import Users</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Settings</div>
+                    <a href="#" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
+                        <span>System Settings</span>
+                    </a>
+                    <a href="#" class="menu-item">
+                        <span class="menu-icon">🔐</span>
+                        <span>Security</span>
                     </a>
                 </div>
             </nav>
@@ -77,10 +106,11 @@
                 <div style="display: flex; gap: var(--spacing-md);">
                     <!-- Search moved or removed as requested -->
 
-                    <select style="width: 150px;">
-                        <option>Filter by role</option>
-                        <option>Admin</option>
-                        <option>User</option>
+                    <select id="user-role-filter" style="width: 150px;">
+                        <option value="">Filter by role</option>
+                        <option value="admin">Admin</option>
+                        <option value="user">User</option>
+                        <option value="speaker">Speaker</option>
                     </select>
                 </div>
             </header>
@@ -91,25 +121,25 @@
                 <div class="stats-grid mb-lg">
                     <div class="stat-card">
                         <div class="stat-icon primary"><i class="fas fa-users"></i></div>
-                        <div class="stat-value">847</div>
+                        <div class="stat-value" id="users-total">0</div>
                         <div class="stat-label">Total Users</div>
                     </div>
 
                     <div class="stat-card">
                         <div class="stat-icon success"><i class="fas fa-check"></i></div>
-                        <div class="stat-value">812</div>
+                        <div class="stat-value" id="users-active">0</div>
                         <div class="stat-label">Active</div>
                     </div>
 
                     <div class="stat-card">
                         <div class="stat-icon warning"><i class="fas fa-pause"></i></div>
-                        <div class="stat-value">35</div>
+                        <div class="stat-value" id="users-inactive">0</div>
                         <div class="stat-label">Inactive</div>
                     </div>
 
                     <div class="stat-card">
                         <div class="stat-icon danger"><i class="fas fa-user-plus"></i></div>
-                        <div class="stat-value">125</div>
+                        <div class="stat-value" id="users-new-month">0</div>
                         <div class="stat-label">New This Month</div>
                     </div>
                 </div>
@@ -134,73 +164,7 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-                                            <div
-                                                style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">
-                                                JD</div>
-                                            <div>John Doe</div>
-                                        </div>
-                                    </td>
-                                    <td>john.doe@example.com</td>
-                                    <td>AI Research Summit</td>
-                                    <td>2024-06-10</td>
-                                    <td><span class="status-indicator status-active"><span class="status-dot"></span>
-                                            Active</span></td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <button class="btn btn-sm btn-secondary" data-action="reset-password"
-                                                data-user-id="1"><i class="fas fa-key"></i></button>
-                                            <button class="btn btn-sm btn-success" data-action="toggle-user"
-                                                data-user-id="1"><i class="fas fa-check"></i></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-                                            <div
-                                                style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">
-                                                JS</div>
-                                            <div>Jane Smith</div>
-                                        </div>
-                                    </td>
-                                    <td>jane.smith@example.com</td>
-                                    <td>ML Conference</td>
-                                    <td>2024-06-15</td>
-                                    <td><span class="status-indicator status-active"><span class="status-dot"></span>
-                                            Active</span></td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <button class="btn btn-sm btn-secondary" data-action="reset-password"
-                                                data-user-id="2"><i class="fas fa-key"></i></button>
-                                            <button class="btn btn-sm btn-success" data-action="toggle-user"
-                                                data-user-id="2"><i class="fas fa-check"></i></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-                                            <div
-                                                style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">
-                                                MB</div>
-                                            <div>Mike Brown</div>
-                                        </div>
-                                    </td>
-                                    <td>mike.brown@example.com</td>
-                                    <td>Data Science Workshop</td>
-                                    <td>2024-05-20</td>
-                                    <td><span class="status-indicator status-inactive"><span class="status-dot"></span>
-                                            Inactive</span></td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <button class="btn btn-sm btn-secondary" data-action="reset-password"
-                                                data-user-id="3"><i class="fas fa-key"></i></button>
-                                            <button class="btn btn-sm btn-danger" data-action="toggle-user"
-                                                data-user-id="3"><i class="fas fa-times"></i></button>
-                                        </div>
-                                    </td>
+                                    <td colspan="6" class="text-center">Loading users...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -208,14 +172,9 @@
                 </div>
 
                 <!-- Pagination -->
-                <div class="flex-between mt-lg">
-                    <p style="color: var(--text-secondary);">Showing 1-3 of 847 users</p>
-                    <div class="flex" gap="var(--spacing-md)">
-                        <button class="btn btn-ghost btn-sm">← Previous</button>
-                        <button class="btn btn-primary btn-sm">1</button>
-                        <button class="btn btn-ghost btn-sm">2</button>
-                        <button class="btn btn-ghost btn-sm">3</button>
-                        <button class="btn btn-ghost btn-sm">Next →</button>
+                <div class="flex-between mt-lg" id="users-pagination-container">
+                    <p style="color: var(--text-secondary);" id="users-pagination-summary">Showing 0-0 of 0 users</p>
+                    <div class="flex" gap="var(--spacing-md)" id="users-pagination-buttons">
                     </div>
                 </div>
             </div>

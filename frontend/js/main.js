@@ -52,38 +52,10 @@ class UserPanel {
     const page = window.location.pathname;
     if (page.includes("user/dashboard") || page.includes("user-dashboard")) {
       try {
-        // Simulated chatbots data
-        const chatbots = [
-          {
-            id: 1,
-            name: "AI Research Summit 2024",
-            event: "ICAI 2024",
-            date: "2024-06-15",
-            description:
-              "Join our expert panelists discussing the future of AI Research",
-            participants: ["Dr. Smith", "Prof. Johnson"],
-          },
-          {
-            id: 2,
-            name: "Machine Learning Conference",
-            event: "ML Expo 2024",
-            date: "2024-07-20",
-            description: "Latest trends in Machine Learning and Deep Learning",
-            participants: ["Dr. Lee", "Prof. Kumar"],
-          },
-          {
-            id: 3,
-            name: "Data Science Workshop",
-            event: "Data Con 2024",
-            date: "2024-08-10",
-            description:
-              "Hands-on workshop on advanced data analysis techniques",
-            participants: ["Ms. Sarah", "Mr. Chen"],
-          },
-        ];
+        const response = await API.get("/api/user/chatbots");
+        const chatbots = Array.isArray(response?.data) ? response.data : [];
 
         this.renderChatbots(chatbots);
-        NotificationManager.success("Chatbots loaded");
       } catch (error) {
         console.error("Error loading chatbots:", error);
         NotificationManager.error("Failed to load chatbots");
@@ -102,21 +74,14 @@ class UserPanel {
         <div class="chatbot-available-card-image"><i class="fas fa-robot"></i></div>
         <div class="chatbot-available-card-content">
           <h3 class="chatbot-available-card-title">${chatbot.name}</h3>
-          <div class="chatbot-available-card-date"><i class="far fa-calendar-alt"></i> ${DateUtils.formatDate(chatbot.date)}</div>
-          <p class="chatbot-available-card-desc">${chatbot.description}</p>
+          <div class="chatbot-available-card-date"><i class="far fa-calendar-alt"></i> ${DateUtils.formatDateRange(chatbot.start_date, chatbot.end_date)}</div>
+          <p class="chatbot-available-card-desc">${chatbot.description || "No description provided."}</p>
           <div class="chatbot-available-card-footer">
             <div class="chatbot-available-card-participants">
-              ${chatbot.participants
-                .slice(0, 3)
-                .map(
-                  (p) => `
-                <div class="chatbot-available-card-avatar" title="${p}">
-                  ${p.substring(0, 1).toUpperCase()}
-                </div>
-              `,
-                )
-                .join("")}
-              ${chatbot.participants.length > 3 ? `<span>+${chatbot.participants.length - 3}</span>` : ""}
+              <div class="chatbot-available-card-avatar" title="${chatbot.event_name || "Event"}">
+                ${(chatbot.event_name || "E").substring(0, 1).toUpperCase()}
+              </div>
+              <span>${chatbot.guests_count || 0} guests</span>
             </div>
             <button class="btn btn-sm btn-primary" onclick="joinChatbot(${chatbot.id})">
               <i class="far fa-comments"></i> Join
@@ -155,6 +120,13 @@ class ChatInterface {
   init() {
     if (!this.messagesArea || !this.inputField || !this.sendBtn) return;
 
+    if (!this.chatbotId) {
+      NotificationManager.error("Chatbot ID missing");
+      return;
+    }
+
+    this.messagesArea.innerHTML = "";
+
     this.sendBtn.addEventListener("click", () => this.sendMessage());
     this.inputField.addEventListener("keypress", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -164,6 +136,7 @@ class ChatInterface {
     });
 
     this.loadMessages();
+    this.loadChatbotMeta();
     this.setupAutoScroll();
   }
 
@@ -176,26 +149,33 @@ class ChatInterface {
     const text = this.inputField.value.trim();
     if (!text) return;
 
-    // Add user message
-    this.addMessage(text, "user");
     this.inputField.value = "";
     this.inputField.style.height = "auto";
     this.sendBtn.disabled = true;
 
     try {
-      // Simulate bot thinking
       await this.showTypingIndicator();
 
-      // Simulated bot response
-      const response = await this.getBotResponse(text);
-      this.addMessage(response, "bot");
+      const response = await API.post(
+        `/api/user/chatbots/${this.chatbotId}/messages`,
+        {
+          content: text,
+        },
+      );
 
-      // Save message to backend
-      await API.post(`/api/chat/${this.chatbotId}/messages`, {
-        message: text,
-        response: response,
-        timestamp: new Date().toISOString(),
-      });
+      const payload = response?.data || {};
+      const userMessage = payload.user_message;
+      const botResponse = payload.bot_response;
+
+      if (userMessage?.content) {
+        this.addMessage(userMessage.content, "user", userMessage.timestamp);
+      }
+      if (botResponse?.content) {
+        this.addMessage(botResponse.content, "bot", botResponse.timestamp);
+      }
+      if (!userMessage?.content && !botResponse?.content) {
+        this.addMessage(text, "user");
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       NotificationManager.error("Failed to send message");
@@ -205,8 +185,8 @@ class ChatInterface {
     }
   }
 
-  addMessage(text, sender) {
-    const timestamp = DateUtils.formatTime(new Date());
+  addMessage(text, sender, messageTimestamp = null) {
+    const timestamp = DateUtils.formatTime(messageTimestamp || new Date());
     const message = {
       id: Date.now(),
       text: text,
@@ -253,18 +233,6 @@ class ChatInterface {
     if (indicator_el) indicator_el.remove();
   }
 
-  async getBotResponse(message) {
-    // Simulated responses
-    const responses = [
-      "That's an interesting question! Let me provide you with more details.",
-      "Great point! Based on our conference theme, here's what I'd like to share...",
-      "Thank you for asking. This is one of the key topics we'll be discussing.",
-      "Absolutely! This is crucial for understanding our conference objectives.",
-    ];
-
-    return responses[Math.floor(Math.random() * responses.length)];
-  }
-
   scrollToBottom() {
     setTimeout(() => {
       this.messagesArea.scrollTop = this.messagesArea.scrollHeight;
@@ -281,15 +249,38 @@ class ChatInterface {
 
   async loadMessages() {
     try {
-      // Load previous messages
-      const response = await API.get(`/api/chat/${this.chatbotId}/messages`);
-      if (response && response.messages) {
-        response.messages.forEach((msg) => {
-          this.addMessage(msg.text, msg.sender);
-        });
-      }
+      const response = await API.get(
+        `/api/user/chatbots/${this.chatbotId}/messages`,
+      );
+      const messages = Array.isArray(response?.data) ? response.data : [];
+      messages.forEach((msg) => {
+        if (!msg?.content) return;
+        this.addMessage(msg.content, msg.sender || "bot", msg.timestamp);
+      });
     } catch (error) {
       console.error("Error loading messages:", error);
+    }
+  }
+
+  async loadChatbotMeta() {
+    try {
+      const response = await API.get(`/api/chatbots/${this.chatbotId}`);
+      const chatbot = response?.data;
+      if (!chatbot) return;
+
+      const titleEl = DomUtils.$(".chat-header-name");
+      const statusEl = DomUtils.$(".chat-header-status");
+
+      if (titleEl) {
+        titleEl.textContent = chatbot.name || "Chatbot";
+      }
+
+      if (statusEl) {
+        const isActive = chatbot.status === "active";
+        statusEl.textContent = isActive ? "🟢 Online" : "🟡 Offline";
+      }
+    } catch (error) {
+      console.error("Error loading chatbot meta:", error);
     }
   }
 
@@ -457,17 +448,10 @@ class LoginHandler {
         setTimeout(() => {
           // Use the user role from the backend response
           const userRole = response.user.role;
-          const isFrontendPath = window.location.pathname
-            .toLowerCase()
-            .includes("/frontend/");
           const redirectUrl =
             userRole === "admin"
-              ? isFrontendPath
-                ? "admin/dashboard.html"
-                : "frontend/admin/dashboard.html"
-              : isFrontendPath
-                ? "user/dashboard.html"
-                : "frontend/user/dashboard.html";
+              ? "admin/dashboard.html"
+              : "user/dashboard.html";
           console.log(`Redirecting to: ${redirectUrl}`); // DEBUG
           window.location.href = redirectUrl;
         }, 500);
@@ -540,19 +524,47 @@ class ProfilePage {
     this.setupPasswordChange();
   }
 
-  loadProfileData() {
+  async loadProfileData() {
     const nameEl = DomUtils.$("[data-profile-name]");
     const emailEl = DomUtils.$("[data-profile-email]");
     const roleEl = DomUtils.$("[data-profile-role]");
     const avatarEl = DomUtils.$("[data-profile-avatar]");
 
-    if (nameEl) nameEl.textContent = this.currentUser.name;
-    if (emailEl) emailEl.textContent = this.currentUser.email;
-    if (roleEl) roleEl.textContent = this.currentUser.role;
-    if (avatarEl)
-      avatarEl.textContent = this.currentUser.name
-        .substring(0, 1)
-        .toUpperCase();
+    try {
+      const response = await API.get("/api/user/profile");
+      const profile = response?.data || this.currentUser;
+
+      Storage.setUser({ ...this.currentUser, ...profile });
+
+      if (nameEl) nameEl.textContent = profile.name || "-";
+      if (emailEl) emailEl.textContent = profile.email || "-";
+      if (roleEl) roleEl.textContent = profile.role || "-";
+      if (avatarEl) {
+        avatarEl.textContent = (profile.name || "U")
+          .substring(0, 1)
+          .toUpperCase();
+      }
+
+      const usernameEl = DomUtils.$("[data-profile-username]");
+      const memberSinceEl = DomUtils.$("[data-profile-member-since]");
+      const joinedEventsEl = DomUtils.$("[data-profile-joined-events]");
+      const messagesSentEl = DomUtils.$("[data-profile-messages-sent]");
+
+      if (usernameEl) usernameEl.textContent = profile.username || "-";
+      if (memberSinceEl) {
+        memberSinceEl.textContent = profile.created_at
+          ? DateUtils.formatDate(profile.created_at)
+          : "-";
+      }
+      if (joinedEventsEl) {
+        joinedEventsEl.textContent = `${profile.joined_chatbots || 0} events`;
+      }
+      if (messagesSentEl) {
+        messagesSentEl.textContent = `${profile.messages_sent || 0} messages`;
+      }
+    } catch (error) {
+      console.error("Error loading profile:", error);
+    }
   }
 
   setupPasswordChange() {
@@ -577,9 +589,9 @@ class ProfilePage {
         }
 
         try {
-          await API.put(`/api/users/${this.currentUser.id}/password`, {
-            current: currentPassword,
-            new: newPassword,
+          await API.put(`/api/auth/change-password`, {
+            current_password: currentPassword,
+            new_password: newPassword,
           });
 
           NotificationManager.success("Password changed successfully");
@@ -597,7 +609,21 @@ class ProfilePage {
 // ============================================
 
 window.joinChatbot = function (chatbotId) {
-  window.location.href = `/user/chat.html?id=${chatbotId}`;
+  (async () => {
+    try {
+      await API.post(`/api/user/chatbots/${chatbotId}/join`, {});
+    } catch (error) {
+      if (
+        !String(error?.message || "")
+          .toLowerCase()
+          .includes("already joined")
+      ) {
+        NotificationManager.error(error.message || "Unable to join chatbot");
+        return;
+      }
+    }
+    window.location.href = `chat.html?id=${chatbotId}`;
+  })();
 };
 
 window.downloadCredentials = function () {

@@ -255,7 +255,9 @@ class DateUtils {
   }
 
   static formatDateRange(start, end) {
-    if (!start || !end) return "N/A";
+    if (!start && !end) return "N/A";
+    if (start && !end) return `${this.formatDate(start)} - Ongoing`;
+    if (!start && end) return this.formatDate(end);
     const s = new Date(start);
     const e = new Date(end);
     return `${this.formatDate(s)} - ${this.formatDate(e)}`;
@@ -284,8 +286,11 @@ class DateUtils {
 // ============================================
 
 class API {
-  static getHeaders() {
-    const headers = { "Content-Type": "application/json" };
+  static getHeaders(isFormData = false) {
+    const headers = {};
+    if (!isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
     const token = Storage.getToken();
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -310,10 +315,11 @@ class API {
   static async post(url, data) {
     try {
       const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+      const isFormData = data instanceof FormData;
       const response = await fetch(fullUrl, {
         method: "POST",
-        headers: this.getHeaders(),
-        body: JSON.stringify(data),
+        headers: this.getHeaders(isFormData),
+        body: isFormData ? data : JSON.stringify(data),
       });
       return this.handleResponse(response);
     } catch (error) {
@@ -325,10 +331,11 @@ class API {
   static async put(url, data) {
     try {
       const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+      const isFormData = data instanceof FormData;
       const response = await fetch(fullUrl, {
         method: "PUT",
-        headers: this.getHeaders(),
-        body: JSON.stringify(data),
+        headers: this.getHeaders(isFormData),
+        body: isFormData ? data : JSON.stringify(data),
       });
       return this.handleResponse(response);
     } catch (error) {
@@ -417,10 +424,10 @@ class AppAuth {
     }
 
     if (pagePath.includes("/frontend/")) {
-      return "/frontend/index.html";
+      return "index.html";
     }
 
-    return "/index.html";
+    return "frontend/index.html";
   }
 
   static redirectToLogin() {

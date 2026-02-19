@@ -1,0 +1,21 @@
+Admin section 
+
+1. Create chatbot
+2. List of chatbot
+3. Edit / Delete chatbot or it image
+4. Setting of chatbot
+  - name
+  - event date [range]
+  - Description [optional]
+  - promot [default single person]
+  - Guest list with image 
+  - background list
+* [single or multiple person prompt]
+* Import excel file to generate username,password and  mail
+
+----------------------------------------------------------------------------
+User side
+
+1.Guess list and background list in chatbot interface 
+next open camera or upload the image 
+while send button click one form for the Name and WhatsApp number 

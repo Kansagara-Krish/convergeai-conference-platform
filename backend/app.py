@@ -2,7 +2,7 @@
 # Flask Application Main File
 # ============================================
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_migrate import Migrate
 import os
@@ -25,6 +25,10 @@ def create_app(config_name=None):
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'development')
     
+    frontend_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..', 'frontend')
+    )
+
     app = Flask(__name__)
     app.config.from_object(config.get(config_name, config['default']))
     
@@ -77,6 +81,31 @@ def create_app(config_name=None):
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat()
         }), 200
+
+    # Serve uploaded files (images, etc.)
+    @app.route('/uploads/<path:filename>')
+    def serve_uploads(filename):
+        upload_folder = os.path.join(app.root_path, 'uploads')
+        return send_from_directory(upload_folder, filename)
+
+    # Frontend routes
+    @app.route('/')
+    def serve_frontend_index():
+        return send_from_directory(frontend_dir, 'index.html')
+
+    @app.route('/<path:path>')
+    def serve_frontend(path):
+        if path.startswith('api/'):
+            return jsonify({
+                'success': False,
+                'message': 'Resource not found'
+            }), 404
+
+        target_path = os.path.join(frontend_dir, path)
+        if os.path.exists(target_path) and os.path.isfile(target_path):
+            return send_from_directory(frontend_dir, path)
+
+        return send_from_directory(frontend_dir, 'index.html')
     
     # Create database tables
     with app.app_context():

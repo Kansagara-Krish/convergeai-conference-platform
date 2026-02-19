@@ -6,10 +6,10 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 
 try:
-    from models import db, User, Chatbot, Guest, Message
+    from models import db, User, Chatbot, Guest, Message, SessionToken
     from routes.auth import token_required, admin_required
 except ImportError:
-    from backend.models import db, User, Chatbot, Guest, Message
+    from backend.models import db, User, Chatbot, Guest, Message, SessionToken
     from backend.routes.auth import token_required, admin_required
 
 admin_bp = Blueprint('admin', __name__)
@@ -23,6 +23,8 @@ admin_bp = Blueprint('admin', __name__)
 @admin_required
 def get_stats(user):
     """Get dashboard statistics"""
+    now = datetime.now()
+    first_day_of_month = datetime(now.year, now.month, 1)
     
     stats = {
         'total_chatbots': Chatbot.query.count(),
@@ -30,6 +32,7 @@ def get_stats(user):
         'total_guests': Guest.query.count(),
         'total_users': User.query.count(),
         'active_users': User.query.filter_by(active=True).count(),
+        'new_users_this_month': User.query.filter(User.created_at >= first_day_of_month).count(),
         'total_messages': Message.query.count(),
         'upcoming_events': Chatbot.query.filter(Chatbot.start_date > datetime.now().date()).count(),
     }
