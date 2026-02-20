@@ -462,7 +462,10 @@ class LoginHandler {
       }
     } catch (error) {
       console.error("Login error:", error);
-      this.showLoginError("Invalid credentials or server error", null);
+      this.showLoginError(
+        error.message || "Invalid credentials or server error",
+        null,
+      );
     } finally {
       // Hide loading state
       submitBtn.disabled = false;

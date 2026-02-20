@@ -3,7 +3,36 @@
    ============================================ */
 
 // API Base URL Configuration
-const API_BASE_URL = "http://localhost:5000";
+function resolveApiBaseUrl() {
+  if (typeof window !== "undefined" && window.__API_BASE_URL__) {
+    return String(window.__API_BASE_URL__).trim();
+  }
+
+  if (typeof window === "undefined") {
+    return "http://localhost:5000";
+  }
+
+  const { protocol, hostname, port } = window.location;
+
+  if (
+    (hostname === "localhost" || hostname === "127.0.0.1") &&
+    port === "5000"
+  ) {
+    return "";
+  }
+
+  if (
+    protocol === "file:" ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  ) {
+    return "http://localhost:5000";
+  }
+
+  return "";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 // ============================================
 // 0. DOM UTILITY CLASS
@@ -63,11 +92,14 @@ class NotificationManager {
 // ============================================
 
 class ModalManager {
-  static create(title, content, actions = []) {
+  static create(title, content, actions = [], options = {}) {
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
+    const modalStyle = options.width
+      ? `style="max-width: ${options.width};"`
+      : "";
     overlay.innerHTML = `
-      <div class="modal">
+      <div class="modal" ${modalStyle}>
         <div class="modal-header">
           <h2 class="modal-title">${title}</h2>
           <button class="modal-close">&times;</button>
@@ -286,6 +318,22 @@ class DateUtils {
 // ============================================
 
 class API {
+  static buildUrl(url) {
+    return url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+  }
+
+  static handleNetworkError(error) {
+    const message = (error && error.message) || "Failed to fetch";
+    if (message.toLowerCase().includes("failed to fetch")) {
+      throw new Error(
+        `Cannot connect to API server. Make sure backend is running at ${
+          API_BASE_URL || window.location.origin
+        }`,
+      );
+    }
+    throw error;
+  }
+
   static getHeaders(isFormData = false) {
     const headers = {};
     if (!isFormData) {
@@ -300,7 +348,7 @@ class API {
 
   static async get(url) {
     try {
-      const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+      const fullUrl = this.buildUrl(url);
       const response = await fetch(fullUrl, {
         method: "GET",
         headers: this.getHeaders(),
@@ -308,13 +356,13 @@ class API {
       return this.handleResponse(response);
     } catch (error) {
       console.error("API Error:", error);
-      throw error;
+      this.handleNetworkError(error);
     }
   }
 
   static async post(url, data) {
     try {
-      const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+      const fullUrl = this.buildUrl(url);
       const isFormData = data instanceof FormData;
       const response = await fetch(fullUrl, {
         method: "POST",
@@ -324,13 +372,13 @@ class API {
       return this.handleResponse(response);
     } catch (error) {
       console.error("API Error:", error);
-      throw error;
+      this.handleNetworkError(error);
     }
   }
 
   static async put(url, data) {
     try {
-      const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+      const fullUrl = this.buildUrl(url);
       const isFormData = data instanceof FormData;
       const response = await fetch(fullUrl, {
         method: "PUT",
@@ -340,13 +388,13 @@ class API {
       return this.handleResponse(response);
     } catch (error) {
       console.error("API Error:", error);
-      throw error;
+      this.handleNetworkError(error);
     }
   }
 
   static async delete(url) {
     try {
-      const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+      const fullUrl = this.buildUrl(url);
       const response = await fetch(fullUrl, {
         method: "DELETE",
         headers: this.getHeaders(),
@@ -354,7 +402,7 @@ class API {
       return this.handleResponse(response);
     } catch (error) {
       console.error("API Error:", error);
-      throw error;
+      this.handleNetworkError(error);
     }
   }
 

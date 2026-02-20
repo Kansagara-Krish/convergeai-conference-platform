@@ -33,6 +33,15 @@ class Config:
     UPLOAD_FOLDER = 'uploads'
     ALLOWED_EXTENSIONS = {'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'pdf'}
 
+    # Email (SMTP)
+    MAIL_SERVER = os.environ.get('MAIL_SERVER') or os.environ.get('SMTP_SERVER', '')
+    MAIL_PORT = int(os.environ.get('MAIL_PORT') or os.environ.get('SMTP_PORT', 587))
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME') or os.environ.get('SMTP_USERNAME', '')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD') or os.environ.get('SMTP_PASSWORD', '')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('SMTP_FROM_EMAIL') or MAIL_USERNAME or 'noreply@localhost'
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() == 'true'
+    MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'false').lower() == 'true'
+
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True

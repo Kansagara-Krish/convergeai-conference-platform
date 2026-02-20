@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Import Excel - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/admin.css">
+    <link rel="stylesheet" href="../css/admin.css?v=11">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="../js/utils.js?v=3"></script>
-    <script src="../js/admin.js?v=3"></script>
+    <script src="../js/utils.js?v=11"></script>
+    <script src="../js/admin.js?v=11"></script>
 </head>
 
 <body>
@@ -72,11 +72,6 @@
             <header class="admin-header">
                 <div class="header-title">
                     <h1>Import Users from Excel</h1>
-                    <div class="header-breadcrumb">
-                        <a href="dashboard.html">Home</a>
-                        <span>/</span>
-                        <span>Import Excel</span>
-                    </div>
                 </div>
             </header>
 
@@ -119,13 +114,9 @@
                                 <div class="form-group">
                                     <label for="event-select">
                                         Assign to Event
-                                        <span class="required">*</span>
                                     </label>
-                                    <select id="event-select" name="event_id" required>
+                                    <select id="event-select" name="event_id">
                                         <option value="">Select an event...</option>
-                                        <option value="1">AI Research Summit</option>
-                                        <option value="2">ML Conference</option>
-                                        <option value="3">Data Science Workshop</option>
                                     </select>
                                 </div>
 
@@ -133,15 +124,9 @@
                                     <label for="role-select">Default User Role</label>
                                     <select id="role-select" name="default_role">
                                         <option value="user">User</option>
-                                        <option value="moderator">Moderator</option>
-                                        <option value="speaker">Speaker</option>
+                                        <option value="admin">Admin</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <div class="import-preview"
-                                style="margin-top: var(--spacing-lg); padding: var(--spacing-lg); background: rgba(79, 70, 229, 0.1); border-radius: var(--radius-md); border: 1px dashed var(--border-color); color: var(--text-secondary);">
-                                No file selected
                             </div>
                         </div>
 
@@ -171,28 +156,9 @@
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="recent-imports-body">
                                 <tr>
-                                    <td>2024-02-10</td>
-                                    <td>AI Research Summit</td>
-                                    <td>250</td>
-                                    <td>icai_users.xlsx</td>
-                                    <td><span class="badge badge-success">Completed</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-secondary"><i class="fas fa-download"></i>
-                                            Download List</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>2024-01-25</td>
-                                    <td>ML Conference</td>
-                                    <td>180</td>
-                                    <td>ml_users.xlsx</td>
-                                    <td><span class="badge badge-success">Completed</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-secondary"><i class="fas fa-download"></i>
-                                            Download List</button>
-                                    </td>
+                                    <td colspan="6" class="text-center">No recent imports in this session.</td>
                                 </tr>
                             </tbody>
                         </table>

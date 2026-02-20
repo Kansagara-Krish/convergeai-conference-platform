@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Delete User API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        #output {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        input {
+            padding: 8px;
+            margin: 5px 0;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Delete User API Test</h1>
+    
+    <div class="section">
+        <h2>1. Login First</h2>
+        <input type="text" id="username" placeholder="Username" value="admin">
+        <input type="password" id="password" placeholder="Password" value="password">
+        <button onclick="login()">Login</button>
+        <div id="login-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. List Users</h2>
+        <button onclick="listUsers()">Get All Users</button>
+        <div id="users-list"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Delete User</h2>
+        <input type="number" id="userId" placeholder="User ID to delete">
+        <button onclick="deleteUser()">Delete User</button>
+        <div id="delete-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Debug Output</h2>
+        <button onclick="clearOutput()">Clear Output</button>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let authToken = null;
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            console.log(message);
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const statusDiv = document.getElementById('login-status');
+
+            log(`Attempting login with username: ${username}`);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                log(`Login response status: ${response.status}`);
+
+                const data = await response.json();
+                log(`Login response: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    statusDiv.innerHTML = '<span class="success">✓ Logged in successfully!</span>';
+                    log(`Token received: ${authToken.substring(0, 20)}...`, 'success');
+                } else {
+                    statusDiv.innerHTML = `<span class="error">✗ Login failed: ${data.message}</span>`;
+                    log(`Login failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">✗ Network error: ${error.message}</span>`;
+                log(`Login network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function listUsers() {
+            const listDiv = document.getElementById('users-list');
+
+            if (!authToken) {
+                listDiv.innerHTML = '<span class="error">Please login first!</span>';
+                return;
+            }
+
+            log('Fetching users list...');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users?per_page=50`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                log(`Users list response status: ${response.status}`);
+
+                const data = await response.json();
+                log(`Users list response: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.ok && data.data) {
+                    const users = data.data;
+                    listDiv.innerHTML = '<h3>Users:</h3><ul>' +  
+                        users.map(u => `<li>ID: ${u.id} - ${u.name} (${u.username}) - ${u.email}</li>`).join('') +
+                        '</ul>';
+                    log(`Fetched ${users.length} users`, 'success');
+                } else {
+                    listDiv.innerHTML = `<span class="error">Failed to load users: ${data.message}</span>`;
+                    log(`Failed to load users: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                listDiv.innerHTML = `<span class="error">Network error: ${error.message}</span>`;
+                log(`Users list network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteUser() {
+            const userId = document.getElementById('userId').value;
+            const statusDiv = document.getElementById('delete-status');
+
+            if (!authToken) {
+                statusDiv.innerHTML = '<span class="error">Please login first!</span>';
+                return;
+            }
+
+            if (!userId) {
+                statusDiv.innerHTML = '<span class="error">Please enter a user ID!</span>';
+                return;
+            }
+
+            log(`Attempting to delete user ID: ${userId}`);
+
+            try {
+                const url = `${API_BASE}/api/admin/users/${userId}`;
+                log(`DELETE request to: ${url}`);
+                log(`Authorization header: Bearer ${authToken.substring(0, 20)}...`);
+
+                const response = await fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                log(`Delete response status: ${response.status}`);
+
+                const data = await response.json();
+                log(`Delete response: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.ok) {
+                    statusDiv.innerHTML = '<span class="success">✓ User deleted successfully!</span>';
+                    log(`User ${userId} deleted successfully!`, 'success');
+                    // Refresh users list
+                    await listUsers();
+                } else {
+                    statusDiv.innerHTML = `<span class="error">✗ Delete failed: ${data.message}</span>`;
+                    log(`Delete failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">✗ Network error: ${error.message}</span>`;
+                log(`Delete network error: ${error.message}`, 'error');
+                log(`Error details: ${error.stack}`, 'error');
+            }
+        }
+
+        // Log initial state
+        log('Test page loaded');
+        log(`API Base URL: ${API_BASE}`);
+        log('Ready to test delete functionality');
+    </script>
+</body>
+</html>

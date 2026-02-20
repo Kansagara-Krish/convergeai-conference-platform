@@ -140,6 +140,7 @@ class Chatbot(db.Model):
             'multiple_mode': self.multiple_mode,
             'background_image': self.background_image,
             'guests_count': len(self.guests),
+            'participants_count': len(self.participants),
             'messages_count': len(self.messages),
             'created_at': self.created_at.isoformat(),
         }

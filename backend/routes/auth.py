@@ -63,12 +63,16 @@ def admin_required(f):
 def login():
     """User login endpoint"""
     
-    data = request.get_json()
+    data = request.get_json() or {}
+    login_id = (data.get('username') or '').strip()
+    password = data.get('password')
     
-    if not data or not data.get('username') or not data.get('password'):
+    if not login_id or password is None or password == '':
         return jsonify({'success': False, 'message': 'Username and password required'}), 400
     
-    user = User.query.filter_by(username=data['username']).first()
+    user = User.query.filter(
+        (User.username.ilike(login_id)) | (User.email.ilike(login_id))
+    ).first()
     
     if not user:
         return jsonify({
@@ -77,7 +81,7 @@ def login():
             'field': 'username'
         }), 401
     
-    if not user.check_password(data['password']):
+    if not user.check_password(password):
         return jsonify({
             'success': False, 
             'message': 'Incorrect password',

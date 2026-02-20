@@ -5,6 +5,7 @@
 .env.local
 .env.*.local
 
+info_text.txt
 # Python
 __pycache__/
 *.py[cod]
