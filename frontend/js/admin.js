@@ -28,6 +28,10 @@ class AdminPanel {
     this.currentChatbotId = null;
     this.sidebarRefreshInterval = null;
     this.chatbotSeenCountKey = "admin_seen_chatbot_total";
+    this.recentChatbotsPerPage = 3;
+    this.recentChatbotsPage = 1;
+    this.recentChatbotsTotalPages = 1;
+    this.dashboardPaginationBound = false;
     this.init();
   }
 
@@ -269,17 +273,29 @@ class AdminPanel {
     }
   }
 
-  async loadRecentChatbots() {
+  async loadRecentChatbots(page = 1) {
     const tbody = DomUtils.$("#dashboard-recent-chatbots");
     if (!tbody) return;
 
+    const safePage = Number.isFinite(Number(page))
+      ? Math.max(Number(page), 1)
+      : 1;
+    this.recentChatbotsPage = safePage;
+
     try {
-      const response = await API.get("/api/admin/chatbots?page=1&per_page=5");
+      const response = await API.get(
+        `/api/admin/chatbots?page=${safePage}&per_page=${this.recentChatbotsPerPage}`,
+      );
       const chatbots = Array.isArray(response?.data) ? response.data : [];
+      const totalPages = Number.isFinite(Number(response?.pages))
+        ? Number(response.pages)
+        : 1;
+      this.recentChatbotsTotalPages = Math.max(totalPages, 1);
 
       if (chatbots.length === 0) {
         tbody.innerHTML =
           '<tr><td colspan="6" class="text-center">No chatbots found.</td></tr>';
+        this.renderRecentChatbotsPagination();
         return;
       }
 
@@ -291,7 +307,7 @@ class AdminPanel {
               <td>${bot.event_name || "-"}</td>
               <td>${DateUtils.formatDateRange(bot.start_date, bot.end_date)}</td>
               <td><span class="status-indicator status-${bot.status}"><span class="status-dot"></span> ${bot.status}</span></td>
-              <td>${bot.guests_count || 0}</td>
+              <td>${bot.participants_count || 0}</td>
               <td>
                 <div class="table-actions">
                   <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-icon btn-secondary"><i class="fas fa-edit"></i></a>
@@ -304,11 +320,75 @@ class AdminPanel {
         .join("");
 
       this.setupEventListeners();
+      this.renderRecentChatbotsPagination();
     } catch (error) {
       console.error("Error loading recent chatbots:", error);
       tbody.innerHTML =
         '<tr><td colspan="6" class="text-center">Failed to load recent chatbots.</td></tr>';
+      this.renderRecentChatbotsPagination(true);
     }
+  }
+
+  renderRecentChatbotsPagination(isError = false) {
+    const container = DomUtils.$("#dashboard-chatbots-pagination");
+    if (!container) return;
+
+    if (isError || this.recentChatbotsTotalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    const prevDisabled = this.recentChatbotsPage <= 1;
+    const nextDisabled =
+      this.recentChatbotsPage >= this.recentChatbotsTotalPages;
+
+    const pageButtons = Array.from(
+      { length: this.recentChatbotsTotalPages },
+      (_, index) => {
+        const pageNumber = index + 1;
+        const isActive = pageNumber === this.recentChatbotsPage;
+        return `
+          <button class="page-btn${isActive ? " active" : ""}" data-page="${pageNumber}" aria-current="${isActive ? "page" : "false"}">
+            ${pageNumber}
+          </button>
+        `;
+      },
+    ).join("");
+
+    container.innerHTML = `
+      <button class="page-btn" data-page="${this.recentChatbotsPage - 1}" ${
+        prevDisabled ? "disabled" : ""
+      } aria-label="Previous page">
+        Prev
+      </button>
+      <div class="pagination-track" role="list">
+        ${pageButtons}
+      </div>
+      <button class="page-btn" data-page="${this.recentChatbotsPage + 1}" ${
+        nextDisabled ? "disabled" : ""
+      } aria-label="Next page">
+        Next
+      </button>
+    `;
+
+    this.bindRecentChatbotsPagination();
+  }
+
+  bindRecentChatbotsPagination() {
+    const container = DomUtils.$("#dashboard-chatbots-pagination");
+    if (!container || this.dashboardPaginationBound) return;
+
+    container.addEventListener("click", (event) => {
+      const target = event.target.closest("button[data-page]");
+      if (!target || target.disabled) return;
+
+      const page = Number.parseInt(target.dataset.page || "1", 10);
+      if (!Number.isFinite(page) || page === this.recentChatbotsPage) return;
+
+      this.loadRecentChatbots(page);
+    });
+
+    this.dashboardPaginationBound = true;
   }
 
   async deleteChatbot(id) {
@@ -368,8 +448,10 @@ class ChatbotFormHandler {
       // Switch to edit mode
       this.form.dataset.action = "edit";
       DomUtils.$(".header-title h1").textContent = "Edit Chatbot";
-      DomUtils.$(".header-breadcrumb span:last-child").textContent =
-        "Edit Chatbot";
+      const breadcrumbLast = DomUtils.$(".header-breadcrumb span:last-child");
+      if (breadcrumbLast) {
+        breadcrumbLast.textContent = "Edit Chatbot";
+      }
       DomUtils.$('button[type="submit"]').textContent = "💾 Save Changes";
 
       const backgroundInput = this.form.querySelector(
@@ -448,7 +530,7 @@ class ChatbotFormHandler {
 
     // Create image preview
     const img = document.createElement("img");
-    img.src = `/${imagePath}`; // Add leading slash for absolute path
+    img.src = `${API_BASE_URL}/${imagePath}`; // Use API_BASE_URL to serve from backend
     img.style.width = "100%";
     img.style.height = "100%";
     img.style.objectFit = "cover";
@@ -731,6 +813,9 @@ class ChatbotFormHandler {
 class ImportExcelHandler {
   constructor() {
     this.form = DomUtils.$('form[data-form="import-excel"]');
+    this.eventSelect = DomUtils.$("#event-select");
+    this.roleSelect = DomUtils.$("#role-select");
+    this.recentImportsBody = DomUtils.$("#recent-imports-body");
     if (this.form) {
       this.init();
     }
@@ -739,30 +824,137 @@ class ImportExcelHandler {
   init() {
     this.form.addEventListener("submit", (e) => this.handleSubmit(e));
     this.setupFileInput();
+    this.loadEventOptions();
+  }
+
+  async loadEventOptions() {
+    if (!this.eventSelect) return;
+
+    try {
+      const response = await API.get("/api/admin/chatbots?page=1&per_page=200");
+      const chatbots = Array.isArray(response?.data) ? response.data : [];
+
+      this.eventSelect.innerHTML =
+        '<option value="">Select an event...</option>' +
+        chatbots
+          .map(
+            (bot) =>
+              `<option value="${bot.id}">${bot.event_name || bot.name || `Chatbot ${bot.id}`}</option>`,
+          )
+          .join("");
+    } catch (error) {
+      console.error("Failed to load event options:", error);
+      this.eventSelect.innerHTML =
+        '<option value="">Unable to load events</option>';
+    }
   }
 
   setupFileInput() {
     const input = this.form.querySelector('input[type="file"]');
-    if (input) {
-      input.addEventListener("change", () => {
+    if (!input) return;
+
+    const uploadArea = input.closest(".file-upload");
+
+    if (uploadArea) {
+      uploadArea.addEventListener("click", () => input.click());
+
+      uploadArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadArea.classList.add("dragover");
+      });
+
+      uploadArea.addEventListener("dragleave", () => {
+        uploadArea.classList.remove("dragover");
+      });
+
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("dragover");
+
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+
+        const transfer = new DataTransfer();
+        transfer.items.add(files[0]);
+        input.files = transfer.files;
+
         this.previewFile(input.files[0]);
       });
     }
+
+    input.addEventListener("change", () => {
+      this.previewFile(input.files[0]);
+    });
   }
 
-  previewFile(file) {
+  async previewFile(file) {
     if (!file || !file.name.endsWith(".xlsx")) {
       NotificationManager.error("Please upload an Excel file (.xlsx)");
       return;
     }
 
-    // Simulate file preview - in real app, use xlsx library
     const preview = DomUtils.$(".import-preview");
-    if (preview) {
+    const fileInput = this.form.querySelector('input[type="file"]');
+    const uploadArea = fileInput?.closest(".file-upload");
+    const uploadText = uploadArea?.querySelector(".file-upload-text");
+    const uploadHint = uploadArea?.querySelector(".file-upload-hint");
+    const uploadIcon = uploadArea?.querySelector(".file-upload-icon");
+
+    if (uploadIcon) {
+      uploadIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+      uploadIcon.style.color = "var(--accent-green)";
+    }
+
+    if (uploadText) {
+      uploadText.textContent = `✅ ${file.name}`;
+      uploadText.style.color = "var(--text-primary)";
+      uploadText.style.fontWeight = "600";
+    }
+
+    if (uploadHint) {
+      uploadHint.textContent = `Uploaded • Size: ${(file.size / 1024).toFixed(2)} KB • Click to change file`;
+    }
+
+    if (uploadArea) {
+      uploadArea.classList.remove("dragover");
+      uploadArea.style.borderColor = "var(--accent-green)";
+      uploadArea.style.background = "rgba(34, 197, 94, 0.08)";
+    }
+
+    if (!preview) return;
+
+    preview.innerHTML = `
+      <p>File selected: ${file.name}</p>
+      <p>Size: ${(file.size / 1024).toFixed(2)} KB</p>
+      <p style="color: var(--accent-blue);">Analyzing users...</p>
+    `;
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const data = await API.post("/api/admin/import/excel/preview", formData);
+      const info = data?.preview || {};
+
+      if (uploadHint) {
+        uploadHint.textContent = `Rows: ${info.total_rows ?? 0} | Valid: ${info.valid_rows ?? 0} | Skipped: ${info.skipped_rows ?? 0}`;
+      }
+
       preview.innerHTML = `
-        <p>File selected: ${file.name}</p>
-        <p>Size: ${(file.size / 1024).toFixed(2)} KB</p>
-        <p style="color: var(--accent-blue);">Ready to import</p>
+        <p><strong>File:</strong> ${file.name}</p>
+        <p><strong>Total rows found:</strong> ${info.total_rows ?? 0}</p>
+        <p><strong>Valid users ready to import:</strong> <span style="color: var(--accent-green);">${info.valid_rows ?? 0}</span></p>
+        <p><strong>Skipped rows:</strong> ${info.skipped_rows ?? 0}</p>
+        <p style="color: var(--text-secondary); font-size: 0.9em;">Invalid emails: ${info.invalid_email_rows ?? 0} | Existing emails: ${info.duplicate_email_rows ?? 0}</p>
+      `;
+    } catch (error) {
+      if (uploadHint) {
+        uploadHint.textContent =
+          "File uploaded • Preview unavailable • You can still import";
+      }
+
+      preview.innerHTML = `
+        <p><strong>File:</strong> ${file.name}</p>
+        <p style="color: var(--accent-orange);">Could not analyze file preview. You can still try importing.</p>
       `;
     }
   }
@@ -779,32 +971,61 @@ class ImportExcelHandler {
     const formData = new FormData();
     formData.append("file", file);
 
+    const selectedRole = this.roleSelect?.value || "user";
+    const selectedEvent = this.eventSelect?.value || "";
+    if (selectedRole) formData.append("default_role", selectedRole);
+    if (selectedEvent) formData.append("event_id", selectedEvent);
+
     try {
-      const response = await fetch("/api/import/excel", {
-        method: "POST",
-        body: formData,
+      const data = await API.post("/api/admin/import/excel", formData);
+      const skipped = Number.isFinite(Number(data.skipped))
+        ? Number(data.skipped)
+        : 0;
+
+      NotificationManager.success(`Imported ${data.count} users successfully`);
+      NotificationManager.info(
+        `Credentials emails are being sent to ${data.count} users in background`,
+      );
+      this.showCredentials(data.credentials, skipped);
+      this.appendRecentImportRow({
+        fileName: file.name,
+        count: data.count,
+        eventName:
+          this.eventSelect?.options?.[this.eventSelect.selectedIndex]?.text ||
+          "-",
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        NotificationManager.success(
-          `Imported ${data.count} users successfully`,
-        );
-        this.showCredentials(data.credentials);
-      } else {
-        NotificationManager.error(data.message || "Import failed");
-      }
     } catch (error) {
       console.error("Import error:", error);
-      NotificationManager.error("Failed to import file");
+      NotificationManager.error(error.message || "Failed to import file");
     }
   }
 
-  showCredentials(credentials) {
+  appendRecentImportRow({ fileName, count, eventName }) {
+    if (!this.recentImportsBody) return;
+
+    const placeholder = this.recentImportsBody.querySelector("td[colspan='6']");
+    if (placeholder) {
+      this.recentImportsBody.innerHTML = "";
+    }
+
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${DateUtils.formatDate(new Date())}</td>
+      <td>${eventName || "-"}</td>
+      <td>${count}</td>
+      <td>${fileName}</td>
+      <td><span class="badge badge-success">Completed</span></td>
+      <td><span style="color: var(--text-secondary);">Generated in session</span></td>
+    `;
+
+    this.recentImportsBody.prepend(row);
+  }
+
+  showCredentials(credentials, skipped = 0) {
     const html = `
       <h3>Import Successful!</h3>
       <p>${credentials.length} users created with credentials:</p>
+      ${skipped > 0 ? `<p style="color: var(--accent-orange);">${skipped} rows were skipped (duplicates or invalid data).</p>` : ""}
       <div class="table-container" style="max-height: 400px; overflow-y: auto;">
         <table class="table">
           <thead>
@@ -829,18 +1050,20 @@ class ImportExcelHandler {
           </tbody>
         </table>
       </div>
-      <button class="btn btn-primary mt-lg" onclick="downloadCredentials()">
-        <i class="fas fa-download"></i> Download Credentials
-      </button>
     `;
 
-    ModalManager.create("Import Results", html, [
-      {
-        id: "close",
-        label: "Close",
-        class: "btn-secondary",
-      },
-    ]);
+    ModalManager.create(
+      "Import Results",
+      html,
+      [
+        {
+          id: "close",
+          label: "Close",
+          class: "btn-secondary",
+        },
+      ],
+      { width: "800px" },
+    );
   }
 }
 
@@ -852,11 +1075,14 @@ class UserManagementHandler {
   constructor() {
     this.table = DomUtils.$('table[data-table="users"]');
     this.roleFilter = DomUtils.$("#user-role-filter");
+    this.searchInput = DomUtils.$("#user-search");
+    this.addSingleUserBtn = DomUtils.$("#add-single-user-btn");
     this.paginationContainer = DomUtils.$("#users-pagination-container");
     this.paginationSummary = DomUtils.$("#users-pagination-summary");
     this.paginationButtons = DomUtils.$("#users-pagination-buttons");
+    this.searchDebounceTimer = null;
     this.currentPage = 1;
-    this.perPage = 10;
+    this.perPage = 7;
     if (this.table) {
       this.init();
     }
@@ -905,6 +1131,12 @@ class UserManagementHandler {
   }
 
   setupActions() {
+    if (this.addSingleUserBtn) {
+      this.addSingleUserBtn.addEventListener("click", () =>
+        this.openAddSingleUserModal(),
+      );
+    }
+
     this.table.addEventListener("click", (event) => {
       const resetBtn = event.target.closest('[data-action="reset-password"]');
       if (resetBtn) {
@@ -916,17 +1148,227 @@ class UserManagementHandler {
       if (toggleBtn) {
         const isActive = toggleBtn.dataset.userActive === "true";
         this.toggleUser(toggleBtn.dataset.userId, isActive);
+        return;
+      }
+
+      const deleteBtn = event.target.closest('[data-action="delete-user"]');
+      if (deleteBtn) {
+        this.deleteUser(deleteBtn.dataset.userId, deleteBtn.dataset.userName);
       }
     });
   }
 
-  setupFilters() {
-    if (!this.roleFilter) return;
+  async openAddSingleUserModal() {
+    const content = `
+      <form id="single-user-form" class="single-user-form" style="max-height: 600px; overflow-y: auto;">
+        <!-- Account Information Section -->
+        <div style="padding-bottom: 16px; border-bottom: 2px solid var(--border-color); margin-bottom: 16px;">
+          <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
+            <i class="fas fa-user-circle"></i> Account Information
+          </h4>
+          <div class="form-group">
+            <label for="single-user-name">Full Name <span style="color: var(--accent-red);">*</span></label>
+            <input type="text" id="single-user-name" name="name" placeholder="e.g., John Doe" required />
+          </div>
+          <div class="form-group">
+            <label for="single-user-email">Email <span style="color: var(--accent-red);">*</span></label>
+            <input type="email" id="single-user-email" name="email" placeholder="user@example.com" required />
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="single-user-username">Username <span style="color: var(--accent-red);">*</span></label>
+              <input type="text" id="single-user-username" name="username" placeholder="username" required />
+            </div>
+            <div class="form-group">
+              <label for="single-user-password">Password <span style="color: var(--accent-red);">*</span></label>
+              <input type="text" id="single-user-password" name="password" placeholder="temporary password" required />
+            </div>
+          </div>
+        </div>
 
-    this.roleFilter.addEventListener("change", () => {
-      this.currentPage = 1;
-      this.loadUsers(1);
-    });
+        <!-- Role & Status Section -->
+        <div style="padding-bottom: 16px; border-bottom: 2px solid var(--border-color); margin-bottom: 16px;">
+          <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
+            <i class="fas fa-shield-alt"></i> Role & Status
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="single-user-role">User Role</label>
+              <select id="single-user-role" name="role" style="width: 100%;">
+                <option value="user">👤 User</option>
+                <option value="admin">🔐 Admin</option>
+              </select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end; gap: 8px;">
+              <input type="checkbox" id="single-user-active" name="active" checked style="width: 20px; height: 20px; cursor: pointer;" />
+              <label for="single-user-active" style="margin: 0; flex: 1; display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 12px; color: var(--text-secondary);">Active Status</span> <i class="fas fa-check-circle" style="color: var(--accent-green);"></i>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Event Assignment Section -->
+        <div style="padding-bottom: 16px;">
+          <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
+            <i class="fas fa-calendar-check"></i> Assign to Active Events
+          </h4>
+          <select id="single-user-chatbots" name="chatbots" multiple style="width: 100%; height: 140px; padding: 10px; border-radius: 6px; border: 2px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 14px; cursor: pointer; font-family: inherit;">
+            <option value="" disabled>Loading active events...</option>
+          </select>
+          <small style="color: var(--text-secondary); display: block; margin-top: 8px; font-style: italic;">
+            <i class="fas fa-info-circle"></i> Select one or more events • Hold Ctrl/Cmd to multi-select
+          </small>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 2px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" id="single-user-cancel" style="padding: 10px 20px;">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" id="single-user-submit" style="padding: 10px 24px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));">
+            <i class="fas fa-user-plus"></i> Create User
+          </button>
+        </div>
+      </form>
+    `;
+
+    const modal = ModalManager.create("Add Single User", content, []);
+    const form = modal.querySelector("#single-user-form");
+    const cancelBtn = modal.querySelector("#single-user-cancel");
+    const chatbotsSelect = modal.querySelector("#single-user-chatbots");
+
+    // Load available chatbots
+    try {
+      const response = await API.get("/api/admin/chatbots");
+      const allChatbots = response?.data || [];
+
+      // Filter only active chatbots
+      const activeChatbots = allChatbots.filter((c) => c.active);
+
+      if (activeChatbots.length === 0) {
+        chatbotsSelect.innerHTML =
+          '<option value="" disabled>No active events available</option>';
+      } else {
+        // Sort by name
+        activeChatbots.sort((a, b) =>
+          (a.name || "").localeCompare(b.name || ""),
+        );
+
+        chatbotsSelect.innerHTML = activeChatbots
+          .map(
+            (chatbot) =>
+              `<option value="${chatbot.id}">📌 ${chatbot.name} - ${chatbot.event_name}</option>`,
+          )
+          .join("");
+      }
+    } catch (error) {
+      chatbotsSelect.innerHTML =
+        '<option value="" disabled>Error loading events</option>';
+      console.error("Failed to load chatbots:", error);
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", () => ModalManager.close(modal));
+    }
+
+    if (form) {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await this.submitSingleUser(form, modal);
+      });
+    }
+  }
+
+  async submitSingleUser(form, modal) {
+    const elements = form.elements;
+
+    // Get selected chatbot IDs from multi-select
+    const chatbotsSelect = form.querySelector('[name="chatbots"]');
+    const selectedChatbots = Array.from(chatbotsSelect.selectedOptions).map(
+      (opt) => parseInt(opt.value),
+    );
+
+    const payload = {
+      name: elements["name"].value.trim(),
+      email: elements["email"].value.trim(),
+      username: elements["username"].value.trim(),
+      password: elements["password"].value,
+      role: elements["role"].value,
+      active: elements["active"].checked,
+      chatbot_ids: selectedChatbots,
+    };
+
+    if (
+      !payload.name ||
+      !payload.email ||
+      !payload.username ||
+      !payload.password
+    ) {
+      NotificationManager.error("Please fill all required fields");
+      return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailPattern.test(payload.email)) {
+      NotificationManager.error("Please enter a valid email address");
+      return;
+    }
+
+    const submitBtn = form.querySelector("#single-user-submit");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating...";
+    }
+
+    try {
+      const response = await API.post("/api/admin/users", payload);
+      if (response?.email_sent === false) {
+        NotificationManager.warning(
+          response?.message ||
+            "User created, but email was not sent. Check mail settings.",
+        );
+      } else {
+        NotificationManager.success(
+          response?.message || "User created successfully",
+        );
+      }
+      ModalManager.close(modal);
+      await this.loadUserStats();
+      await this.loadUsers(1);
+      // Refresh chatbot list to update participant counts
+      if (window.chatbotList) {
+        window.chatbotList.loadChatbots();
+      }
+    } catch (error) {
+      NotificationManager.error(error.message || "Failed to create user");
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create User";
+      }
+    }
+  }
+
+  setupFilters() {
+    if (this.roleFilter) {
+      this.roleFilter.addEventListener("change", () => {
+        this.currentPage = 1;
+        this.loadUsers(1);
+      });
+    }
+
+    if (this.searchInput) {
+      this.searchInput.addEventListener("input", () => {
+        if (this.searchDebounceTimer) {
+          clearTimeout(this.searchDebounceTimer);
+        }
+
+        this.searchDebounceTimer = setTimeout(() => {
+          this.currentPage = 1;
+          this.loadUsers(1);
+        }, 300);
+      });
+    }
   }
 
   setupPaginationActions() {
@@ -978,12 +1420,30 @@ class UserManagementHandler {
     }
   }
 
+  async deleteUser(userId, userName) {
+    ModalManager.confirm(
+      `Are you sure you want to permanently delete "${userName || "this user"}"? This action cannot be undone.`,
+      async () => {
+        try {
+          await API.delete(`/api/admin/users/${userId}`);
+          NotificationManager.success("User deleted successfully");
+          await this.loadUserStats();
+          await this.loadUsers(this.currentPage);
+        } catch (error) {
+          NotificationManager.error(error.message || "Failed to delete user");
+        }
+      },
+    );
+  }
+
   async loadUsers(page = 1) {
     try {
       const role = this.roleFilter?.value || "";
       const roleQuery = role ? `&role=${encodeURIComponent(role)}` : "";
+      const search = (this.searchInput?.value || "").trim();
+      const searchQuery = search ? `&search=${encodeURIComponent(search)}` : "";
       const response = await API.get(
-        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}`,
+        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}${searchQuery}`,
       );
 
       const users = Array.isArray(response?.data) ? response.data : [];
@@ -1030,12 +1490,27 @@ class UserManagementHandler {
         const statusClass = user.active ? "status-active" : "status-inactive";
         const statusText = user.active ? "Active" : "Inactive";
 
+        // Display chatbot assignments
+        const chatbots = user.chatbots || [];
+        const chatbotsDisplay =
+          chatbots.length > 0
+            ? `<div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 4px;">
+               <i class="fas fa-calendar-alt" style="margin-right: 4px;"></i>
+               ${chatbots.map((c) => c.name).join(", ")}
+             </div>`
+            : `<div style="font-size: 0.85em; color: var(--text-tertiary); margin-top: 4px; font-style: italic;">
+               No events assigned
+             </div>`;
+
         return `
           <tr>
             <td>
               <div style="display: flex; align-items: center; gap: var(--spacing-md);">
                 <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">${initials}</div>
-                <div>${user.name || user.username || "-"}</div>
+                <div>
+                  <div>${user.name || user.username || "-"}</div>
+                  ${chatbotsDisplay}
+                </div>
               </div>
             </td>
             <td>${user.email || "-"}</td>
@@ -1046,6 +1521,7 @@ class UserManagementHandler {
               <div class="table-actions">
                 <button class="btn btn-sm btn-secondary" data-action="reset-password" data-user-id="${user.id}"><i class="fas fa-key"></i> Reset</button>
                 <button class="btn btn-sm ${user.active ? "btn-danger" : "btn-success"}" data-action="toggle-user" data-user-id="${user.id}" data-user-active="${user.active}">${user.active ? "Deactivate" : "Activate"}</button>
+                <button class="btn btn-sm btn-danger" data-action="delete-user" data-user-id="${user.id}" data-user-name="${user.name || user.username || "User"}" title="Delete user"><i class="fas fa-trash"></i></button>
               </div>
             </td>
           </tr>
@@ -1101,6 +1577,187 @@ class UserManagementHandler {
   }
 }
 
+class AdminProfileHandler {
+  constructor() {
+    this.form = DomUtils.$('form[data-form="admin-profile"]');
+    if (!this.form) return;
+
+    this.nameInput = this.form.querySelector('[name="name"]');
+    this.usernameInput = this.form.querySelector('[name="username"]');
+    this.emailInput = this.form.querySelector('[name="email"]');
+    this.organizationInput = this.form.querySelector('[name="organization"]');
+    this.bioInput = this.form.querySelector('[name="bio"]');
+
+    this.init();
+  }
+
+  init() {
+    this.form.addEventListener("submit", (event) => this.handleSubmit(event));
+    this.loadProfile();
+  }
+
+  async loadProfile() {
+    try {
+      const response = await API.get("/api/user/profile");
+      const profile = response?.data || {};
+
+      if (this.nameInput) this.nameInput.value = profile.name || "";
+      if (this.usernameInput) this.usernameInput.value = profile.username || "";
+      if (this.emailInput) this.emailInput.value = profile.email || "";
+      if (this.organizationInput) {
+        this.organizationInput.value = profile.organization || "";
+      }
+      if (this.bioInput) this.bioInput.value = profile.bio || "";
+
+      const roleEl = DomUtils.$("#profile-role");
+      if (roleEl) roleEl.textContent = profile.role || "Admin";
+
+      const messagesEl = DomUtils.$("#profile-messages");
+      if (messagesEl) {
+        messagesEl.textContent = Number.isFinite(Number(profile.messages_sent))
+          ? Number(profile.messages_sent)
+          : 0;
+      }
+
+      const joinedEl = DomUtils.$("#profile-joined-chatbots");
+      if (joinedEl) {
+        joinedEl.textContent = Number.isFinite(Number(profile.joined_chatbots))
+          ? Number(profile.joined_chatbots)
+          : 0;
+      }
+    } catch (error) {
+      console.error("Error loading admin profile:", error);
+      NotificationManager.error("Failed to load profile");
+    }
+  }
+
+  async handleSubmit(event) {
+    event.preventDefault();
+
+    const payload = {
+      name: this.nameInput?.value?.trim() || "",
+      organization: this.organizationInput?.value?.trim() || "",
+      bio: this.bioInput?.value?.trim() || "",
+    };
+
+    if (!payload.name) {
+      NotificationManager.error("Name is required");
+      return;
+    }
+
+    try {
+      const response = await API.put("/api/user/profile", payload);
+      const updatedUser = response?.data || {};
+
+      const currentUser = Storage.getUser() || {};
+      Storage.setUser({
+        ...currentUser,
+        name: updatedUser.name || payload.name,
+        organization: updatedUser.organization || payload.organization,
+        bio: updatedUser.bio || payload.bio,
+      });
+
+      NotificationManager.success("Profile updated successfully");
+    } catch (error) {
+      console.error("Error updating admin profile:", error);
+      NotificationManager.error(error.message || "Failed to update profile");
+    }
+  }
+}
+
+class AdminSettingsHandler {
+  constructor() {
+    this.form = DomUtils.$('form[data-form="admin-password"]');
+    if (!this.form) return;
+
+    this.currentPasswordInput = this.form.querySelector(
+      '[name="current_password"]',
+    );
+    this.newPasswordInput = this.form.querySelector('[name="new_password"]');
+    this.confirmPasswordInput = this.form.querySelector(
+      '[name="confirm_password"]',
+    );
+
+    this.init();
+  }
+
+  init() {
+    this.setupPasswordVisibilityToggles();
+    this.form.addEventListener("submit", (event) => this.handleSubmit(event));
+  }
+
+  setupPasswordVisibilityToggles() {
+    const toggles = DomUtils.$$(".password-visibility-toggle");
+    if (!toggles || toggles.length === 0) return;
+
+    toggles.forEach((toggleBtn) => {
+      toggleBtn.addEventListener("click", () => {
+        const targetId = toggleBtn.dataset.target;
+        if (!targetId) return;
+
+        const input = document.getElementById(targetId);
+        if (!input) return;
+
+        const icon = toggleBtn.querySelector("i");
+        const isHidden = input.type === "password";
+        input.type = isHidden ? "text" : "password";
+
+        if (icon) {
+          icon.classList.toggle("fa-eye", !isHidden);
+          icon.classList.toggle("fa-eye-slash", isHidden);
+        }
+
+        toggleBtn.setAttribute(
+          "aria-label",
+          isHidden ? "Hide password" : "Show password",
+        );
+      });
+    });
+  }
+
+  async handleSubmit(event) {
+    event.preventDefault();
+
+    const currentPassword = this.currentPasswordInput?.value || "";
+    const newPassword = this.newPasswordInput?.value || "";
+    const confirmPassword = this.confirmPasswordInput?.value || "";
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      NotificationManager.error("Please fill all password fields");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      NotificationManager.error("New password must be at least 6 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      NotificationManager.error("New password and confirmation do not match");
+      return;
+    }
+
+    try {
+      await API.put("/api/auth/change-password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+
+      NotificationManager.success(
+        "Password updated successfully. Please login again.",
+      );
+      this.form.reset();
+      setTimeout(() => {
+        Storage.clear();
+        AdminAuth.redirectToLogin();
+      }, 700);
+    } catch (error) {
+      console.error("Error changing password:", error);
+      NotificationManager.error(error.message || "Failed to update password");
+    }
+  }
+}
+
 // ============================================
 // INITIALIZATION
 // ============================================
@@ -1117,6 +1774,8 @@ document.addEventListener("DOMContentLoaded", () => {
   window.importExcel = new ImportExcelHandler();
   window.userManagement = new UserManagementHandler();
   window.guestManagement = new GuestManagementHandler();
+  window.adminProfile = new AdminProfileHandler();
+  window.adminSettings = new AdminSettingsHandler();
 });
 
 // ============================================
@@ -1132,12 +1791,20 @@ class ChatbotListHandler {
     ) {
       this.grid = document.getElementById("chatbot-grid");
       this.table = document.querySelector('table[data-table="chatbots"]');
+      this.chatbotsPerPage = 100;
+      this.chatbotsPage = 1;
+      this.chatbotsTotalPages = 1;
+      this.chatbotPaginationBound = false;
+      this.paginationContainer = document.getElementById(
+        "chatbot-list-pagination",
+      );
       this.init();
     }
   }
 
   init() {
     this.allChatbots = [];
+    this.filteredChatbots = [];
     this.searchInput = document.getElementById("chatbot-search");
     this.statusFilter = document.getElementById("chatbot-status-filter");
 
@@ -1180,11 +1847,13 @@ class ChatbotListHandler {
     }
 
     if (this.searchInput) {
-      this.searchInput.addEventListener("input", () => this.applyFilters());
+      this.searchInput.addEventListener("input", () => this.applyFilters(true));
     }
 
     if (this.statusFilter) {
-      this.statusFilter.addEventListener("change", () => this.applyFilters());
+      this.statusFilter.addEventListener("change", () =>
+        this.applyFilters(true),
+      );
     }
   }
 
@@ -1210,7 +1879,7 @@ class ChatbotListHandler {
       const response = await API.get("/api/admin/chatbots");
       const chatbots = this.normalizeChatbots(response);
       this.allChatbots = chatbots;
-      this.applyFilters();
+      this.applyFilters(true);
 
       // Update sidebar badge if it exists
       const badge = document.querySelector(".menu-item.active .menu-badge");
@@ -1241,7 +1910,7 @@ class ChatbotListHandler {
     return [];
   }
 
-  applyFilters() {
+  applyFilters(resetPage = false) {
     const searchTerm = (this.searchInput?.value || "").trim().toLowerCase();
     const selectedStatus = (this.statusFilter?.value || "")
       .trim()
@@ -1260,7 +1929,92 @@ class ChatbotListHandler {
       return matchesSearch && matchesStatus;
     });
 
-    this.render(filtered);
+    this.filteredChatbots = filtered;
+    if (resetPage) {
+      this.chatbotsPage = 1;
+    }
+    this.chatbotsTotalPages = Math.max(
+      Math.ceil(filtered.length / this.chatbotsPerPage),
+      1,
+    );
+
+    if (this.chatbotsPage > this.chatbotsTotalPages) {
+      this.chatbotsPage = this.chatbotsTotalPages;
+    }
+
+    this.renderPage();
+  }
+
+  renderPage() {
+    const start = (this.chatbotsPage - 1) * this.chatbotsPerPage;
+    const pageItems = this.filteredChatbots.slice(
+      start,
+      start + this.chatbotsPerPage,
+    );
+    this.render(pageItems);
+    this.renderChatbotPagination();
+  }
+
+  renderChatbotPagination() {
+    const container = this.paginationContainer;
+    if (!container) return;
+
+    if (this.chatbotsTotalPages <= 1) {
+      container.innerHTML = "";
+      return;
+    }
+
+    const prevDisabled = this.chatbotsPage <= 1;
+    const nextDisabled = this.chatbotsPage >= this.chatbotsTotalPages;
+
+    const pageButtons = Array.from(
+      { length: this.chatbotsTotalPages },
+      (_, index) => {
+        const pageNumber = index + 1;
+        const isActive = pageNumber === this.chatbotsPage;
+        return `
+          <button class="page-btn${isActive ? " active" : ""}" data-page="${pageNumber}" aria-current="${isActive ? "page" : "false"}">
+            ${pageNumber}
+          </button>
+        `;
+      },
+    ).join("");
+
+    container.innerHTML = `
+      <button class="page-btn" data-page="${this.chatbotsPage - 1}" ${
+        prevDisabled ? "disabled" : ""
+      } aria-label="Previous page">
+        Prev
+      </button>
+      <div class="pagination-track" role="list">
+        ${pageButtons}
+      </div>
+      <button class="page-btn" data-page="${this.chatbotsPage + 1}" ${
+        nextDisabled ? "disabled" : ""
+      } aria-label="Next page">
+        Next
+      </button>
+    `;
+
+    this.bindChatbotPagination();
+  }
+
+  bindChatbotPagination() {
+    const container = this.paginationContainer;
+    if (!container || this.chatbotPaginationBound) return;
+
+    container.addEventListener("click", (event) => {
+      const target = event.target.closest("button[data-page]");
+      if (!target || target.disabled) return;
+
+      const page = Number.parseInt(target.dataset.page || "1", 10);
+      if (!Number.isFinite(page) || page === this.chatbotsPage) return;
+
+      this.chatbotsPage = page;
+      this.renderPage();
+    });
+
+    this.chatbotPaginationBound = true;
   }
 
   renderLoadError(message) {
@@ -1308,7 +2062,7 @@ class ChatbotListHandler {
                               ${bot.active ? "✓ Active" : "✗ Inactive"}
                             </span>
                         </td>
-                        <td>${bot.guests_count || 0}</td>
+                        <td>${bot.participants_count || 0}</td>
                         <td>${bot.messages_count || 0}</td>
                         <td>
                             <div class="table-actions">
@@ -1350,7 +2104,7 @@ class ChatbotListHandler {
                         </div>
                         <div class="chatbot-card-item">
                             <span class="chatbot-card-item-icon"><i class="fas fa-users"></i></span>
-                            <span>${bot.guests_count || 0} participants</span>
+                            <span>${bot.participants_count || 0} participants</span>
                         </div>
                         <div class="chatbot-card-item">
                             <span class="chatbot-card-item-icon"><i class="fas fa-comments"></i></span>

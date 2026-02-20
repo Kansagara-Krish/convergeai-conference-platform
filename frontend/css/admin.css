@@ -732,6 +732,68 @@
   font-size: 0.9rem;
 }
 
+/* Dashboard table pagination */
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding: 0 var(--spacing-sm) var(--spacing-sm);
+  overflow: hidden;
+}
+
+.table-pagination .pagination-track {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  overflow-x: auto;
+  padding: 4px 2px 6px;
+  max-width: 320px;
+  scrollbar-width: thin;
+}
+
+.table-pagination .pagination-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-pagination .pagination-track::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+
+.table-pagination .page-btn {
+  min-width: 36px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.table-pagination .page-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.table-pagination .page-btn.active {
+  color: white;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.25);
+}
+
+.table-pagination .page-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ============================================
    9. EMPTY STATES
    ============================================ */
@@ -949,4 +1011,70 @@ input[type="checkbox"][name="active"]:checked + .toggle-label .toggle-text {
   background-color: rgba(255, 76, 76, 0.2);
   color: #ff4c4c;
   border: 1px solid #ff4c4c;
+}
+
+/* ============================================
+   FORM SELECT CONSISTENCY
+   ============================================ */
+
+.form-group select,
+select#event-select,
+select#role-select,
+select#user-role-filter,
+select#chatbot-status-filter {
+  background-color: rgba(31, 42, 72, 0.9);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.form-group select option,
+select#event-select option,
+select#role-select option,
+select#user-role-filter option,
+select#chatbot-status-filter option {
+  background-color: #171d3a;
+  color: var(--text-primary);
+}
+
+.form-group select option:checked,
+select#event-select option:checked,
+select#role-select option:checked,
+select#user-role-filter option:checked,
+select#chatbot-status-filter option:checked {
+  background-color: #2a6acb;
+  color: #ffffff;
+}
+
+/* ============================================
+   PASSWORD VISIBILITY TOGGLE
+   ============================================ */
+
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 44px;
+}
+
+.password-visibility-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-visibility-toggle:hover {
+  color: var(--text-primary);
+  background: rgba(79, 70, 229, 0.12);
 }

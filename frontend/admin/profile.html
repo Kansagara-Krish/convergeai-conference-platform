@@ -4,18 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management - Conference Chatbot System</title>
+    <title>My Profile - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/admin.css">
-    <!-- FontAwesome -->
+    <link rel="stylesheet" href="../css/admin.css?v=12">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="../js/utils.js?v=7"></script>
-    <script src="../js/admin.js?v=7"></script>
+    <script src="../js/utils.js?v=12"></script>
+    <script src="../js/admin.js?v=12"></script>
 </head>
 
 <body>
     <div class="admin-container">
-        <!-- Sidebar -->
         <aside class="admin-sidebar">
             <div class="sidebar-brand">
                 <div class="admin-sidebar-header">
@@ -52,7 +50,7 @@
 
                 <div class="menu-section">
                     <div class="menu-label">Users & Data</div>
-                    <a href="user-management.html" class="menu-item active">
+                    <a href="user-management.html" class="menu-item">
                         <span class="menu-icon"><i class="fas fa-users-cog"></i></span>
                         <span>Users</span>
                         <span class="menu-badge">847</span>
@@ -65,7 +63,7 @@
 
                 <div class="menu-section">
                     <div class="menu-label">Settings</div>
-                    <a href="profile.html" class="menu-item">
+                    <a href="profile.html" class="menu-item active">
                         <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
                         <span>My Profile</span>
                     </a>
@@ -91,88 +89,76 @@
             </div>
         </aside>
 
-        <!-- Main Content -->
         <div class="admin-main">
-            <!-- Header -->
             <header class="admin-header">
                 <div class="header-title">
-                    <h1>User Management</h1>
+                    <h1>My Profile</h1>
                 </div>
             </header>
 
-            <!-- Content Area -->
             <div class="admin-content">
-                <!-- Statistics -->
                 <div class="stats-grid mb-lg">
                     <div class="stat-card">
-                        <div class="stat-icon primary"><i class="fas fa-users"></i></div>
-                        <div class="stat-value" id="users-total">0</div>
-                        <div class="stat-label">Total Users</div>
+                        <div class="stat-icon primary"><i class="fas fa-user-check"></i></div>
+                        <div class="stat-value" id="profile-role">Admin</div>
+                        <div class="stat-label">Role</div>
                     </div>
-
                     <div class="stat-card">
-                        <div class="stat-icon success"><i class="fas fa-check"></i></div>
-                        <div class="stat-value" id="users-active">0</div>
-                        <div class="stat-label">Active</div>
+                        <div class="stat-icon success"><i class="fas fa-comments"></i></div>
+                        <div class="stat-value" id="profile-messages">0</div>
+                        <div class="stat-label">Messages Sent</div>
                     </div>
-
                     <div class="stat-card">
-                        <div class="stat-icon warning"><i class="fas fa-pause"></i></div>
-                        <div class="stat-value" id="users-inactive">0</div>
-                        <div class="stat-label">Inactive</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon danger"><i class="fas fa-user-plus"></i></div>
-                        <div class="stat-value" id="users-new-month">0</div>
-                        <div class="stat-label">New This Month</div>
+                        <div class="stat-icon warning"><i class="fas fa-link"></i></div>
+                        <div class="stat-value" id="profile-joined-chatbots">0</div>
+                        <div class="stat-label">Joined Chatbots</div>
                     </div>
                 </div>
 
-                <!-- Users Table -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>All Users</h2>
-                        <div style="display: flex; gap: var(--spacing-sm);">
-                            <button type="button" id="add-single-user-btn" class="btn btn-sm btn-secondary">➕ Add User</button>
-                            <a href="import-excel.html" class="btn btn-sm btn-primary">📥 Import More</a>
+                <div class="form-layout">
+                    <form data-form="admin-profile">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Account Information</h3>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="admin-profile-name">Full Name</label>
+                                    <input type="text" id="admin-profile-name" name="name" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="admin-profile-username">Username</label>
+                                    <input type="text" id="admin-profile-username" name="username" disabled>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="admin-profile-email">Email</label>
+                                    <input type="email" id="admin-profile-email" name="email" disabled>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="admin-profile-organization">Organization</label>
+                                    <input type="text" id="admin-profile-organization" name="organization"
+                                        placeholder="Organization name">
+                                </div>
+                            </div>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="admin-profile-bio">Bio</label>
+                                    <textarea id="admin-profile-bio" name="bio"
+                                        placeholder="Short profile summary"></textarea>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div style="display: flex; gap: var(--spacing-md); align-items: center; flex-wrap: wrap; padding: 0 var(--spacing-lg) var(--spacing-md);">
-                        <input type="text" id="user-search" placeholder="Search by user name" style="width: 320px; max-width: 100%;">
-                        <select id="user-role-filter" style="width: 170px;">
-                            <option value="">Filter by role</option>
-                            <option value="admin">Admin</option>
-                            <option value="user">User</option>
-                            <option value="speaker">Speaker</option>
-                        </select>
-                    </div>
-                    <div class="table-container">
-                        <table class="table" data-table="users">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                    <th>Joined</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td colspan="6" class="text-center">Loading users...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
 
-                <!-- Pagination -->
-                <div class="flex-between mt-lg" id="users-pagination-container">
-                    <p style="color: var(--text-secondary);" id="users-pagination-summary">Showing 0-0 of 0 users</p>
-                    <div class="flex" gap="var(--spacing-md)" id="users-pagination-buttons">
-                    </div>
+                        <div class="form-actions">
+                            <a href="dashboard.html" class="btn btn-secondary">Back</a>
+                            <button type="submit" class="btn btn-primary">Save Profile</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

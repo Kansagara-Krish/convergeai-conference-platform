@@ -5,8 +5,11 @@
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_migrate import Migrate
+from dotenv import load_dotenv
 import os
 from datetime import datetime
+
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 try:
     from config import config
@@ -36,8 +39,11 @@ def create_app(config_name=None):
     db.init_app(app)
     CORS(app, resources={r"/api/*": {
         "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        "allow_headers": ["Content-Type", "Authorization", "Accept"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": False,
+        "max_age": 3600
     }})
     Migrate(app, db)
     
