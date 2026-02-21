@@ -23,11 +23,80 @@ const AdminAuth = {
   },
 };
 
+const AdminPageSkeletonLoader = {
+  isBooting: true,
+  pendingRequests: 0,
+  patched: false,
+
+  init() {
+    const adminContent = document.querySelector(".admin-content");
+    if (!adminContent) {
+      this.isBooting = false;
+      return;
+    }
+
+    adminContent.classList.add("page-skeleton-loading");
+    this.patchApiRequests();
+
+    setTimeout(() => {
+      this.finishIfReady(true);
+    }, 1800);
+  },
+
+  patchApiRequests() {
+    if (this.patched || typeof API === "undefined") return;
+
+    ["get", "post", "put", "delete"].forEach((methodName) => {
+      const original = API[methodName];
+      if (typeof original !== "function") return;
+
+      API[methodName] = async (...args) => {
+        this.onRequestStart();
+        try {
+          return await original.apply(API, args);
+        } finally {
+          this.onRequestEnd();
+        }
+      };
+    });
+
+    this.patched = true;
+  },
+
+  onRequestStart() {
+    if (!this.isBooting) return;
+    this.pendingRequests += 1;
+  },
+
+  onRequestEnd() {
+    if (!this.isBooting) return;
+    this.pendingRequests = Math.max(0, this.pendingRequests - 1);
+    this.finishIfReady(false);
+  },
+
+  finishIfReady(force) {
+    if (!this.isBooting) return;
+    if (!force && this.pendingRequests > 0) return;
+
+    const adminContent = document.querySelector(".admin-content");
+    if (adminContent) {
+      adminContent.classList.remove("page-skeleton-loading");
+    }
+
+    this.isBooting = false;
+  },
+};
+
 class AdminPanel {
   constructor() {
     this.currentChatbotId = null;
     this.sidebarRefreshInterval = null;
-    this.chatbotSeenCountKey = "admin_seen_chatbot_total";
+    this.notificationRefreshInterval = null;
+    this.dashboardNotifications = [];
+    this.dashboardUnreadCount = 0;
+    this.isBellPanelOpen = false;
+    this.sidebarScrollTopKey = "admin_sidebar_scroll_top";
+    this.pageScrollTopKey = "admin_page_scroll_top";
     this.recentChatbotsPerPage = 3;
     this.recentChatbotsPage = 1;
     this.recentChatbotsTotalPages = 1;
@@ -47,6 +116,45 @@ class AdminPanel {
     this.setupEventListeners();
     this.startSidebarBadgeRefresh();
     this.loadDashboardData();
+    this.setupDashboardBell();
+  }
+
+  setupDashboardBell() {
+    const bellBtn = DomUtils.$("#dashboard-bell-btn");
+    const bellWrap = DomUtils.$("#dashboard-bell-wrap");
+    const bellPanel = DomUtils.$("#dashboard-bell-panel");
+    if (!bellBtn || !bellWrap || !bellPanel) return;
+
+    setTimeout(() => {
+      bellBtn.classList.remove("bell-ringing");
+    }, 2300);
+
+    bellBtn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      this.isBellPanelOpen = !this.isBellPanelOpen;
+      bellPanel.classList.toggle("active", this.isBellPanelOpen);
+      bellPanel.setAttribute("aria-hidden", String(!this.isBellPanelOpen));
+
+      if (this.isBellPanelOpen) {
+        await this.loadDashboardNotifications();
+        if (this.dashboardUnreadCount > 0) {
+          await this.markDashboardNotificationsRead();
+        }
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!bellWrap.contains(event.target)) {
+        this.isBellPanelOpen = false;
+        bellPanel.classList.remove("active");
+        bellPanel.setAttribute("aria-hidden", "true");
+      }
+    });
+
+    this.loadDashboardNotifications();
+    this.startDashboardNotificationRefresh();
   }
 
   setupSidebar() {
@@ -76,13 +184,62 @@ class AdminPanel {
     // Close sidebar when menu item is clicked (only on mobile)
     menuItems.forEach((item) => {
       item.addEventListener("click", () => {
+        this.saveScrollPositions(sidebar);
         if (window.innerWidth < 1024) {
           DomUtils.removeClass(sidebar, "active");
         }
       });
     });
 
+    this.restoreScrollPositions(sidebar);
+    this.bindScrollPersistence(sidebar);
     this.resetSidebarBadges();
+  }
+
+  bindScrollPersistence(sidebar) {
+    const persistScroll = () => this.saveScrollPositions(sidebar);
+
+    sidebar.addEventListener("scroll", persistScroll, { passive: true });
+    window.addEventListener("scroll", persistScroll, { passive: true });
+    window.addEventListener("beforeunload", persistScroll);
+  }
+
+  saveScrollPositions(sidebar) {
+    if (sidebar) {
+      sessionStorage.setItem(
+        this.sidebarScrollTopKey,
+        String(sidebar.scrollTop),
+      );
+    }
+
+    const pageTop =
+      window.scrollY ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+    sessionStorage.setItem(this.pageScrollTopKey, String(pageTop));
+  }
+
+  restoreScrollPositions(sidebar) {
+    const savedSidebarTop = Number.parseInt(
+      sessionStorage.getItem(this.sidebarScrollTopKey) || "0",
+      10,
+    );
+
+    if (sidebar && Number.isFinite(savedSidebarTop)) {
+      sidebar.scrollTop = Math.max(savedSidebarTop, 0);
+    }
+
+    const savedPageTop = Number.parseInt(
+      sessionStorage.getItem(this.pageScrollTopKey) || "0",
+      10,
+    );
+
+    if (Number.isFinite(savedPageTop) && savedPageTop > 0) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, savedPageTop);
+      });
+    }
   }
 
   resetSidebarBadges() {
@@ -109,50 +266,122 @@ class AdminPanel {
     badge.style.display = safeValue > 0 ? "inline-block" : "none";
   }
 
-  getSeenChatbotTotal() {
-    const rawValue = localStorage.getItem(this.chatbotSeenCountKey);
-    const parsedValue = Number.parseInt(rawValue || "0", 10);
-    return Number.isFinite(parsedValue) ? parsedValue : 0;
-  }
-
-  setSeenChatbotTotal(total) {
-    const safeTotal = Number.isFinite(Number(total)) ? Number(total) : 0;
-    localStorage.setItem(this.chatbotSeenCountKey, String(safeTotal));
-  }
-
-  getNewChatbotCount(totalChatbots) {
-    const safeTotal = Number.isFinite(Number(totalChatbots))
-      ? Number(totalChatbots)
-      : 0;
-    const seenTotal = this.getSeenChatbotTotal();
-    return Math.max(safeTotal - seenTotal, 0);
-  }
-
-  isOnChatbotListPage() {
-    return window.location.pathname.toLowerCase().includes("chatbot-list.html");
-  }
-
   updateSidebarBadges(stats) {
     if (!stats) return;
+  }
 
-    const totalChatbots = Number.isFinite(Number(stats.total_chatbots))
-      ? Number(stats.total_chatbots)
+  updateDashboardBell(unreadCount) {
+    const dot = DomUtils.$("#dashboard-bell-dot");
+    if (!dot) return;
+    const safeUnreadCount = Number.isFinite(Number(unreadCount))
+      ? Number(unreadCount)
       : 0;
+    if (safeUnreadCount > 0) {
+      dot.classList.remove("hidden");
+      return;
+    }
+    dot.classList.add("hidden");
+  }
 
-    if (this.isOnChatbotListPage()) {
-      this.setSeenChatbotTotal(totalChatbots);
+  startDashboardNotificationRefresh() {
+    if (this.notificationRefreshInterval) {
+      clearInterval(this.notificationRefreshInterval);
     }
 
-    const newChatbotCount = this.getNewChatbotCount(totalChatbots);
+    this.notificationRefreshInterval = setInterval(() => {
+      this.loadDashboardNotifications();
+    }, 30000);
 
-    this.setSidebarBadge(
-      '.sidebar-menu a[href="chatbot-list.html"] .menu-badge',
-      newChatbotCount,
-    );
-    this.setSidebarBadge(
-      '.sidebar-menu a[href="user-management.html"] .menu-badge',
-      stats.total_users,
-    );
+    window.addEventListener("beforeunload", () => {
+      if (this.notificationRefreshInterval) {
+        clearInterval(this.notificationRefreshInterval);
+      }
+    });
+  }
+
+  async loadDashboardNotifications() {
+    const bellList = DomUtils.$("#dashboard-bell-list");
+    if (!bellList) return;
+
+    try {
+      const response = await API.get("/api/admin/notifications?limit=50");
+      this.dashboardNotifications = Array.isArray(response?.data)
+        ? response.data
+        : [];
+      this.dashboardUnreadCount = Number.isFinite(
+        Number(response?.unread_count),
+      )
+        ? Number(response.unread_count)
+        : 0;
+
+      this.updateDashboardBell(this.dashboardUnreadCount);
+      this.renderDashboardNotifications();
+    } catch (error) {
+      console.error("Error loading notifications:", error);
+      bellList.innerHTML =
+        '<div class="dashboard-bell-empty">Failed to load notifications.</div>';
+    }
+  }
+
+  renderDashboardNotifications() {
+    const bellList = DomUtils.$("#dashboard-bell-list");
+    if (!bellList) return;
+
+    if (
+      !Array.isArray(this.dashboardNotifications) ||
+      this.dashboardNotifications.length === 0
+    ) {
+      bellList.innerHTML =
+        '<div class="dashboard-bell-empty">No notifications in the last 7 days.</div>';
+      return;
+    }
+
+    bellList.innerHTML = this.dashboardNotifications
+      .map((item) => {
+        const unreadClass = item.is_read ? "" : " unread";
+        const title = this.escapeHtml(item.title || "Notification");
+        const message = this.escapeHtml(item.message || "");
+        const createdAt = this.formatNotificationTime(item.created_at);
+        return `
+          <div class="dashboard-bell-item${unreadClass}">
+            <div class="dashboard-bell-item-title">${title}</div>
+            <div class="dashboard-bell-item-message">${message}</div>
+            <div class="dashboard-bell-item-time">${createdAt}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  async markDashboardNotificationsRead() {
+    try {
+      await API.put("/api/admin/notifications/read", {});
+      this.dashboardUnreadCount = 0;
+      this.dashboardNotifications = this.dashboardNotifications.map((item) => ({
+        ...item,
+        is_read: true,
+      }));
+      this.updateDashboardBell(0);
+      this.renderDashboardNotifications();
+    } catch (error) {
+      console.error("Error marking notifications read:", error);
+    }
+  }
+
+  formatNotificationTime(timestamp) {
+    if (!timestamp) return "Just now";
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return "Just now";
+    return date.toLocaleString();
+  }
+
+  escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
 
   async loadSidebarCounts() {
@@ -228,12 +457,29 @@ class AdminPanel {
   async loadDashboardData() {
     const page = window.location.pathname;
     if (page.includes("dashboard.html") || page.endsWith("admin/")) {
-      this.loadDashboardStats();
-      this.loadRecentChatbots();
+      this.setDashboardSectionsLoading(true);
+      try {
+        await Promise.all([
+          this.loadDashboardStats(),
+          this.loadRecentChatbots(),
+        ]);
+      } finally {
+        this.setDashboardSectionsLoading(false);
+      }
     }
   }
 
+  setDashboardSectionsLoading(isLoading) {
+    const targets = ["#quick-actions-card", "#recent-chatbots-card"];
+    targets.forEach((selector) => {
+      const node = DomUtils.$(selector);
+      if (!node) return;
+      node.classList.toggle("dashboard-section-loading", Boolean(isLoading));
+    });
+  }
+
   async loadDashboardStats() {
+    this.setDashboardLoading(true);
     try {
       const response = await API.get("/api/admin/dashboard/stats");
       const stats = response.data;
@@ -251,7 +497,15 @@ class AdminPanel {
     } catch (error) {
       console.error("Error loading dashboard:", error);
       NotificationManager.error("Failed to load dashboard stats");
+    } finally {
+      this.setDashboardLoading(false);
     }
+  }
+
+  setDashboardLoading(isLoading) {
+    const statsGrid = DomUtils.$(".stats-grid");
+    if (!statsGrid) return;
+    statsGrid.classList.toggle("dashboard-loading", Boolean(isLoading));
   }
 
   updateStatCard(id, value) {
@@ -419,6 +673,11 @@ class AdminPanel {
 class ChatbotFormHandler {
   constructor() {
     this.form = DomUtils.$('form[data-form="chatbot"]');
+    this.deletedGuestIds = [];
+    this.defaultSinglePersonPrompt =
+      "Generate a high-quality professional portrait image of the guest.\n\nDetails:\n- Focus on one person only.\n- Center the person in the frame.\n- Use a given background image\n- Maintain realistic facial features.\n- Proper lighting and sharp focus.\n- Business or formal attire.\n- No extra people in the frame.\n- No distortion or overlapping elements.\n- Professional conference vibe.";
+    this.defaultMultiplePersonPrompt =
+      "Generate a professional group image of multiple guests.\n\nRequirements:\n- Include all selected guests in one frame.\n- Arrange them naturally in a group.\n- Maintain correct proportions for each person.\n- Ensure no unnatural gaps between group members.\n- If people are close together, blend them naturally without visual separation.\n- Avoid cutting faces or overlapping distortions.\n- Use a conference or stage background.\n- Maintain uniform lighting and perspective.\n- Make the group appear cohesive and professionally composed.";
     if (this.form) {
       this.init();
     }
@@ -431,6 +690,8 @@ class ChatbotFormHandler {
     this.setupRichEditor();
     this.setupDatePicker();
     this.setupToggleSwitch();
+    this.setupDefaultPrompts();
+    this.setupGuestBuilder();
 
     // Check for edit mode
     const urlParams = new URLSearchParams(window.location.search);
@@ -452,7 +713,7 @@ class ChatbotFormHandler {
       if (breadcrumbLast) {
         breadcrumbLast.textContent = "Edit Chatbot";
       }
-      DomUtils.$('button[type="submit"]').textContent = "💾 Save Changes";
+      DomUtils.$('button[type="submit"]').textContent = "Save Changes";
 
       const backgroundInput = this.form.querySelector(
         '[name="background_image"]',
@@ -478,7 +739,10 @@ class ChatbotFormHandler {
         start_date: bot.start_date,
         end_date: bot.end_date,
         description: bot.description,
-        system_prompt: bot.system_prompt,
+        single_person_prompt:
+          bot.single_person_prompt || this.defaultSinglePersonPrompt,
+        multiple_person_prompt:
+          bot.multiple_person_prompt || this.defaultMultiplePersonPrompt,
       };
 
       for (const [name, value] of Object.entries(fields)) {
@@ -486,9 +750,8 @@ class ChatbotFormHandler {
         if (input) input.value = value;
       }
 
-      // checkboxes
-      if (bot.single_mode) DomUtils.$("#single-mode").checked = true;
-      if (bot.multiple_mode) DomUtils.$("#multiple-mode").checked = true;
+      this.populateGuests(Array.isArray(bot.guests) ? bot.guests : []);
+
       if (bot.active !== undefined) {
         const activeCheckbox = DomUtils.$("#chatbot-active");
         if (activeCheckbox) {
@@ -552,7 +815,8 @@ class ChatbotFormHandler {
       clearBtn.type = "button";
       clearBtn.className = "btn btn-sm btn-danger";
       clearBtn.style.marginTop = "8px";
-      clearBtn.innerHTML = "🗑️ Clear Current Image";
+      clearBtn.innerHTML =
+        '<span class="material-symbols-outlined icon-inline">delete</span>Clear Current Image';
       clearBtn.addEventListener("click", (e) => {
         e.preventDefault();
         this.clearCurrentImage();
@@ -567,8 +831,9 @@ class ChatbotFormHandler {
     const uploadArea = fileInput.parentElement;
     const fileUploadIcon = uploadArea.querySelector(".file-upload-icon");
 
-    // Reset to emoji
-    fileUploadIcon.innerHTML = "🖼️";
+    // Reset to default icon
+    fileUploadIcon.innerHTML =
+      '<span class="material-symbols-outlined">image</span>';
     fileUploadIcon.style.opacity = "1";
 
     // Reset text
@@ -630,18 +895,24 @@ class ChatbotFormHandler {
 
   handleFiles(files, area) {
     if (files.length === 0) return;
-    const file = files[0];
     const input = area.querySelector('input[type="file"]');
+    if (!input) return;
+
+    const allowMultiple = Boolean(input.multiple);
+    const selectedFiles = allowMultiple ? Array.from(files) : [files[0]];
+    const file = selectedFiles[0];
 
     // Update the input's files
     const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(file);
+    selectedFiles.forEach((selectedFile) =>
+      dataTransfer.items.add(selectedFile),
+    );
     input.files = dataTransfer.files;
 
     // Show file info
-    const fileName = file.name;
-    const fileSize = (file.size / 1024 / 1024).toFixed(2);
-    const feedbackText = `📦 ${fileName} (${fileSize} MB)`;
+    const feedbackText = allowMultiple
+      ? `${selectedFiles.length} files selected`
+      : `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
 
     // Update UI with file preview
     const fileUploadText = area.querySelector(".file-upload-text");
@@ -651,11 +922,173 @@ class ChatbotFormHandler {
     }
 
     // For image uploads, show image preview
-    if (input.name === "background_image" && file.type.startsWith("image/")) {
+    if (
+      input.name === "background_image" &&
+      file &&
+      file.type.startsWith("image/")
+    ) {
       this.showImagePreview(file, area);
     }
 
-    NotificationManager.success(`File selected: ${fileName}`);
+    NotificationManager.success("File selection updated");
+  }
+
+  setupGuestBuilder() {
+    const addGuestBtn = this.form.querySelector("#add-guest-btn");
+    if (addGuestBtn) {
+      addGuestBtn.addEventListener("click", () => {
+        const row = this.addGuestRow();
+        const nameInput = row?.querySelector(".manual-guest-name");
+        if (row) {
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        if (nameInput) {
+          setTimeout(() => nameInput.focus(), 120);
+        }
+      });
+    }
+
+    const container = this.form.querySelector("#manual-guests-container");
+    if (container && !container.children.length) {
+      this.addGuestRow();
+    }
+  }
+
+  addGuestRow(guest = {}) {
+    const container = this.form.querySelector("#manual-guests-container");
+    if (!container) return null;
+
+    const row = document.createElement("div");
+    row.className = "manual-guest-row";
+
+    if (guest.id) {
+      row.dataset.guestId = String(guest.id);
+    }
+
+    const fileInputId = `manual-guest-image-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+    row.innerHTML = `
+      <input type="text" class="manual-guest-name" placeholder="Guest name" value="${(guest.name || "").replace(/"/g, "&quot;")}" />
+      <div class="manual-guest-file-wrap">
+        <input type="file" id="${fileInputId}" class="manual-guest-image" accept="image/*" />
+        <img class="manual-guest-thumb" alt="Guest image preview" />
+        <button type="button" class="btn btn-secondary btn-sm manual-guest-file-btn">Choose Image</button>
+        <span class="manual-guest-file-name">No image selected</span>
+      </div>
+      <button type="button" class="btn btn-ghost manual-guest-remove" title="Remove guest"><i class="fas fa-trash"></i></button>
+    `;
+
+    const imageInput = row.querySelector(".manual-guest-image");
+    const imageBtn = row.querySelector(".manual-guest-file-btn");
+    const fileName = row.querySelector(".manual-guest-file-name");
+    const thumb = row.querySelector(".manual-guest-thumb");
+
+    const setThumb = (src) => {
+      if (!thumb) return;
+      if (!src) {
+        thumb.removeAttribute("src");
+        thumb.style.display = "none";
+        return;
+      }
+      thumb.src = src;
+      thumb.style.display = "block";
+    };
+
+    const resolveUploadUrl = (path) => {
+      const raw = String(path || "").trim();
+      if (!raw) return "";
+      if (/^https?:\/\//i.test(raw)) return raw;
+      const normalized = raw.replace(/^\/+/, "");
+      if (normalized.startsWith("uploads/")) {
+        return `${API_BASE_URL}/${normalized}`;
+      }
+      return `${API_BASE_URL}/uploads/${normalized}`;
+    };
+
+    if (imageBtn && imageInput) {
+      imageBtn.addEventListener("click", () => imageInput.click());
+      imageInput.addEventListener("change", () => {
+        const selected = imageInput.files?.[0];
+        fileName.textContent = selected ? selected.name : "No image selected";
+        if (selected) {
+          setThumb(URL.createObjectURL(selected));
+        } else if (guest.photo) {
+          setThumb(resolveUploadUrl(guest.photo));
+        } else {
+          setThumb("");
+        }
+      });
+    }
+
+    const removeBtn = row.querySelector(".manual-guest-remove");
+    removeBtn.addEventListener("click", () => {
+      if (row.dataset.guestId) {
+        this.deletedGuestIds.push(row.dataset.guestId);
+      }
+      row.remove();
+    });
+
+    if (guest.photo) {
+      setThumb(resolveUploadUrl(guest.photo));
+      const photoName = guest.photo.split("/").pop();
+      if (photoName && fileName) {
+        fileName.textContent = "Current image selected";
+        fileName.title = photoName;
+      }
+      const info = document.createElement("small");
+      info.className = "manual-guest-photo-info";
+      info.textContent = "Current image available. Choose file to replace.";
+      row.appendChild(info);
+    } else {
+      setThumb("");
+    }
+
+    container.appendChild(row);
+    return row;
+  }
+
+  populateGuests(guests) {
+    const container = this.form.querySelector("#manual-guests-container");
+    if (!container) return;
+
+    container.innerHTML = "";
+    this.deletedGuestIds = [];
+
+    if (!Array.isArray(guests) || guests.length === 0) {
+      this.addGuestRow();
+      return;
+    }
+
+    guests.forEach((guest) => this.addGuestRow(guest));
+  }
+
+  collectManualGuests(formData) {
+    const rows = this.form.querySelectorAll(".manual-guest-row");
+    const guests = [];
+
+    rows.forEach((row, index) => {
+      const nameInput = row.querySelector(".manual-guest-name");
+      const imageInput = row.querySelector(".manual-guest-image");
+      const name = String(nameInput?.value || "").trim();
+
+      if (!name) return;
+
+      const item = { name };
+      if (row.dataset.guestId) {
+        item.id = Number(row.dataset.guestId);
+      }
+
+      const file = imageInput?.files?.[0];
+      if (file) {
+        const fieldName = `manual_guest_photo_${index}`;
+        formData.append(fieldName, file);
+        item.photo_file_field = fieldName;
+      }
+
+      guests.push(item);
+    });
+
+    return guests;
   }
 
   showImagePreview(file, area) {
@@ -704,6 +1137,23 @@ class ChatbotFormHandler {
           }
         }
       });
+    }
+  }
+
+  setupDefaultPrompts() {
+    const singlePrompt = this.form.querySelector(
+      '[name="single_person_prompt"]',
+    );
+    const multiplePrompt = this.form.querySelector(
+      '[name="multiple_person_prompt"]',
+    );
+
+    if (singlePrompt && !singlePrompt.value.trim()) {
+      singlePrompt.value = this.defaultSinglePersonPrompt;
+    }
+
+    if (multiplePrompt && !multiplePrompt.value.trim()) {
+      multiplePrompt.value = this.defaultMultiplePersonPrompt;
     }
   }
 
@@ -761,6 +1211,69 @@ class ChatbotFormHandler {
 
     const formData = new FormData(this.form);
 
+    const singlePersonPrompt = String(
+      formData.get("single_person_prompt") || "",
+    ).trim();
+    const multiplePersonPrompt = String(
+      formData.get("multiple_person_prompt") || "",
+    ).trim();
+
+    if (!singlePersonPrompt || !multiplePersonPrompt) {
+      NotificationManager.error(
+        "Single Person Prompt and Multiple Person Prompt cannot be empty",
+      );
+      return;
+    }
+
+    formData.set("single_person_prompt", singlePersonPrompt);
+    formData.set("multiple_person_prompt", multiplePersonPrompt);
+
+    const guestListInput = this.form.querySelector('[name="guest_list"]');
+    const hasExcelGuestList = Boolean(guestListInput?.files?.length);
+
+    const guestRows = this.form.querySelectorAll(".manual-guest-row");
+    let hasValidManualGuest = false;
+
+    for (const row of guestRows) {
+      const nameInput = row.querySelector(".manual-guest-name");
+      const imageInput = row.querySelector(".manual-guest-image");
+      const name = String(nameInput?.value || "").trim();
+      const hasImageFile = Boolean(imageInput?.files?.length);
+      const hasExistingImage = Boolean(
+        row.querySelector(".manual-guest-photo-info"),
+      );
+      const hasAnyInput = Boolean(name || hasImageFile);
+
+      if (!hasAnyInput) continue;
+
+      if (!name) {
+        NotificationManager.error(
+          "Guest name is required for manual guest entry",
+        );
+        return;
+      }
+
+      if (!hasImageFile && !hasExistingImage) {
+        NotificationManager.error(
+          "Guest image is required for manual guest entry",
+        );
+        return;
+      }
+
+      hasValidManualGuest = true;
+    }
+
+    if (!isEdit && !hasExcelGuestList && !hasValidManualGuest) {
+      NotificationManager.error(
+        "Add at least one guest with name and image, or upload a guest Excel file",
+      );
+      return;
+    }
+
+    const manualGuests = this.collectManualGuests(formData);
+    formData.set("manual_guests", JSON.stringify(manualGuests));
+    formData.set("deleted_guest_ids", JSON.stringify(this.deletedGuestIds));
+
     // Handle active status (checkbox value must be explicitly sent)
     const activeCheckbox = this.form.querySelector('[name="active"]');
     if (activeCheckbox) {
@@ -775,10 +1288,12 @@ class ChatbotFormHandler {
       // Check if image was cleared (selected for deletion)
       const uploadArea = backgroundInput.parentElement;
       const fileUploadIcon = uploadArea.querySelector(".file-upload-icon");
-      const hasEmoji = fileUploadIcon.textContent.includes("🖼️");
+      const hasDefaultImageIcon = Boolean(
+        fileUploadIcon?.querySelector(".material-symbols-outlined"),
+      );
 
       // If icon shows emoji (cleared) and no files selected, mark for deletion
-      if (hasEmoji && !backgroundInput.files.length) {
+      if (hasDefaultImageIcon && !backgroundInput.files.length) {
         formData.append("clear_background_image", "1");
       }
     }
@@ -816,6 +1331,8 @@ class ImportExcelHandler {
     this.eventSelect = DomUtils.$("#event-select");
     this.roleSelect = DomUtils.$("#role-select");
     this.recentImportsBody = DomUtils.$("#recent-imports-body");
+    this.recentImportsKey = "admin_recent_imports";
+    this.maxRecentImports = 10;
     if (this.form) {
       this.init();
     }
@@ -825,6 +1342,7 @@ class ImportExcelHandler {
     this.form.addEventListener("submit", (e) => this.handleSubmit(e));
     this.setupFileInput();
     this.loadEventOptions();
+    this.loadRecentImports();
   }
 
   async loadEventOptions() {
@@ -893,7 +1411,7 @@ class ImportExcelHandler {
       return;
     }
 
-    const preview = DomUtils.$(".import-preview");
+    const countBox = DomUtils.$("#uploaded-user-count");
     const fileInput = this.form.querySelector('input[type="file"]');
     const uploadArea = fileInput?.closest(".file-upload");
     const uploadText = uploadArea?.querySelector(".file-upload-text");
@@ -906,7 +1424,7 @@ class ImportExcelHandler {
     }
 
     if (uploadText) {
-      uploadText.textContent = `✅ ${file.name}`;
+      uploadText.textContent = file.name;
       uploadText.style.color = "var(--text-primary)";
       uploadText.style.fontWeight = "600";
     }
@@ -921,13 +1439,11 @@ class ImportExcelHandler {
       uploadArea.style.background = "rgba(34, 197, 94, 0.08)";
     }
 
-    if (!preview) return;
-
-    preview.innerHTML = `
-      <p>File selected: ${file.name}</p>
-      <p>Size: ${(file.size / 1024).toFixed(2)} KB</p>
-      <p style="color: var(--accent-blue);">Analyzing users...</p>
-    `;
+    if (countBox) {
+      countBox.style.display = "block";
+      countBox.innerHTML =
+        '<p><strong>Users:</strong> <span style="color: var(--accent-blue);">...</span></p>';
+    }
 
     try {
       const formData = new FormData();
@@ -936,26 +1452,23 @@ class ImportExcelHandler {
       const info = data?.preview || {};
 
       if (uploadHint) {
-        uploadHint.textContent = `Rows: ${info.total_rows ?? 0} | Valid: ${info.valid_rows ?? 0} | Skipped: ${info.skipped_rows ?? 0}`;
+        uploadHint.textContent = `Uploaded • Size: ${(file.size / 1024).toFixed(2)} KB • Click to change file`;
       }
 
-      preview.innerHTML = `
-        <p><strong>File:</strong> ${file.name}</p>
-        <p><strong>Total rows found:</strong> ${info.total_rows ?? 0}</p>
-        <p><strong>Valid users ready to import:</strong> <span style="color: var(--accent-green);">${info.valid_rows ?? 0}</span></p>
-        <p><strong>Skipped rows:</strong> ${info.skipped_rows ?? 0}</p>
-        <p style="color: var(--text-secondary); font-size: 0.9em;">Invalid emails: ${info.invalid_email_rows ?? 0} | Existing emails: ${info.duplicate_email_rows ?? 0}</p>
-      `;
+      if (countBox) {
+        countBox.innerHTML = `<p><strong>Users:</strong> <span style="color: var(--accent-green);">${info.total_rows ?? 0}</span></p>`;
+      }
     } catch (error) {
       if (uploadHint) {
         uploadHint.textContent =
           "File uploaded • Preview unavailable • You can still import";
       }
 
-      preview.innerHTML = `
-        <p><strong>File:</strong> ${file.name}</p>
-        <p style="color: var(--accent-orange);">Could not analyze file preview. You can still try importing.</p>
-      `;
+      if (countBox) {
+        countBox.style.display = "block";
+        countBox.innerHTML =
+          '<p><strong>Users:</strong> <span style="color: var(--accent-orange);">Unavailable</span></p>';
+      }
     }
   }
 
@@ -1003,7 +1516,14 @@ class ImportExcelHandler {
   appendRecentImportRow({ fileName, count, eventName }) {
     if (!this.recentImportsBody) return;
 
-    const placeholder = this.recentImportsBody.querySelector("td[colspan='6']");
+    this.storeRecentImport({
+      fileName,
+      count,
+      eventName,
+      createdAt: new Date().toISOString(),
+    });
+
+    const placeholder = this.recentImportsBody.querySelector("td[colspan='5']");
     if (placeholder) {
       this.recentImportsBody.innerHTML = "";
     }
@@ -1015,10 +1535,51 @@ class ImportExcelHandler {
       <td>${count}</td>
       <td>${fileName}</td>
       <td><span class="badge badge-success">Completed</span></td>
-      <td><span style="color: var(--text-secondary);">Generated in session</span></td>
     `;
 
     this.recentImportsBody.prepend(row);
+  }
+
+  loadRecentImports() {
+    if (!this.recentImportsBody) return;
+
+    const stored = this.readRecentImports();
+    if (!stored.length) return;
+
+    this.recentImportsBody.innerHTML = "";
+    stored.forEach((item) => this.renderRecentImportRow(item));
+  }
+
+  renderRecentImportRow(item) {
+    if (!this.recentImportsBody) return;
+
+    const row = document.createElement("tr");
+    const createdAt = item.createdAt ? new Date(item.createdAt) : new Date();
+    row.innerHTML = `
+      <td>${DateUtils.formatDate(createdAt)}</td>
+      <td>${item.eventName || "-"}</td>
+      <td>${item.count || 0}</td>
+      <td>${item.fileName || "-"}</td>
+      <td><span class="badge badge-success">Completed</span></td>
+    `;
+    this.recentImportsBody.appendChild(row);
+  }
+
+  storeRecentImport(entry) {
+    const stored = this.readRecentImports();
+    stored.unshift(entry);
+    const trimmed = stored.slice(0, this.maxRecentImports);
+    localStorage.setItem(this.recentImportsKey, JSON.stringify(trimmed));
+  }
+
+  readRecentImports() {
+    try {
+      const raw = localStorage.getItem(this.recentImportsKey);
+      const parsed = JSON.parse(raw || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
   }
 
   showCredentials(credentials, skipped = 0) {
@@ -1075,6 +1636,7 @@ class UserManagementHandler {
   constructor() {
     this.table = DomUtils.$('table[data-table="users"]');
     this.roleFilter = DomUtils.$("#user-role-filter");
+    this.statusFilter = DomUtils.$("#user-status-filter");
     this.searchInput = DomUtils.$("#user-search");
     this.addSingleUserBtn = DomUtils.$("#add-single-user-btn");
     this.paginationContainer = DomUtils.$("#users-pagination-container");
@@ -1195,8 +1757,8 @@ class UserManagementHandler {
             <div class="form-group">
               <label for="single-user-role">User Role</label>
               <select id="single-user-role" name="role" style="width: 100%;">
-                <option value="user">👤 User</option>
-                <option value="admin">🔐 Admin</option>
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
             <div class="form-group" style="display: flex; align-items: flex-end; gap: 8px;">
@@ -1258,7 +1820,7 @@ class UserManagementHandler {
         chatbotsSelect.innerHTML = activeChatbots
           .map(
             (chatbot) =>
-              `<option value="${chatbot.id}">📌 ${chatbot.name} - ${chatbot.event_name}</option>`,
+              `<option value="${chatbot.id}">${chatbot.name} - ${chatbot.event_name}</option>`,
           )
           .join("");
       }
@@ -1357,6 +1919,13 @@ class UserManagementHandler {
       });
     }
 
+    if (this.statusFilter) {
+      this.statusFilter.addEventListener("change", () => {
+        this.currentPage = 1;
+        this.loadUsers(1);
+      });
+    }
+
     if (this.searchInput) {
       this.searchInput.addEventListener("input", () => {
         if (this.searchDebounceTimer) {
@@ -1440,10 +2009,12 @@ class UserManagementHandler {
     try {
       const role = this.roleFilter?.value || "";
       const roleQuery = role ? `&role=${encodeURIComponent(role)}` : "";
+      const active = this.statusFilter?.value || "";
+      const activeQuery = active ? `&active=${encodeURIComponent(active)}` : "";
       const search = (this.searchInput?.value || "").trim();
       const searchQuery = search ? `&search=${encodeURIComponent(search)}` : "";
       const response = await API.get(
-        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}${searchQuery}`,
+        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}${activeQuery}${searchQuery}`,
       );
 
       const users = Array.isArray(response?.data) ? response.data : [];
@@ -1763,6 +2334,8 @@ class AdminSettingsHandler {
 // ============================================
 
 document.addEventListener("DOMContentLoaded", () => {
+  AdminPageSkeletonLoader.init();
+
   // Initialize admin panel
   if (document.querySelector(".admin-container")) {
     window.adminPanel = new AdminPanel();
@@ -1817,11 +2390,11 @@ class ChatbotListHandler {
     const params = new URLSearchParams(window.location.search);
     const msg = params.get("msg");
     if (msg === "created") {
-      NotificationManager.success("✨ Chatbot created successfully!");
+      NotificationManager.success("Chatbot created successfully!");
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (msg === "updated") {
-      NotificationManager.success("✅ Chatbot updated successfully!");
+      NotificationManager.success("Chatbot updated successfully!");
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }
@@ -2059,7 +2632,7 @@ class ChatbotListHandler {
                         <td><span class="status-indicator status-${bot.status}"><span class="status-dot"></span> ${bot.status}</span></td>
                         <td>
                             <span class="admin-status ${bot.active ? "status-active" : "status-inactive"}">
-                              ${bot.active ? "✓ Active" : "✗ Inactive"}
+                              ${bot.active ? "Active" : "Inactive"}
                             </span>
                         </td>
                         <td>${bot.participants_count || 0}</td>
@@ -2094,7 +2667,7 @@ class ChatbotListHandler {
                             <div class="chatbot-card-status">${bot.event_name}</div>
                         </div>
                         <span class="admin-status ${bot.active ? "status-active" : "status-inactive"}">
-                          ${bot.active ? "✓ Active" : "✗ Inactive"}
+                          ${bot.active ? "Active" : "Inactive"}
                         </span>
                     </div>
                     <div class="chatbot-card-body">

@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/admin.css">
+    <link rel="stylesheet" href="../css/admin.css?v=8">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js?v=7"></script>
-    <script src="../js/admin.js?v=7"></script>
+    <script src="../js/admin.js?v=8"></script>
 </head>
 
 <body>
@@ -70,7 +70,7 @@
                         <span>My Profile</span>
                     </a>
                     <a href="settings.html" class="menu-item">
-                        <span class="menu-icon">🔐</span>
+                        <span class="menu-icon"><span class="material-symbols-outlined">lock</span></span>
                         <span>Security</span>
                     </a>
                 </div>
@@ -133,18 +133,22 @@
                 <div class="card">
                     <div class="card-header">
                         <h2>All Users</h2>
-                        <div style="display: flex; gap: var(--spacing-sm);">
-                            <button type="button" id="add-single-user-btn" class="btn btn-sm btn-secondary">➕ Add User</button>
-                            <a href="import-excel.html" class="btn btn-sm btn-primary">📥 Import More</a>
+                        <div class="users-header-actions">
+                            <button type="button" id="add-single-user-btn" class="btn btn-sm btn-secondary"><span class="material-symbols-outlined icon-inline">person_add</span>Add User</button>
+                            <a href="import-excel.html" class="btn btn-sm btn-primary"><span class="material-symbols-outlined icon-inline">upload_file</span>Import More</a>
                         </div>
                     </div>
-                    <div style="display: flex; gap: var(--spacing-md); align-items: center; flex-wrap: wrap; padding: 0 var(--spacing-lg) var(--spacing-md);">
-                        <input type="text" id="user-search" placeholder="Search by user name" style="width: 320px; max-width: 100%;">
-                        <select id="user-role-filter" style="width: 170px;">
+                    <div class="users-filter-row">
+                        <input type="text" id="user-search" class="users-filter-search" placeholder="Search by user name">
+                        <select id="user-role-filter" class="users-filter-select">
                             <option value="">Filter by role</option>
                             <option value="admin">Admin</option>
                             <option value="user">User</option>
-                            <option value="speaker">Speaker</option>
+                        </select>
+                        <select id="user-status-filter" class="users-filter-select">
+                            <option value="">Filter by status</option>
+                            <option value="true">Active</option>
+                            <option value="false">Deactive</option>
                         </select>
                     </div>
                     <div class="table-container">

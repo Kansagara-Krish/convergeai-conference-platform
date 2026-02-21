@@ -68,6 +68,32 @@ class Chatbot(db.Model):
     """Chatbot model for event chatbots"""
     __tablename__ = 'chatbots'
     INFINITE_END_DATE = datetime(9999, 12, 31).date()
+    DEFAULT_SINGLE_PERSON_PROMPT = (
+        'Generate a high-quality professional portrait image of the guest.\n\n'
+        'Details:\n'
+        '- Focus on one person only.\n'
+        '- Center the person in the frame.\n'
+        '- Use a given background image\n'
+        '- Maintain realistic facial features.\n'
+        '- Proper lighting and sharp focus.\n'
+        '- Business or formal attire.\n'
+        '- No extra people in the frame.\n'
+        '- No distortion or overlapping elements.\n'
+        '- Professional conference vibe.'
+    )
+    DEFAULT_MULTIPLE_PERSON_PROMPT = (
+        'Generate a professional group image of multiple guests.\n\n'
+        'Requirements:\n'
+        '- Include all selected guests in one frame.\n'
+        '- Arrange them naturally in a group.\n'
+        '- Maintain correct proportions for each person.\n'
+        '- Ensure no unnatural gaps between group members.\n'
+        '- If people are close together, blend them naturally without visual separation.\n'
+        '- Avoid cutting faces or overlapping distortions.\n'
+        '- Use a conference or stage background.\n'
+        '- Maintain uniform lighting and perspective.\n'
+        '- Make the group appear cohesive and professionally composed.'
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False, index=True)
@@ -80,12 +106,11 @@ class Chatbot(db.Model):
     
     # AI Configuration
     system_prompt = db.Column(db.Text, nullable=False)
-    single_mode = db.Column(db.Boolean, default=False)
-    multiple_mode = db.Column(db.Boolean, default=True)
+    single_person_prompt = db.Column(db.Text, nullable=False, default=DEFAULT_SINGLE_PERSON_PROMPT)
+    multiple_person_prompt = db.Column(db.Text, nullable=False, default=DEFAULT_MULTIPLE_PERSON_PROMPT)
     
     # Media
     background_image = db.Column(db.String(255))
-    logo = db.Column(db.String(255))
     
     # Settings
     public = db.Column(db.Boolean, default=True)
@@ -136,8 +161,8 @@ class Chatbot(db.Model):
             'status': self.status,
             'active': self.active,
             'system_prompt': self.system_prompt,
-            'single_mode': self.single_mode,
-            'multiple_mode': self.multiple_mode,
+            'single_person_prompt': self.single_person_prompt,
+            'multiple_person_prompt': self.multiple_person_prompt,
             'background_image': self.background_image,
             'guests_count': len(self.guests),
             'participants_count': len(self.participants),
@@ -176,6 +201,7 @@ class Guest(db.Model):
             'name': self.name,
             'title': self.title,
             'description': self.description,
+            'photo': self.photo,
             'organization': self.organization,
             'is_speaker': self.is_speaker,
             'is_moderator': self.is_moderator,
@@ -206,6 +232,39 @@ class Message(db.Model):
             'sender': 'user' if self.is_user_message else 'bot',
             'timestamp': self.created_at.isoformat(),
             'user': self.user.to_dict() if self.user else None,
+        }
+
+# ============================================
+# Admin Notification Model
+# ============================================
+
+class AdminNotification(db.Model):
+    """Notification model for admin dashboard bell."""
+    __tablename__ = 'admin_notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    entity_type = db.Column(db.String(50), nullable=False, default='system')
+    entity_id = db.Column(db.Integer)
+    is_read = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    read_at = db.Column(db.DateTime)
+
+    def mark_read(self):
+        self.is_read = True
+        self.read_at = datetime.utcnow()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'message': self.message,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat(),
+            'read_at': self.read_at.isoformat() if self.read_at else None,
         }
 
 # ============================================

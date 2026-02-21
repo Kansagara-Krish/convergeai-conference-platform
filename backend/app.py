@@ -6,6 +6,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_migrate import Migrate
 from dotenv import load_dotenv
+from sqlalchemy import inspect, text
 import os
 from datetime import datetime
 
@@ -113,9 +114,80 @@ def create_app(config_name=None):
 
         return send_from_directory(frontend_dir, 'index.html')
     
+    def ensure_chatbot_prompt_columns():
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        if 'chatbots' not in table_names:
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('chatbots')}
+
+        if 'single_person_prompt' not in columns:
+            db.session.execute(text(
+                """
+                ALTER TABLE chatbots
+                ADD COLUMN single_person_prompt TEXT NOT NULL
+                DEFAULT 'Generate a high-quality professional portrait image of the guest.
+
+Details:
+- Focus on one person only.
+- Center the person in the frame.
+- Use a given background image
+- Maintain realistic facial features.
+- Proper lighting and sharp focus.
+- Business or formal attire.
+- No extra people in the frame.
+- No distortion or overlapping elements.
+- Professional conference vibe.'
+                """
+            ))
+
+        if 'multiple_person_prompt' not in columns:
+            db.session.execute(text(
+                """
+                ALTER TABLE chatbots
+                ADD COLUMN multiple_person_prompt TEXT NOT NULL
+                DEFAULT 'Generate a professional group image of multiple guests.
+
+Requirements:
+- Include all selected guests in one frame.
+- Arrange them naturally in a group.
+- Maintain correct proportions for each person.
+- Ensure no unnatural gaps between group members.
+- If people are close together, blend them naturally without visual separation.
+- Avoid cutting faces or overlapping distortions.
+- Use a conference or stage background.
+- Maintain uniform lighting and perspective.
+- Make the group appear cohesive and professionally composed.'
+                """
+            ))
+
+        db.session.commit()
+
+    def remove_unused_chatbot_columns():
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        if 'chatbots' not in table_names:
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('chatbots')}
+        removable_columns = ['single_mode', 'multiple_mode', 'logo']
+
+        for column_name in removable_columns:
+            if column_name in columns:
+                try:
+                    db.session.execute(text(f'ALTER TABLE chatbots DROP COLUMN {column_name}'))
+                except Exception:
+                    db.session.rollback()
+                    continue
+
+        db.session.commit()
+
     # Create database tables
     with app.app_context():
         db.create_all()
+        ensure_chatbot_prompt_columns()
+        remove_unused_chatbot_columns()
     
     return app
 

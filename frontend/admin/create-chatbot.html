@@ -157,38 +157,49 @@
 
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label for="prompt">
-                                        System Prompt
+                                    <label for="single-person-prompt">
+                                        Single Person Prompt
                                         <span class="required">*</span>
                                     </label>
-                                    <textarea id="prompt" name="system_prompt" class="rich-editor"
-                                        placeholder="Enter the AI system prompt that defines the chatbot's behavior and knowledge base..."
-                                        data-rules="required" required></textarea>
+                                    <textarea id="single-person-prompt" name="single_person_prompt"
+                                        placeholder="Enter prompt for single person mode..."
+                                        rows="12" style="min-height: 300px; resize: vertical;"
+                                        data-rules="required" required>Generate a high-quality professional portrait image of the guest.
+
+Details:
+- Focus on one person only.
+- Center the person in the frame.
+- Use a given background image
+- Maintain realistic facial features.
+- Proper lighting and sharp focus.
+- Business or formal attire.
+- No extra people in the frame.
+- No distortion or overlapping elements.
+- Professional conference vibe.</textarea>
                                 </div>
                             </div>
 
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label style="margin-bottom: 12px; display: block; font-weight: 600; color: var(--text-primary);">
-                                        <i class="fas fa-microphone" style="color: var(--accent-blue); margin-right: 8px;"></i>
-                                        Conversation Mode
+                                    <label for="multiple-person-prompt">
+                                        Multiple Person Prompt
+                                        <span class="required">*</span>
                                     </label>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                                        <div class="checkbox" style="padding: 12px; border-radius: 6px; border: 2px solid var(--border-color); background-color: var(--bg-secondary); transition: all 0.3s;">
-                                            <input type="checkbox" id="single-mode" name="single_mode" value="1" checked style="width: 18px; height: 18px; cursor: pointer;">
-                                            <label for="single-mode" style="margin: 0; margin-left: 8px; cursor: pointer; display: inline; font-weight: 500;">
-                                                <i class="fas fa-user-tie"></i> Single Person
-                                            </label>
-                                            <small style="display: block; margin-top: 6px; color: var(--text-secondary); margin-left: 26px;">One speaker mode</small>
-                                        </div>
-                                        <div class="checkbox" style="padding: 12px; border-radius: 6px; border: 2px solid var(--border-color); background-color: var(--bg-secondary); transition: all 0.3s;">
-                                            <input type="checkbox" id="multiple-mode" name="multiple_mode" value="1" style="width: 18px; height: 18px; cursor: pointer;">
-                                            <label for="multiple-mode" style="margin: 0; margin-left: 8px; cursor: pointer; display: inline; font-weight: 500;">
-                                                <i class="fas fa-users"></i> Multiple Persons
-                                            </label>
-                                            <small style="display: block; margin-top: 6px; color: var(--text-secondary); margin-left: 26px;">Panel discussion mode</small>
-                                        </div>
-                                    </div>
+                                    <textarea id="multiple-person-prompt" name="multiple_person_prompt"
+                                        placeholder="Enter prompt for multiple person mode..."
+                                        rows="12" style="min-height: 300px; resize: vertical;"
+                                        data-rules="required" required>Generate a professional group image of multiple guests.
+
+Requirements:
+- Include all selected guests in one frame.
+- Arrange them naturally in a group.
+- Maintain correct proportions for each person.
+- Ensure no unnatural gaps between group members.
+- If people are close together, blend them naturally without visual separation.
+- Avoid cutting faces or overlapping distortions.
+- Use a conference or stage background.
+- Maintain uniform lighting and perspective.
+- Make the group appear cohesive and professionally composed.</textarea>
                                 </div>
                             </div>
 
@@ -216,7 +227,7 @@
                                     <div class="file-upload">
                                         <input type="file" id="background-image" name="background_image"
                                             accept="image/*" style="display: none;">
-                                        <div class="file-upload-icon">🖼️</div>
+                                        <div class="file-upload-icon"><span class="material-symbols-outlined">image</span></div>
                                         <div class="file-upload-text">Click or drag image here</div>
                                         <div class="file-upload-hint">Recommended: 1920x1080px, PNG or JPG</div>
                                     </div>
@@ -225,24 +236,46 @@
 
                             <div class="form-row full">
                                 <div class="form-group">
-                                    <label for="guest-list">Guest List (with photos)</label>
-                                    <div class="file-upload">
-                                        <input type="file" id="guest-list" name="guest_list" accept=".xlsx,.csv"
-                                            style="display: none;">
-                                        <div class="file-upload-icon">📋</div>
-                                        <div class="file-upload-text">Click or drag file here</div>
-                                        <div class="file-upload-hint">Upload Excel or CSV with guest information</div>
+                                    <label class="guest-list-title">Guest List</label>
+                                    <small class="guest-list-subtitle">Add guests using either method below.</small>
+
+                                    <div class="guest-method-card">
+                                        <div class="guest-method-header">
+                                            <strong>1) Add guests one by one</strong>
+                                            <button type="button" id="add-guest-btn" class="btn btn-secondary btn-sm">
+                                                <i class="fas fa-plus"></i> Add Guest
+                                            </button>
+                                        </div>
+                                        <div id="manual-guests-container" class="manual-guests-container"></div>
+                                    </div>
+
+                                    <div class="guest-method-card">
+                                        <strong class="guest-method-heading">2) Import from Excel</strong>
+
+                                        <div class="file-upload guest-import-upload">
+                                            <input type="file" id="guest-list" name="guest_list" accept=".xlsx,.csv" style="display: none;">
+                                            <div class="file-upload-icon"><span class="material-symbols-outlined">description</span></div>
+                                            <div class="file-upload-text">Click or drag guest Excel/CSV here</div>
+                                            <div class="file-upload-hint">Excel/CSV should include guest name and image name columns</div>
+                                        </div>
+
+                                        <div class="file-upload">
+                                            <input type="file" id="guest-images" name="guest_images" accept="image/*" multiple style="display: none;">
+                                            <div class="file-upload-icon"><span class="material-symbols-outlined">imagesmode</span></div>
+                                            <div class="file-upload-text">Click or drag guest images here</div>
+                                            <div class="file-upload-hint">Upload image files matching image names from Excel</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Form Actions -->
-                        <div class="form-actions">
+                        <div class="form-actions form-actions-chatbot">
                             <a href="chatbot-list.html" class="btn btn-secondary">Cancel</a>
-                            <button type="reset" class="btn btn-ghost">Reset</button>
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                ✨ Create Chatbot
+                            <button type="reset" class="btn btn-secondary btn-reset-chatbot">Reset</button>
+                            <button type="submit" class="btn btn-primary btn-lg btn-create-chatbot">
+                                <span class="material-symbols-outlined icon-inline">auto_awesome</span>Create Chatbot
                             </button>
                         </div>
                     </form>
