@@ -49,8 +49,8 @@ class NotificationManager {
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.innerHTML = `
-      <span>${this.getIcon(type)}</span>
-      <span>${message}</span>
+      <span class="toast-icon">${this.getIcon(type)}</span>
+      <span class="toast-message">${message}</span>
     `;
     document.body.appendChild(toast);
 

@@ -70,7 +70,7 @@
                         <span>My Profile</span>
                     </a>
                     <a href="settings.html" class="menu-item">
-                        <span class="menu-icon">🔐</span>
+                        <span class="menu-icon"><span class="material-symbols-outlined">lock</span></span>
                         <span>Security</span>
                     </a>
                 </div>
@@ -100,6 +100,16 @@
 
                 </div>
                 <div class="header-actions">
+                    <div class="dashboard-bell-wrap" id="dashboard-bell-wrap">
+                        <button class="dashboard-bell-btn bell-ringing" id="dashboard-bell-btn" aria-label="Dashboard notifications">
+                            <i class="fas fa-bell"></i>
+                            <span class="dashboard-bell-dot" id="dashboard-bell-dot"></span>
+                        </button>
+                        <div class="dashboard-bell-panel" id="dashboard-bell-panel" aria-hidden="true">
+                            <div class="dashboard-bell-panel-title">Notifications</div>
+                            <div class="dashboard-bell-list" id="dashboard-bell-list">Loading notifications...</div>
+                        </div>
+                    </div>
 
                     <div class="header-user-menu">
                         <button class="header-user-btn">
@@ -120,7 +130,7 @@
             <!-- Content Area -->
             <div class="admin-content">
                 <!-- Statistics -->
-                <div class="stats-grid">
+                <div class="stats-grid dashboard-loading">
                     <div class="stat-card">
                         <div class="stat-icon primary"><i class="fas fa-robot"></i></div>
                         <div class="stat-value" id="total-chatbots">0</div>
@@ -151,30 +161,30 @@
                 </div>
 
                 <!-- Quick Actions -->
-                <div class="card mt-2xl">
+                <div id="quick-actions-card" class="card mt-2xl dashboard-section-loading">
                     <div class="card-header">
                         <h2>Quick Actions</h2>
                     </div>
                     <div class="card-body">
                         <div class="grid grid-4">
                             <a href="create-chatbot.html" class="btn btn-primary" style="text-align: center;">
-                                ➕ New Chatbot
+                                <span class="material-symbols-outlined icon-inline">add_circle</span>New Chatbot
                             </a>
                             <a href="import-excel.html" class="btn btn-secondary" style="text-align: center;">
-                                📥 Import Users
+                                <span class="material-symbols-outlined icon-inline">upload_file</span>Import Users
                             </a>
                             <a href="chatbot-list.html" class="btn btn-secondary" style="text-align: center;">
-                                📋 View All
+                                <span class="material-symbols-outlined icon-inline">list_alt</span>View All
                             </a>
                             <a href="user-management.html" class="btn btn-secondary" style="text-align: center;">
-                                👥 Manage Users
+                                <span class="material-symbols-outlined icon-inline">groups</span>Manage Users
                             </a>
                         </div>
                     </div>
                 </div>
 
                 <!-- Recent Chatbots -->
-                <div class="card mt-2xl">
+                <div id="recent-chatbots-card" class="card mt-2xl dashboard-section-loading">
                     <div class="card-header">
                         <h2>Recent Chatbots</h2>
                         <a href="chatbot-list.html" class="btn btn-sm btn-ghost">View All</a>

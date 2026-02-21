@@ -277,7 +277,9 @@ class ChatInterface {
 
       if (statusEl) {
         const isActive = chatbot.status === "active";
-        statusEl.textContent = isActive ? "🟢 Online" : "🟡 Offline";
+        statusEl.innerHTML = isActive
+          ? '<span class="material-symbols-outlined icon-inline" style="color: var(--success); font-size: 0.95rem;">radio_button_checked</span>Online'
+          : '<span class="material-symbols-outlined icon-inline" style="color: var(--warning); font-size: 0.95rem;">radio_button_checked</span>Offline';
       }
     } catch (error) {
       console.error("Error loading chatbot meta:", error);

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0');
+
 /* ============================================
    CONFERENCE CHATBOT MANAGEMENT SYSTEM
    Modern, Professional, Responsive Design
@@ -57,6 +59,21 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+  font-size: 1.15rem;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.icon-inline {
+  margin-right: 6px;
 }
 
 html {
@@ -186,6 +203,46 @@ a:hover {
   white-space: nowrap;
 }
 
+a.btn,
+a.btn:visited {
+  text-decoration: none;
+}
+
+a.btn-primary,
+a.btn-primary:visited,
+a.btn-primary:hover,
+a.btn-primary:active {
+  color: #ffffff;
+}
+
+a.btn-secondary,
+a.btn-secondary:visited,
+a.btn-secondary:hover,
+a.btn-secondary:active {
+  color: var(--text-primary);
+}
+
+a.btn-danger,
+a.btn-danger:visited,
+a.btn-danger:hover,
+a.btn-danger:active {
+  color: #ef4444;
+}
+
+a.btn-success,
+a.btn-success:visited,
+a.btn-success:hover,
+a.btn-success:active {
+  color: #10b981;
+}
+
+a.btn-ghost,
+a.btn-ghost:visited,
+a.btn-ghost:hover,
+a.btn-ghost:active {
+  color: var(--text-secondary);
+}
+
 /* Primary Button */
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
@@ -256,6 +313,11 @@ a:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
+a.btn-ghost:hover,
+a.btn-ghost:active {
+  color: var(--text-primary);
+}
+
 /* Small Button */
 .btn-sm {
   padding: 0.375rem 0.75rem;
@@ -317,7 +379,26 @@ select {
   color: var(--text-primary);
   font-family: var(--font-primary);
   font-size: 0.95rem;
-  transition: all var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base),
+    color var(--transition-base);
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 16px;
+}
+
+select::-ms-expand {
+  display: none;
 }
 
 input::placeholder,
@@ -330,7 +411,7 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent-blue);
-  background: rgba(30, 41, 59, 0.8);
+  background-color: rgba(30, 41, 59, 0.8);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
@@ -755,6 +836,23 @@ textarea {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: rgba(15, 23, 42, 0.94);
+  color: var(--text-primary);
+}
+
+.toast .toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  flex: 0 0 22px;
+  font-size: 1rem;
+}
+
+.toast .toast-message {
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: 0.1px;
 }
 
 @keyframes slideIn {
@@ -770,26 +868,38 @@ textarea {
 }
 
 .toast.success {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(6, 34, 29, 0.92);
   border-left-color: rgba(16, 185, 129, 0.8);
-  color: #86efac;
+}
+
+.toast.success .toast-icon {
+  color: #34d399;
 }
 
 .toast.error {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(50, 18, 26, 0.94);
   border-left-color: rgba(239, 68, 68, 0.8);
-  color: #fca5a5;
+}
+
+.toast.error .toast-icon {
+  color: #fb7185;
 }
 
 .toast.warning {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(51, 32, 8, 0.94);
   border-left-color: rgba(245, 158, 11, 0.8);
-  color: #fcd34d;
+}
+
+.toast.warning .toast-icon {
+  color: #fbbf24;
 }
 
 .toast.info {
-  background: rgba(79, 70, 229, 0.15);
+  background: rgba(26, 32, 66, 0.94);
   border-left-color: rgba(79, 70, 229, 0.8);
+}
+
+.toast.info .toast-icon {
   color: #a5b4fc;
 }
 

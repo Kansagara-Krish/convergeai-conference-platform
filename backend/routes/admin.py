@@ -3,7 +3,7 @@
 # ============================================
 
 from flask import Blueprint, request, jsonify, current_app
-from datetime import datetime
+from datetime import datetime, timedelta
 from openpyxl import load_workbook
 from io import BytesIO
 from sqlalchemy import or_
@@ -14,14 +14,32 @@ from email.message import EmailMessage
 import threading
 
 try:
-    from models import db, User, Chatbot, Guest, Message, SessionToken, ChatbotParticipant
+    from models import db, User, Chatbot, Guest, Message, SessionToken, ChatbotParticipant, AdminNotification
     from routes.auth import token_required, admin_required
 except ImportError:
-    from backend.models import db, User, Chatbot, Guest, Message, SessionToken, ChatbotParticipant
+    from backend.models import db, User, Chatbot, Guest, Message, SessionToken, ChatbotParticipant, AdminNotification
     from backend.routes.auth import token_required, admin_required
 
 admin_bp = Blueprint('admin', __name__)
 EMAIL_REGEX = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$')
+NOTIFICATION_RETENTION_DAYS = 7
+
+
+def purge_old_notifications():
+    cutoff = datetime.utcnow() - timedelta(days=NOTIFICATION_RETENTION_DAYS)
+    AdminNotification.query.filter(AdminNotification.created_at < cutoff).delete(synchronize_session=False)
+
+
+def create_admin_notification(title, message, entity_type='system', entity_id=None):
+    purge_old_notifications()
+    notification = AdminNotification(
+        title=title,
+        message=message,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        is_read=False
+    )
+    db.session.add(notification)
 
 
 def is_valid_email(email):
@@ -128,6 +146,52 @@ def get_stats(user):
     return jsonify({
         'success': True,
         'data': stats
+    }), 200
+
+
+@admin_bp.route('/notifications', methods=['GET'])
+@token_required
+@admin_required
+def get_notifications(user):
+    """Get recent admin notifications (retained for 7 days)."""
+    limit = request.args.get('limit', 50, type=int)
+    safe_limit = max(1, min(limit, 100))
+
+    purge_old_notifications()
+    db.session.commit()
+
+    notifications = AdminNotification.query.order_by(
+        AdminNotification.created_at.desc(),
+        AdminNotification.id.desc()
+    ).limit(safe_limit).all()
+
+    unread_count = AdminNotification.query.filter_by(is_read=False).count()
+
+    return jsonify({
+        'success': True,
+        'data': [item.to_dict() for item in notifications],
+        'unread_count': unread_count
+    }), 200
+
+
+@admin_bp.route('/notifications/read', methods=['PUT'])
+@token_required
+@admin_required
+def mark_notifications_read(user):
+    """Mark all notifications as read when admin opens notification list."""
+    unread_notifications = AdminNotification.query.filter_by(is_read=False).all()
+    read_at = datetime.utcnow()
+
+    for item in unread_notifications:
+        item.is_read = True
+        item.read_at = read_at
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Notifications marked as read',
+        'updated': len(unread_notifications)
     }), 200
 
 # ============================================
@@ -268,6 +332,14 @@ def create_user(user):
     thread.start()
 
     assigned_count = len(chatbot_ids) if chatbot_ids else 0
+    create_admin_notification(
+        title='New user created',
+        message=f'{name} ({username}) was created with role {role}.',
+        entity_type='user',
+        entity_id=new_user.id
+    )
+    db.session.commit()
+
     message = f'User created successfully and assigned to {assigned_count} event(s)! Credentials email is being sent.' if assigned_count > 0 else 'User created successfully! Credentials email is being sent.'
 
     return jsonify({
@@ -459,6 +531,13 @@ def add_guest(user, chatbot_id):
     )
     
     db.session.add(guest)
+    db.session.flush()
+    create_admin_notification(
+        title='New guest added',
+        message=f'{guest.name} was added to "{chatbot.name}".',
+        entity_type='guest',
+        entity_id=guest.id
+    )
     db.session.commit()
     
     return jsonify({
@@ -719,6 +798,15 @@ def import_users_from_excel(user):
 
         db.session.commit()
 
+        event_name = chatbot.event_name if chatbot else 'None'
+        create_admin_notification(
+            title='Users imported',
+            message=f'{len(credentials)} users imported from Excel for event "{event_name}".',
+            entity_type='import',
+            entity_id=chatbot.id if chatbot else None
+        )
+        db.session.commit()
+
         # Send all emails in background thread so admin doesn't wait
         app = current_app._get_current_object()
         thread = threading.Thread(
@@ -728,7 +816,6 @@ def import_users_from_excel(user):
         thread.daemon = True
         thread.start()
 
-        event_name = chatbot.event_name if chatbot else 'None'
         return jsonify({
             'success': True,
             'message': f'Users imported successfully and assigned to event "{event_name}"! Credentials emails are being sent to {len(credentials)} users.',

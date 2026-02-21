@@ -44,6 +44,10 @@
                         <span>All Chatbots</span>
                         <span class="menu-badge">12</span>
                     </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
+                        <span>Guest Management</span>
+                    </a>
                 </div>
 
                 <div class="menu-section">
@@ -58,11 +62,32 @@
                         <span>Import Users</span>
                     </a>
                 </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Settings</div>
+                    <a href="profile.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
+                        <span>My Profile</span>
+                    </a>
+                    <a href="settings.html" class="menu-item">
+                        <span class="menu-icon"><span class="material-symbols-outlined">lock</span></span>
+                        <span>Security</span>
+                    </a>
+                </div>
             </nav>
 
-            <div class="admin-sidebar-footer">
-                <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
-                        class="fas fa-sign-out-alt"></i> Logout</button>
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <div class="admin-sidebar-footer">
+                    <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
             </div>
         </aside>
 
@@ -107,8 +132,10 @@
                                         <div class="file-upload-text">Click or drag Excel file here</div>
                                         <div class="file-upload-hint">Maximum file size: 10 MB</div>
                                     </div>
+                                    <div id="uploaded-user-count" class="import-preview" style="margin-top: 10px; display: none;"></div>
                                 </div>
                             </div>
+
 
                             <div class="form-row">
                                 <div class="form-group">
@@ -153,12 +180,11 @@
                                     <th>Users Imported</th>
                                     <th>File</th>
                                     <th>Status</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="recent-imports-body">
                                 <tr>
-                                    <td colspan="6" class="text-center">No recent imports in this session.</td>
+                                    <td colspan="5" class="text-center">No recent imports in this session.</td>
                                 </tr>
                             </tbody>
                         </table>
