@@ -414,6 +414,9 @@ def delete_user(user, user_id):
     
     # Delete all session tokens for this user first
     SessionToken.query.filter_by(user_id=user_id).delete()
+
+    # Remove participant links so chatbot participant counts stay accurate
+    ChatbotParticipant.query.filter_by(user_id=user_id).delete()
     
     # Now delete the user
     db.session.delete(target_user)
@@ -433,6 +436,13 @@ def delete_user(user, user_id):
 @admin_required
 def list_chatbots(user):
     """List all chatbots"""
+
+    # Keep participant counts accurate by removing orphan participant rows
+    # (can exist if users were deleted earlier without participant cleanup).
+    ChatbotParticipant.query.filter(
+        ~ChatbotParticipant.user_id.in_(db.session.query(User.id))
+    ).delete(synchronize_session=False)
+    db.session.commit()
     
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -523,11 +533,7 @@ def add_guest(user, chatbot_id):
         chatbot_id=chatbot_id,
         name=data.get('name'),
         title=data.get('title'),
-        description=data.get('description'),
-        organization=data.get('organization'),
-        email=data.get('email'),
-        is_speaker=data.get('is_speaker', False),
-        is_moderator=data.get('is_moderator', False)
+        description=data.get('description')
     )
     
     db.session.add(guest)
@@ -560,6 +566,60 @@ def list_all_guests(user):
         'count': len(guests)
     }), 200
 
+
+@admin_bp.route('/guests', methods=['POST'])
+@token_required
+@admin_required
+def create_guest(user):
+    """Create a new guest"""
+    
+    data = request.get_json()
+    
+    if not data.get('name'):
+        return jsonify({'success': False, 'message': 'Guest name is required'}), 400
+    
+    guest = Guest(
+        chatbot_id=data.get('chatbot_id'),
+        name=data.get('name'),
+        title=data.get('title'),
+        description=data.get('description')
+    )
+    
+    db.session.add(guest)
+    db.session.flush()
+    create_admin_notification(
+        title='New guest added',
+        message=f'{guest.name} was added as a guest.',
+        entity_type='guest',
+        entity_id=guest.id
+    )
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Guest created successfully',
+        'data': guest.to_dict()
+    }), 201
+
+
+
+@admin_bp.route('/guests/<int:guest_id>', methods=['GET'])
+@token_required
+@admin_required
+def get_guest(user, guest_id):
+    """Get a single guest"""
+    
+    guest = Guest.query.get(guest_id)
+    
+    if not guest:
+        return jsonify({'success': False, 'message': 'Guest not found'}), 404
+    
+    return jsonify({
+        'success': True,
+        'data': guest.to_dict()
+    }), 200
+
+
 @admin_bp.route('/guests/<int:guest_id>', methods=['DELETE'])
 @token_required
 @admin_required
@@ -577,6 +637,35 @@ def delete_guest(user, guest_id):
     return jsonify({
         'success': True,
         'message': 'Guest deleted successfully'
+    }), 200
+
+
+@admin_bp.route('/guests/<int:guest_id>', methods=['PUT'])
+@token_required
+@admin_required
+def update_guest(user, guest_id):
+    """Update a guest"""
+    
+    guest = Guest.query.get(guest_id)
+    
+    if not guest:
+        return jsonify({'success': False, 'message': 'Guest not found'}), 404
+    
+    data = request.get_json()
+    
+    if 'name' in data:
+        guest.name = data['name']
+    if 'title' in data:
+        guest.title = data['title']
+    if 'description' in data:
+        guest.description = data['description']
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Guest updated successfully',
+        'data': guest.to_dict()
     }), 200
 
 # ============================================

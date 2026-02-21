@@ -91,6 +91,7 @@ class AdminPanel {
   constructor() {
     this.currentChatbotId = null;
     this.sidebarRefreshInterval = null;
+    this.dashboardRefreshInterval = null;
     this.notificationRefreshInterval = null;
     this.dashboardNotifications = [];
     this.dashboardUnreadCount = 0;
@@ -117,6 +118,7 @@ class AdminPanel {
     this.startSidebarBadgeRefresh();
     this.loadDashboardData();
     this.setupDashboardBell();
+    this.startDashboardRefresh();
   }
 
   setupDashboardBell() {
@@ -393,6 +395,17 @@ class AdminPanel {
     }
   }
 
+  startDashboardRefresh() {
+    // Refresh dashboard stats every 5 seconds
+    setInterval(() => {
+      const page = window.location.pathname;
+      if (page.includes("dashboard.html") || page.endsWith("admin/")) {
+        this.loadDashboardStats();
+        this.loadRecentChatbots();
+      }
+    }, 5000);
+  }
+
   startSidebarBadgeRefresh() {
     this.loadSidebarCounts();
 
@@ -407,6 +420,23 @@ class AdminPanel {
     window.addEventListener("beforeunload", () => {
       if (this.sidebarRefreshInterval) {
         clearInterval(this.sidebarRefreshInterval);
+      }
+    });
+  }
+
+  startDashboardRefresh() {
+    // Refresh dashboard stats every 5 seconds
+    this.dashboardRefreshInterval = setInterval(() => {
+      const page = window.location.pathname;
+      if (page.includes("dashboard.html") || page.endsWith("admin/")) {
+        this.loadDashboardStats();
+        this.loadRecentChatbots();
+      }
+    }, 5000);
+
+    window.addEventListener("beforeunload", () => {
+      if (this.dashboardRefreshInterval) {
+        clearInterval(this.dashboardRefreshInterval);
       }
     });
   }
@@ -787,6 +817,7 @@ class ChatbotFormHandler {
       '[name="background_image"]',
     ).parentElement;
     const fileUploadIcon = uploadArea.querySelector(".file-upload-icon");
+    uploadArea.classList.add("current-image-state");
 
     // Clear existing content
     fileUploadIcon.innerHTML = "";
@@ -794,18 +825,17 @@ class ChatbotFormHandler {
     // Create image preview
     const img = document.createElement("img");
     img.src = `${API_BASE_URL}/${imagePath}`; // Use API_BASE_URL to serve from backend
+    img.alt = "Current background image";
     img.style.width = "100%";
     img.style.height = "100%";
     img.style.objectFit = "cover";
-    img.style.borderRadius = "8px";
-    img.style.opacity = "0.8";
     fileUploadIcon.appendChild(img);
 
     // Update text
     const fileUploadText = uploadArea.querySelector(".file-upload-text");
     if (fileUploadText) {
-      fileUploadText.textContent = "Current Image - Click to replace";
-      fileUploadText.style.color = "var(--accent-blue)";
+      fileUploadText.textContent = "Current image · click to replace";
+      fileUploadText.style.color = "";
     }
 
     // Update hint with clear button
@@ -813,16 +843,24 @@ class ChatbotFormHandler {
     if (fileUploadHint) {
       const clearBtn = document.createElement("button");
       clearBtn.type = "button";
-      clearBtn.className = "btn btn-sm btn-danger";
-      clearBtn.style.marginTop = "8px";
-      clearBtn.innerHTML =
-        '<span class="material-symbols-outlined icon-inline">delete</span>Clear Current Image';
+      clearBtn.className = "upload-clear-btn";
+      clearBtn.textContent = "Clear current image";
       clearBtn.addEventListener("click", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         this.clearCurrentImage();
       });
+
+      const hintRow = document.createElement("div");
+      hintRow.className = "upload-hint-row";
+
+      const helper = document.createElement("span");
+      helper.textContent = "Recommended: 1920×1080 PNG or JPG";
+
+      hintRow.appendChild(helper);
+      hintRow.appendChild(clearBtn);
       fileUploadHint.innerHTML = "";
-      fileUploadHint.appendChild(clearBtn);
+      fileUploadHint.appendChild(hintRow);
     }
   }
 
@@ -830,6 +868,7 @@ class ChatbotFormHandler {
     const fileInput = this.form.querySelector('[name="background_image"]');
     const uploadArea = fileInput.parentElement;
     const fileUploadIcon = uploadArea.querySelector(".file-upload-icon");
+    uploadArea.classList.remove("current-image-state");
 
     // Reset to default icon
     fileUploadIcon.innerHTML =
@@ -840,7 +879,7 @@ class ChatbotFormHandler {
     const fileUploadText = uploadArea.querySelector(".file-upload-text");
     if (fileUploadText) {
       fileUploadText.textContent = "Click or drag image here";
-      fileUploadText.style.color = "inherit";
+      fileUploadText.style.color = "";
     }
 
     // Reset hint
@@ -1092,6 +1131,7 @@ class ChatbotFormHandler {
   }
 
   showImagePreview(file, area) {
+    area.classList.add("current-image-state");
     const reader = new FileReader();
     reader.onload = (e) => {
       const previewArea = area.querySelector(".file-upload-icon");
@@ -1099,10 +1139,10 @@ class ChatbotFormHandler {
         // Create a small thumbnail preview
         const img = document.createElement("img");
         img.src = e.target.result;
+        img.alt = "Selected background image";
         img.style.width = "100%";
         img.style.height = "100%";
         img.style.objectFit = "cover";
-        img.style.borderRadius = "8px";
         previewArea.innerHTML = "";
         previewArea.appendChild(img);
       }
@@ -1298,6 +1338,15 @@ class ChatbotFormHandler {
       }
     }
 
+    // Disable submit button and show loader
+    const submitBtn = this.form.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML =
+      '<i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i>' +
+      (isEdit ? "Saving..." : "Creating...");
+    submitBtn.style.opacity = "0.6";
+
     try {
       const chatbotId = formData.get("id");
       const endpoint = isEdit ? `/api/chatbots/${chatbotId}` : "/api/chatbots";
@@ -1317,6 +1366,11 @@ class ChatbotFormHandler {
     } catch (error) {
       console.error("Form submission error:", error);
       NotificationManager.error(error.message || "Failed to save chatbot");
+
+      // Re-enable button on error
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnText;
+      submitBtn.style.opacity = "1";
     }
   }
 }
@@ -1722,7 +1776,7 @@ class UserManagementHandler {
 
   async openAddSingleUserModal() {
     const content = `
-      <form id="single-user-form" class="single-user-form" style="max-height: 600px; overflow-y: auto;">
+      <form id="single-user-form" class="single-user-form">
         <!-- Account Information Section -->
         <div style="padding-bottom: 16px; border-bottom: 2px solid var(--border-color); margin-bottom: 16px;">
           <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
@@ -1753,19 +1807,22 @@ class UserManagementHandler {
           <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
             <i class="fas fa-shield-alt"></i> Role & Status
           </h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="single-user-role-row" style="display: grid; grid-template-columns: minmax(280px, 1fr) auto; gap: 16px; align-items: end;">
             <div class="form-group">
               <label for="single-user-role">User Role</label>
-              <select id="single-user-role" name="role" style="width: 100%;">
+              <select id="single-user-role" name="role" class="single-user-role-select" style="width: 100%;">
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
-            <div class="form-group" style="display: flex; align-items: flex-end; gap: 8px;">
-              <input type="checkbox" id="single-user-active" name="active" checked style="width: 20px; height: 20px; cursor: pointer;" />
-              <label for="single-user-active" style="margin: 0; flex: 1; display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 12px; color: var(--text-secondary);">Active Status</span> <i class="fas fa-check-circle" style="color: var(--accent-green);"></i>
-              </label>
+            <div class="form-group single-user-active-wrap" style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+              <div class="toggle-switch">
+                <input type="checkbox" id="single-user-active" name="active" checked style="display: none;" />
+                <label for="single-user-active" class="toggle-label" style="margin: 0;">
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-text" data-active="Active" data-inactive="Inactive">Active</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -1775,7 +1832,7 @@ class UserManagementHandler {
           <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
             <i class="fas fa-calendar-check"></i> Assign to Active Events
           </h4>
-          <select id="single-user-chatbots" name="chatbots" multiple style="width: 100%; height: 140px; padding: 10px; border-radius: 6px; border: 2px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 14px; cursor: pointer; font-family: inherit;">
+          <select id="single-user-chatbots" name="chatbots" multiple class="single-user-events-select" style="width: 100%; height: 160px; padding: 10px; border-radius: 8px; border: 2px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 14px; cursor: pointer; font-family: inherit;">
             <option value="" disabled>Loading active events...</option>
           </select>
           <small style="color: var(--text-secondary); display: block; margin-top: 8px; font-style: italic;">
@@ -1795,10 +1852,25 @@ class UserManagementHandler {
       </form>
     `;
 
-    const modal = ModalManager.create("Add Single User", content, []);
+    const modal = ModalManager.create("Add Single User", content, [], {
+      width: "980px",
+    });
     const form = modal.querySelector("#single-user-form");
     const cancelBtn = modal.querySelector("#single-user-cancel");
     const chatbotsSelect = modal.querySelector("#single-user-chatbots");
+    const activeToggle = modal.querySelector("#single-user-active");
+    const activeToggleText = modal.querySelector(".toggle-text");
+
+    if (activeToggle && activeToggleText) {
+      const updateSingleUserActiveText = () => {
+        activeToggleText.textContent = activeToggle.checked
+          ? activeToggleText.dataset.active
+          : activeToggleText.dataset.inactive;
+      };
+
+      updateSingleUserActiveText();
+      activeToggle.addEventListener("change", updateSingleUserActiveText);
+    }
 
     // Load available chatbots
     try {
@@ -1998,6 +2070,13 @@ class UserManagementHandler {
           NotificationManager.success("User deleted successfully");
           await this.loadUserStats();
           await this.loadUsers(this.currentPage);
+          // Refresh dashboard stats
+          if (
+            window.adminPanel &&
+            typeof window.adminPanel.loadDashboardStats === "function"
+          ) {
+            window.adminPanel.loadDashboardStats();
+          }
         } catch (error) {
           NotificationManager.error(error.message || "Failed to delete user");
         }
@@ -2441,6 +2520,13 @@ class ChatbotListHandler {
       await API.delete(`/api/admin/chatbots/${id}`);
       NotificationManager.success("Chatbot deleted successfully");
       this.loadChatbots(); // Reload list
+      // Refresh dashboard stats
+      if (
+        window.adminPanel &&
+        typeof window.adminPanel.loadDashboardStats === "function"
+      ) {
+        window.adminPanel.loadDashboardStats();
+      }
     } catch (error) {
       console.error("Delete error:", error);
       NotificationManager.error("Failed to delete chatbot");
@@ -2636,7 +2722,7 @@ class ChatbotListHandler {
                             </span>
                         </td>
                         <td>${bot.participants_count || 0}</td>
-                        <td>${bot.messages_count || 0}</td>
+              <td>${bot.guests_count || 0}</td>
                         <td>
                             <div class="table-actions">
                                 <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-icon btn-secondary"><i class="fas fa-edit"></i></a>
@@ -2680,8 +2766,8 @@ class ChatbotListHandler {
                             <span>${bot.participants_count || 0} participants</span>
                         </div>
                         <div class="chatbot-card-item">
-                            <span class="chatbot-card-item-icon"><i class="fas fa-comments"></i></span>
-                            <span>${bot.messages_count || 0} conversations</span>
+                            <span class="chatbot-card-item-icon"><i class="fas fa-user-tie"></i></span>
+                            <span>${bot.guests_count || 0} guests</span>
                         </div>
                     </div>
                     <div class="chatbot-card-footer">
@@ -2726,16 +2812,32 @@ class GuestManagementHandler {
   init() {
     this.loadGuests();
     this.setupEventListeners();
+    this.setupAddGuestButton();
   }
 
   setupEventListeners() {
     this.table.addEventListener("click", (e) => {
-      const btn = e.target.closest('[data-action="delete"]');
-      if (btn) {
-        const id = btn.dataset.id;
+      const deleteBtn = e.target.closest('[data-action="delete"]');
+      if (deleteBtn) {
+        const id = deleteBtn.dataset.id;
         this.confirmDelete(id);
+        return;
+      }
+
+      const editBtn = e.target.closest('[data-action="edit"]');
+      if (editBtn) {
+        const id = editBtn.dataset.id;
+        this.openEditModal(id);
+        return;
       }
     });
+  }
+
+  setupAddGuestButton() {
+    const addBtn = document.querySelector(".card-header .btn-primary");
+    if (addBtn) {
+      addBtn.addEventListener("click", () => this.openAddGuestModal());
+    }
   }
 
   confirmDelete(id) {
@@ -2770,14 +2872,11 @@ class GuestManagementHandler {
 
   updateStats(guests) {
     const total = guests.length;
-    const active = guests.length;
-    const speakers = guests.filter((g) => g.is_speaker).length;
-    const moderators = guests.filter((g) => g.is_moderator).length;
 
     this.setText("total-guests-count", total);
-    this.setText("active-guests-count", active);
-    this.setText("pending-guests-count", speakers);
-    this.setText("vip-guests-count", moderators);
+    this.setText("active-guests-count", total);
+    this.setText("pending-guests-count", 0);
+    this.setText("vip-guests-count", 0);
   }
 
   setText(id, value) {
@@ -2791,7 +2890,7 @@ class GuestManagementHandler {
 
     if (guests.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="6" class="text-center">No guests found.</td></tr>';
+        '<tr><td colspan="3" class="text-center">No guests found.</td></tr>';
       return;
     }
 
@@ -2807,13 +2906,10 @@ class GuestManagementHandler {
                         <div>${guest.name}</div>
                     </div>
                 </td>
-                <td>${guest.email || "N/A"}</td>
-                <td>${guest.chatbot_id ? "Linked Chatbot" : "General"}</td> <!-- We might need chatbot name here -->
-                <td>${guest.is_speaker ? "Speaker" : "Standard"}</td>
-                <td><span class="status-indicator status-active"><span class="status-dot"></span> Active</span></td>
+                <td>${guest.chatbot_id ? "Linked Event" : "General"}</td>
                 <td>
                     <div class="table-actions">
-                        <button class="btn btn-sm btn-secondary"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-secondary" data-action="edit" data-id="${guest.id}"><i class="fas fa-edit"></i></button>
                         <button class="btn btn-sm btn-danger" data-action="delete" data-id="${guest.id}"><i class="fas fa-trash"></i></button>
                     </div>
                 </td>
@@ -2821,5 +2917,150 @@ class GuestManagementHandler {
         `,
       )
       .join("");
+  }
+
+  async openEditModal(id) {
+    try {
+      console.log(`[GuestEdit] Fetching guest ${id}...`);
+      const response = await API.get(`/api/admin/guests/${id}`);
+      console.log(`[GuestEdit] Response received:`, response);
+
+      let guest;
+      if (response.data) {
+        guest = response.data;
+      } else if (response.success && typeof response === "object") {
+        // Fallback if data is at root level
+        guest = response;
+      } else {
+        throw new Error("Invalid response structure");
+      }
+
+      console.log(`[GuestEdit] Guest data:`, guest);
+
+      const formHTML = `
+        <div class="form-group">
+          <label for="guest-name-edit">Name <span class="text-danger">*</span></label>
+          <input type="text" id="guest-name-edit" class="form-control" value="${guest.name || ""}" required>
+        </div>
+        <div class="form-group">
+          <label for="guest-title-edit">Title/Role</label>
+          <input type="text" id="guest-title-edit" class="form-control" value="${guest.title || ""}">
+        </div>
+        <div class="form-group">
+          <label for="guest-description-edit">Description</label>
+          <textarea id="guest-description-edit" class="form-control" rows="3">${guest.description || ""}</textarea>
+        </div>
+      `;
+
+      const self = this;
+      const modal = ModalManager.create(`Edit Guest: ${guest.name}`, formHTML, [
+        {
+          id: "cancel",
+          label: "Cancel",
+          class: "btn-secondary",
+          callback: () => {},
+        },
+        {
+          id: "save",
+          label: "Save Changes",
+          class: "btn-primary",
+          callback: async () => {
+            const updatedData = {
+              name: document.getElementById("guest-name-edit").value.trim(),
+              title: document.getElementById("guest-title-edit").value.trim(),
+              description: document
+                .getElementById("guest-description-edit")
+                .value.trim(),
+            };
+
+            if (!updatedData.name) {
+              NotificationManager.error("Please enter a guest name");
+              return;
+            }
+
+            try {
+              await self.saveGuestChanges(id, updatedData);
+              NotificationManager.success("Guest updated successfully");
+              self.loadGuests();
+            } catch (error) {
+              console.error("[GuestEdit] Save error:", error);
+              NotificationManager.error(
+                "Failed to update guest: " + (error.message || "Unknown error"),
+              );
+            }
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error("[GuestEdit] Error loading guest:", error);
+      console.error("[GuestEdit] Error message:", error.message);
+      console.error("[GuestEdit] Error stack:", error.stack);
+      NotificationManager.error(
+        "Failed to load guest details: " + (error.message || "Unknown error"),
+      );
+    }
+  }
+
+  async saveGuestChanges(id, data) {
+    return API.put(`/api/admin/guests/${id}`, data);
+  }
+
+  async openAddGuestModal() {
+    const formHTML = `
+      <div class="form-group">
+        <label for="guest-name-add">Name <span class="text-danger">*</span></label>
+        <input type="text" id="guest-name-add" class="form-control" placeholder="Guest name" required>
+      </div>
+      <div class="form-group">
+        <label for="guest-title-add">Title/Role</label>
+        <input type="text" id="guest-title-add" class="form-control" placeholder="e.g., Speaker, Moderator">
+      </div>
+      <div class="form-group">
+        <label for="guest-description-add">Description</label>
+        <textarea id="guest-description-add" class="form-control" rows="3" placeholder="Brief bio or description"></textarea>
+      </div>
+    `;
+
+    const self = this;
+    const modal = ModalManager.create("Add New Guest", formHTML, [
+      {
+        id: "cancel",
+        label: "Cancel",
+        class: "btn-secondary",
+        callback: () => {},
+      },
+      {
+        id: "add",
+        label: "Add Guest",
+        class: "btn-primary",
+        callback: async () => {
+          const guestData = {
+            name: document.getElementById("guest-name-add").value.trim(),
+            title: document.getElementById("guest-title-add").value.trim(),
+            description: document
+              .getElementById("guest-description-add")
+              .value.trim(),
+          };
+
+          if (!guestData.name) {
+            NotificationManager.error("Please enter a guest name");
+            return;
+          }
+
+          try {
+            console.log("[AddGuest] Creating guest:", guestData);
+            const response = await API.post("/api/admin/guests", guestData);
+            console.log("[AddGuest] Response:", response);
+            NotificationManager.success("Guest added successfully");
+            self.loadGuests();
+          } catch (error) {
+            console.error("[AddGuest] Error:", error);
+            NotificationManager.error(
+              "Failed to add guest: " + (error.message || "Unknown error"),
+            );
+          }
+        },
+      },
+    ]);
   }
 }
