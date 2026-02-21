@@ -186,11 +186,6 @@ class Guest(db.Model):
     title = db.Column(db.String(255))
     description = db.Column(db.Text)
     photo = db.Column(db.String(255))
-    organization = db.Column(db.String(255))
-    email = db.Column(db.String(255))
-    
-    is_speaker = db.Column(db.Boolean, default=False)
-    is_moderator = db.Column(db.Boolean, default=False)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -198,13 +193,11 @@ class Guest(db.Model):
         """Convert to dictionary"""
         return {
             'id': self.id,
+            'chatbot_id': self.chatbot_id,
             'name': self.name,
             'title': self.title,
             'description': self.description,
             'photo': self.photo,
-            'organization': self.organization,
-            'is_speaker': self.is_speaker,
-            'is_moderator': self.is_moderator,
         }
 
 # ============================================
