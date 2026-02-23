@@ -16,14 +16,14 @@
 }
 
 .chat-header-bar {
-  background: linear-gradient(90deg, rgba(26, 31, 46, 0.8), rgba(30, 41, 59, 0.8));
+  background: transparent;
   border-bottom: 1px solid var(--border-color);
-  padding: var(--spacing-lg) var(--spacing-xl);
+  padding: 0.75rem var(--spacing-xl);
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 
 .chat-header-info {
@@ -62,6 +62,7 @@
 .chat-header-actions {
   display: flex;
   gap: var(--spacing-md);
+  align-items: center;
 }
 
 .messages-area {
@@ -148,6 +149,91 @@
   align-items: flex-end;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  transition: opacity 0.35s ease, transform 0.35s ease, filter 0.35s ease;
+}
+
+.input-area.chat-input-hidden {
+  opacity: 0;
+  transform: translateY(24px);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.input-area.chat-input-reveal {
+  animation: inputSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.chat-welcome-card {
+  max-width: 820px;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(79, 70, 229, 0.3);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.35);
+}
+
+.chat-welcome-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  margin-bottom: var(--spacing-sm);
+}
+
+.chat-welcome-typing {
+  color: var(--text-primary);
+  line-height: 1.65;
+  font-size: 1rem;
+}
+
+.chat-welcome-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--accent-cyan);
+  animation: blinkCursor 0.9s steps(1) infinite;
+}
+
+.chat-empty-state {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  max-width: 640px;
+}
+
+.chat-empty-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-sm);
+}
+
+.chat-empty-text {
+  color: var(--text-secondary);
+}
+
+@keyframes blinkCursor {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes inputSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(2px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
 }
 
 .input-wrapper {
@@ -403,4 +489,70 @@
   .input-field {
     padding: var(--spacing-sm);
   }
+}
+
+/* ============================================
+   HEADER USER MENU & DROPDOWN
+   ============================================ */
+
+.header-user-menu {
+  position: relative;
+}
+
+.header-user-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.header-user-btn:hover {
+  opacity: 0.8;
+}
+
+.chat-header-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-top: 2px;
+  min-width: 200px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transition: all var(--transition-base);
+  z-index: 50;
+}
+
+.chat-header-dropdown.active {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: rgba(79, 70, 229, 0.1);
 }

@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/admin.css">
+    <link rel="stylesheet" href="../css/admin.css?v=2">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="../js/utils.js?v=6"></script>
-    <script src="../js/admin.js?v=6"></script>
+    <script src="../js/utils.js?v=12"></script>
+    <script src="../js/admin.js?v=12"></script>
 </head>
 
 <body>
@@ -135,28 +135,21 @@
                         <div class="stat-icon primary"><i class="fas fa-robot"></i></div>
                         <div class="stat-value" id="total-chatbots">0</div>
                         <div class="stat-label">Total Chatbots</div>
-                        <div class="stat-change positive">↑ 2 this week</div>
+                        <div class="stat-change" id="total-chatbots-change"></div>
                     </div>
 
                     <div class="stat-card">
                         <div class="stat-icon success"><i class="fas fa-calendar-check"></i></div>
                         <div class="stat-value" id="active-events">0</div>
                         <div class="stat-label">Active Events</div>
-                        <div class="stat-change positive">✓ Live now</div>
+                        <div class="stat-change" id="active-events-change"></div>
                     </div>
 
                     <div class="stat-card">
                         <div class="stat-icon warning"><i class="fas fa-users"></i></div>
                         <div class="stat-value" id="total-users">0</div>
                         <div class="stat-label">Total Users</div>
-                        <div class="stat-change positive">↑ 125 new</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon danger"><i class="fas fa-calendar-alt"></i></div>
-                        <div class="stat-value" id="upcoming-events">0</div>
-                        <div class="stat-label">Upcoming Events</div>
-                        <div class="stat-change positive">Next 30 days</div>
+                        <div class="stat-change" id="total-users-change"></div>
                     </div>
                 </div>
 
@@ -166,7 +159,7 @@
                         <h2>Quick Actions</h2>
                     </div>
                     <div class="card-body">
-                        <div class="grid grid-4">
+                        <div class="grid grid-4 quick-actions-grid">
                             <a href="create-chatbot.html" class="btn btn-primary" style="text-align: center;">
                                 <span class="material-symbols-outlined icon-inline">add_circle</span>New Chatbot
                             </a>

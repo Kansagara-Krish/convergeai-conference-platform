@@ -46,7 +46,7 @@ def is_valid_email(email):
     return bool(email and EMAIL_REGEX.match(email))
 
 
-def send_user_credentials_email(recipient_email, name, role, username, password):
+def send_user_credentials_email(recipient_email, name, role, username, password, allowed_events=None):
     """Send credentials email synchronously"""
     mail_server = current_app.config.get('MAIL_SERVER')
     mail_port = current_app.config.get('MAIL_PORT', 587)
@@ -59,6 +59,13 @@ def send_user_credentials_email(recipient_email, name, role, username, password)
     if not mail_server:
         return False, 'MAIL_SERVER is not configured'
 
+    if allowed_events and isinstance(allowed_events, list):
+        cleaned_events = [str(event).strip() for event in allowed_events if str(event).strip()]
+    else:
+        cleaned_events = []
+
+    events_line = ', '.join(cleaned_events) if cleaned_events else 'Not assigned yet'
+
     msg = EmailMessage()
     msg['Subject'] = 'Your ConvergeAI Account Credentials'
     msg['From'] = mail_sender
@@ -70,6 +77,7 @@ def send_user_credentials_email(recipient_email, name, role, username, password)
             f"Role: {role}\n"
             f"Username: {username}\n"
             f"Password: {password}\n\n"
+            f"Allowed Event(s): {events_line}\n\n"
             "Please login and change your password after first login.\n\n"
             "Regards,\nConvergeAI Admin"
         )
@@ -95,11 +103,11 @@ def send_user_credentials_email(recipient_email, name, role, username, password)
         return False, str(exc)
 
 
-def send_email_background(app, recipient_email, name, role, username, password):
+def send_email_background(app, recipient_email, name, role, username, password, allowed_events=None):
     """Send email in background thread with app context"""
     with app.app_context():
         try:
-            send_user_credentials_email(recipient_email, name, role, username, password)
+            send_user_credentials_email(recipient_email, name, role, username, password, allowed_events)
         except Exception as e:
             # Log error but don't crash the thread
             print(f"Background email failed for {recipient_email}: {str(e)}")
@@ -115,7 +123,8 @@ def send_bulk_emails_background(app, credentials_list):
                     name=cred['name'],
                     role=cred['role'],
                     username=cred['username'],
-                    password=cred['password']
+                    password=cred['password'],
+                    allowed_events=cred.get('allowed_events')
                 )
             except Exception as e:
                 print(f"Background email failed for {cred['email']}: {str(e)}")
@@ -302,11 +311,14 @@ def create_user(user):
 
     # Associate user with chatbots if provided
     chatbot_ids = data.get('chatbot_ids', [])
+    assigned_event_names = []
     if chatbot_ids and isinstance(chatbot_ids, list):
         for chatbot_id in chatbot_ids:
             # Verify chatbot exists
             chatbot = Chatbot.query.get(chatbot_id)
             if chatbot:
+                if chatbot.event_name and chatbot.event_name not in assigned_event_names:
+                    assigned_event_names.append(chatbot.event_name)
                 # Check if already a participant
                 existing = ChatbotParticipant.query.filter_by(
                     chatbot_id=chatbot_id,
@@ -326,7 +338,7 @@ def create_user(user):
     app = current_app._get_current_object()
     thread = threading.Thread(
         target=send_email_background,
-        args=(app, email, name, role, username, password)
+        args=(app, email, name, role, username, password, assigned_event_names)
     )
     thread.daemon = True
     thread.start()
@@ -845,7 +857,7 @@ def import_users_from_excel(user):
 
             username = normalize_username(raw_username, email)
             if not password:
-                password = SessionToken.generate_token()[:12]
+                password = '123'
 
             new_user = User(
                 name=name,
@@ -878,7 +890,8 @@ def import_users_from_excel(user):
                 'role': role,
                 'username': username,
                 'password': password,
-                'email': email
+                'email': email,
+                'allowed_events': [chatbot.event_name] if chatbot and chatbot.event_name else []
             })
 
         if not credentials:
