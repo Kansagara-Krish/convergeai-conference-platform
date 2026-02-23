@@ -30,12 +30,16 @@ const AdminPageSkeletonLoader = {
 
   init() {
     const adminContent = document.querySelector(".admin-content");
+    const adminHeader = document.querySelector(".admin-header");
     if (!adminContent) {
       this.isBooting = false;
       return;
     }
 
     adminContent.classList.add("page-skeleton-loading");
+    if (adminHeader) {
+      adminHeader.classList.add("page-skeleton-loading");
+    }
     this.patchApiRequests();
 
     setTimeout(() => {
@@ -79,8 +83,12 @@ const AdminPageSkeletonLoader = {
     if (!force && this.pendingRequests > 0) return;
 
     const adminContent = document.querySelector(".admin-content");
+    const adminHeader = document.querySelector(".admin-header");
     if (adminContent) {
       adminContent.classList.remove("page-skeleton-loading");
+    }
+    if (adminHeader) {
+      adminHeader.classList.remove("page-skeleton-loading");
     }
 
     this.isBooting = false;
@@ -93,6 +101,8 @@ class AdminPanel {
     this.sidebarRefreshInterval = null;
     this.dashboardRefreshInterval = null;
     this.notificationRefreshInterval = null;
+    this.dashboardRefreshPausedUntil = 0;
+    this.lastDashboardNetworkAlertAt = 0;
     this.dashboardNotifications = [];
     this.dashboardUnreadCount = 0;
     this.isBellPanelOpen = false;
@@ -160,8 +170,56 @@ class AdminPanel {
   }
 
   setupSidebar() {
+    const container = DomUtils.$(".admin-container");
     const sidebar = DomUtils.$(".admin-sidebar");
-    if (!sidebar) return;
+    if (!sidebar || !container) return;
+
+    const header = DomUtils.$(".admin-header");
+    const headerTitle = DomUtils.$(".admin-header .header-title") || header;
+    const sidebarHeader = DomUtils.$(".admin-sidebar-header");
+    let hamburger = DomUtils.$(".hamburger-menu");
+    let sidebarControlBtn = DomUtils.$(".sidebar-control-btn");
+    const collapsedKey = "admin_sidebar_collapsed";
+
+    if (!hamburger && headerTitle) {
+      hamburger = DomUtils.create("button", "hamburger-menu");
+      hamburger.type = "button";
+      hamburger.setAttribute("aria-label", "Toggle menu");
+      hamburger.setAttribute("aria-expanded", "false");
+      hamburger.innerHTML = '<i class="fas fa-bars"></i>';
+      headerTitle.prepend(hamburger);
+    }
+
+    if (!sidebarControlBtn && sidebarHeader) {
+      sidebarControlBtn = DomUtils.create("button", "sidebar-control-btn");
+      sidebarControlBtn.type = "button";
+      sidebarControlBtn.setAttribute("aria-label", "Collapse sidebar");
+      sidebarHeader.appendChild(sidebarControlBtn);
+    }
+
+    let backdrop = DomUtils.$(".sidebar-backdrop");
+    if (!backdrop) {
+      backdrop = DomUtils.create("div", "sidebar-backdrop");
+      document.body.appendChild(backdrop);
+    }
+
+    const openSidebar = () => {
+      DomUtils.addClass(sidebar, "active");
+      DomUtils.addClass(backdrop, "active");
+      document.body.classList.add("admin-sidebar-open");
+      if (hamburger) {
+        hamburger.setAttribute("aria-expanded", "true");
+      }
+    };
+
+    const closeSidebar = () => {
+      DomUtils.removeClass(sidebar, "active");
+      DomUtils.removeClass(backdrop, "active");
+      document.body.classList.remove("admin-sidebar-open");
+      if (hamburger) {
+        hamburger.setAttribute("aria-expanded", "false");
+      }
+    };
 
     // Active menu item based on current page
     const currentPage =
@@ -176,19 +234,90 @@ class AdminPanel {
 
     // Sidebar toggle for mobile (keep existing logic for mobile overlay if needed,
     // but the new toggle works for desktop too)
-    const hamburger = DomUtils.$(".hamburger-menu");
     if (hamburger) {
       hamburger.addEventListener("click", () => {
-        DomUtils.toggleClass(sidebar, "active");
+        const isOpen = sidebar.classList.contains("active");
+        if (isOpen) {
+          closeSidebar();
+        } else {
+          openSidebar();
+        }
       });
     }
+
+    const updateSidebarControl = () => {
+      if (!sidebarControlBtn) return;
+
+      const isMobile = window.innerWidth < 1024;
+      const isCollapsed = container.classList.contains("sidebar-collapsed");
+
+      if (isMobile) {
+        sidebarControlBtn.innerHTML = '<i class="fas fa-xmark"></i>';
+        sidebarControlBtn.setAttribute("aria-label", "Close sidebar");
+      } else if (isCollapsed) {
+        sidebarControlBtn.innerHTML = '<i class="fas fa-angles-right"></i>';
+        sidebarControlBtn.setAttribute("aria-label", "Expand sidebar");
+      } else {
+        sidebarControlBtn.innerHTML = '<i class="fas fa-angles-left"></i>';
+        sidebarControlBtn.setAttribute("aria-label", "Collapse sidebar");
+      }
+    };
+
+    const applyDesktopCollapsedState = () => {
+      if (window.innerWidth < 1024) {
+        container.classList.remove("sidebar-collapsed");
+        updateSidebarControl();
+        return;
+      }
+
+      const isCollapsed = localStorage.getItem(collapsedKey) === "1";
+      container.classList.toggle("sidebar-collapsed", isCollapsed);
+      updateSidebarControl();
+    };
+
+    applyDesktopCollapsedState();
+
+    if (sidebarControlBtn) {
+      sidebarControlBtn.addEventListener("click", () => {
+        const isMobile = window.innerWidth < 1024;
+        if (isMobile) {
+          closeSidebar();
+          updateSidebarControl();
+          return;
+        }
+
+        const nextCollapsed =
+          !container.classList.contains("sidebar-collapsed");
+        container.classList.toggle("sidebar-collapsed", nextCollapsed);
+        localStorage.setItem(collapsedKey, nextCollapsed ? "1" : "0");
+        updateSidebarControl();
+      });
+    }
+
+    backdrop.addEventListener("click", () => {
+      closeSidebar();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeSidebar();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth >= 1024) {
+        closeSidebar();
+      }
+      applyDesktopCollapsedState();
+      updateSidebarControl();
+    });
 
     // Close sidebar when menu item is clicked (only on mobile)
     menuItems.forEach((item) => {
       item.addEventListener("click", () => {
         this.saveScrollPositions(sidebar);
         if (window.innerWidth < 1024) {
-          DomUtils.removeClass(sidebar, "active");
+          closeSidebar();
         }
       });
     });
@@ -196,6 +325,7 @@ class AdminPanel {
     this.restoreScrollPositions(sidebar);
     this.bindScrollPersistence(sidebar);
     this.resetSidebarBadges();
+    updateSidebarControl();
   }
 
   bindScrollPersistence(sidebar) {
@@ -395,17 +525,6 @@ class AdminPanel {
     }
   }
 
-  startDashboardRefresh() {
-    // Refresh dashboard stats every 5 seconds
-    setInterval(() => {
-      const page = window.location.pathname;
-      if (page.includes("dashboard.html") || page.endsWith("admin/")) {
-        this.loadDashboardStats();
-        this.loadRecentChatbots();
-      }
-    }, 5000);
-  }
-
   startSidebarBadgeRefresh() {
     this.loadSidebarCounts();
 
@@ -429,8 +548,15 @@ class AdminPanel {
     this.dashboardRefreshInterval = setInterval(() => {
       const page = window.location.pathname;
       if (page.includes("dashboard.html") || page.endsWith("admin/")) {
-        this.loadDashboardStats();
-        this.loadRecentChatbots();
+        if (this.shouldPauseDashboardRefresh()) {
+          return;
+        }
+        this.loadDashboardStats({
+          showToast: false,
+          showLoading: false,
+          animate: false,
+        });
+        this.loadRecentChatbots(this.recentChatbotsPage, { showToast: false });
       }
     }, 5000);
 
@@ -439,6 +565,41 @@ class AdminPanel {
         clearInterval(this.dashboardRefreshInterval);
       }
     });
+  }
+
+  shouldPauseDashboardRefresh() {
+    const now = Date.now();
+    if (now < this.dashboardRefreshPausedUntil) {
+      return true;
+    }
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      this.dashboardRefreshPausedUntil = now + 10000;
+      this.showDashboardNetworkWarning(
+        "Browser appears offline. Dashboard refresh paused briefly.",
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  isDashboardNetworkError(error) {
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      message.includes("cannot connect to api server") ||
+      message.includes("failed to fetch") ||
+      message.includes("internet_disconnected")
+    );
+  }
+
+  showDashboardNetworkWarning(message) {
+    const now = Date.now();
+    if (now - this.lastDashboardNetworkAlertAt < 15000) {
+      return;
+    }
+    this.lastDashboardNetworkAlertAt = now;
+    NotificationManager.warning(message);
   }
 
   setupHeader() {
@@ -508,27 +669,46 @@ class AdminPanel {
     });
   }
 
-  async loadDashboardStats() {
-    this.setDashboardLoading(true);
+  async loadDashboardStats(options = {}) {
+    const showToast = options.showToast !== false;
+    const showLoading = options.showLoading !== false;
+    const animate = options.animate !== false;
+
+    if (showLoading) {
+      this.setDashboardLoading(true);
+    }
+
     try {
       const response = await API.get("/api/admin/dashboard/stats");
-      const stats = response.data;
+      const stats = response?.data?.data || response?.data || {};
       this.updateSidebarBadges(stats);
 
       // Update stat cards
-      this.updateStatCard("total-chatbots", stats.total_chatbots);
-      this.updateStatCard("total-users", stats.total_users);
-      this.updateStatCard("active-events", stats.active_chatbots);
-      this.updateStatCard("upcoming-events", stats.upcoming_events);
+      this.updateStatCard("total-chatbots", stats.total_chatbots, animate);
+      this.updateStatCard("total-users", stats.total_users, animate);
+      this.updateStatCard("active-events", stats.active_chatbots, animate);
+      this.updateStatCard("upcoming-events", stats.upcoming_events, animate);
 
       // Update other stats if elements exist
-      this.updateStatCard("active-chatbots", stats.active_chatbots);
-      this.updateStatCard("total-guests", stats.total_guests);
+      this.updateStatCard("active-chatbots", stats.active_chatbots, animate);
+      this.updateStatCard("total-guests", stats.total_guests, animate);
+      this.updateDashboardStatChanges(stats);
     } catch (error) {
       console.error("Error loading dashboard:", error);
-      NotificationManager.error("Failed to load dashboard stats");
+      if (this.isDashboardNetworkError(error)) {
+        this.dashboardRefreshPausedUntil = Date.now() + 15000;
+        if (showToast) {
+          this.showDashboardNetworkWarning(
+            error.message || "Network issue while loading dashboard stats.",
+          );
+        }
+      } else if (showToast) {
+        NotificationManager.error("Failed to load dashboard stats");
+      }
     } finally {
-      this.setDashboardLoading(false);
+      if (showLoading) {
+        this.setDashboardLoading(false);
+      }
     }
   }
 
@@ -538,26 +718,79 @@ class AdminPanel {
     statsGrid.classList.toggle("dashboard-loading", Boolean(isLoading));
   }
 
-  updateStatCard(id, value) {
+  updateStatCard(id, value, animate = true) {
     const target = DomUtils.$(`#${id}`);
     if (!target) return;
 
     const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0;
 
     if (target.classList.contains("stat-value")) {
+      const previousValue = Number.parseInt(target.textContent || "0", 10);
       target.textContent = safeValue;
-      target.classList.add("animate-fade-in");
+      if (animate && previousValue !== safeValue) {
+        target.classList.add("animate-fade-in");
+      }
       return;
     }
 
     const valueEl = target.querySelector(".stat-value");
     if (valueEl) {
+      const previousValue = Number.parseInt(valueEl.textContent || "0", 10);
       valueEl.textContent = safeValue;
-      valueEl.classList.add("animate-fade-in");
+      if (animate && previousValue !== safeValue) {
+        valueEl.classList.add("animate-fade-in");
+      }
     }
   }
 
-  async loadRecentChatbots(page = 1) {
+  updateDashboardStatChanges(stats = {}) {
+    const activeChatbots = Number.isFinite(Number(stats.active_chatbots))
+      ? Number(stats.active_chatbots)
+      : 0;
+    const upcomingEvents = Number.isFinite(Number(stats.upcoming_events))
+      ? Number(stats.upcoming_events)
+      : 0;
+    const newUsersThisMonth = Number.isFinite(
+      Number(stats.new_users_this_month),
+    )
+      ? Number(stats.new_users_this_month)
+      : 0;
+
+    this.setDashboardStatChange(
+      "total-chatbots-change",
+      activeChatbots > 0
+        ? `✓ ${activeChatbots} active now`
+        : "No active chatbots",
+      activeChatbots > 0,
+    );
+
+    this.setDashboardStatChange(
+      "active-events-change",
+      upcomingEvents > 0
+        ? `↑ ${upcomingEvents} upcoming`
+        : "No upcoming events",
+      upcomingEvents > 0,
+    );
+
+    this.setDashboardStatChange(
+      "total-users-change",
+      newUsersThisMonth > 0
+        ? `↑ ${newUsersThisMonth} new this month`
+        : "No new users this month",
+      newUsersThisMonth > 0,
+    );
+  }
+
+  setDashboardStatChange(id, text, isPositive) {
+    const el = DomUtils.$(`#${id}`);
+    if (!el) return;
+
+    el.textContent = text;
+    DomUtils.toggleClass(el, "positive", Boolean(isPositive));
+  }
+
+  async loadRecentChatbots(page = 1, options = {}) {
+    const showToast = options.showToast !== false;
     const tbody = DomUtils.$("#dashboard-recent-chatbots");
     if (!tbody) return;
 
@@ -610,6 +843,11 @@ class AdminPanel {
       tbody.innerHTML =
         '<tr><td colspan="6" class="text-center">Failed to load recent chatbots.</td></tr>';
       this.renderRecentChatbotsPagination(true);
+      if (showToast && this.isDashboardNetworkError(error)) {
+        this.showDashboardNetworkWarning(
+          error.message || "Network issue while loading recent chatbots.",
+        );
+      }
     }
   }
 
@@ -1807,7 +2045,7 @@ class UserManagementHandler {
           <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
             <i class="fas fa-shield-alt"></i> Role & Status
           </h4>
-          <div class="single-user-role-row" style="display: grid; grid-template-columns: minmax(280px, 1fr) auto; gap: 16px; align-items: end;">
+          <div class="single-user-role-row" style="display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start;">
             <div class="form-group">
               <label for="single-user-role">User Role</label>
               <select id="single-user-role" name="role" class="single-user-role-select" style="width: 100%;">
@@ -1815,7 +2053,7 @@ class UserManagementHandler {
                 <option value="admin">Admin</option>
               </select>
             </div>
-            <div class="form-group single-user-active-wrap" style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+            <div class="form-group single-user-active-wrap" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
               <div class="toggle-switch">
                 <input type="checkbox" id="single-user-active" name="active" checked style="display: none;" />
                 <label for="single-user-active" class="toggle-label" style="margin: 0;">
@@ -2037,8 +2275,21 @@ class UserManagementHandler {
       "Reset password for this user? A new temporary password will be sent to their email.",
       async () => {
         try {
-          await API.post(`/api/auth/users/${userId}/reset-password`, {});
-          NotificationManager.success("Password reset sent to user email");
+          const response = await API.post(
+            `/api/auth/users/${userId}/reset-password`,
+            {},
+          );
+          const message = response?.message || "Password reset completed";
+          const emailSent = Boolean(response?.email_sent);
+
+          if (emailSent) {
+            NotificationManager.success(message);
+          } else {
+            const tempPassword = response?.temporary_password
+              ? ` Temporary password: ${response.temporary_password}`
+              : "";
+            NotificationManager.warning(`${message}${tempPassword}`);
+          }
         } catch (error) {
           NotificationManager.error("Failed to reset password");
         }
@@ -2155,8 +2406,8 @@ class UserManagementHandler {
         return `
           <tr>
             <td>
-              <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-                <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;">${initials}</div>
+              <div class="table-user-cell">
+                <div class="table-user-avatar">${initials}</div>
                 <div>
                   <div>${user.name || user.username || "-"}</div>
                   ${chatbotsDisplay}
@@ -2875,8 +3126,6 @@ class GuestManagementHandler {
 
     this.setText("total-guests-count", total);
     this.setText("active-guests-count", total);
-    this.setText("pending-guests-count", 0);
-    this.setText("vip-guests-count", 0);
   }
 
   setText(id, value) {

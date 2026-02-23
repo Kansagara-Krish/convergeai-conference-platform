@@ -23,14 +23,13 @@
                 <nav class="user-nav">
                     <a href="dashboard.html" class="user-nav-item">Dashboard</a>
                     <a href="profile.html" class="user-nav-item">Profile</a>
-                    <div class="user-profile-menu">
-                        <button class="user-profile-btn">
-                            <div class="user-profile-avatar" data-user-name>U</div>
-                            <span class="material-symbols-outlined">account_circle</span>
+                    <div class="header-user-menu">
+                        <button class="header-user-btn">
+                            <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;" data-user-avatar>U</span>
                         </button>
-                        <div class="dropdown-menu">
-                            <a href="profile.html" class="dropdown-item"><span class="material-symbols-outlined icon-inline">person</span>Profile</a>
-                            <a href="#" class="dropdown-item" data-action="logout"><span class="material-symbols-outlined icon-inline">logout</span>Logout</a>
+                        <div class="dropdown-menu chat-header-dropdown">
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> Profile</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
                         </div>
                     </div>
                 </nav>
@@ -41,16 +40,7 @@
             <div class="chat-wrapper">
                 <!-- Chat Header -->
                 <div class="chat-header-bar">
-                    <div class="chat-header-info">
-                        <div class="chat-header-avatar">AI</div>
-                        <div class="chat-header-details">
-                            <div class="chat-header-name">AI Research Summit</div>
-                            <div class="chat-header-status"><span class="material-symbols-outlined icon-inline" style="color: var(--success); font-size: 0.95rem;">radio_button_checked</span>Online</div>
-                        </div>
-                    </div>
                     <div class="chat-header-actions">
-                        <button class="btn btn-icon btn-secondary"><span class="material-symbols-outlined">info</span></button>
-                        <button class="btn btn-icon btn-secondary"><span class="material-symbols-outlined">notifications</span></button>
                     </div>
                 </div>
 

@@ -20,24 +20,25 @@ class UserPanel {
   }
 
   setupHeader() {
-    const userBtn = DomUtils.$(".user-profile-btn");
-    const dropdown = DomUtils.$(".dropdown-menu");
+    // Chat header user dropdown
+    const chatHeaderUserBtn = DomUtils.$(".header-user-btn");
+    const chatHeaderDropdown = DomUtils.$(".chat-header-dropdown");
 
-    if (userBtn && dropdown) {
-      userBtn.addEventListener("click", (e) => {
+    if (chatHeaderUserBtn && chatHeaderDropdown) {
+      chatHeaderUserBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        DomUtils.toggleClass(dropdown, "active");
+        DomUtils.toggleClass(chatHeaderDropdown, "active");
       });
 
       document.addEventListener("click", () => {
-        DomUtils.removeClass(dropdown, "active");
+        DomUtils.removeClass(chatHeaderDropdown, "active");
       });
     }
 
-    // Update user name if displayed
-    const userName = DomUtils.$("[data-user-name]");
-    if (userName) {
-      userName.textContent = this.currentUser.name;
+    // Update user avatar in chat header
+    const userAvatar = DomUtils.$("[data-user-avatar]");
+    if (userAvatar && this.currentUser.name) {
+      userAvatar.textContent = this.currentUser.name.charAt(0).toUpperCase();
     }
   }
 
@@ -112,16 +113,23 @@ class ChatInterface {
     this.messagesArea = DomUtils.$(".messages-area");
     this.inputField = DomUtils.$(".input-field");
     this.sendBtn = DomUtils.$(".send-btn");
+    this.inputArea = DomUtils.$(".input-area");
     this.chatbotId = this.getChatbotId();
     this.messages = [];
     this.init();
   }
 
-  init() {
+  async init() {
     if (!this.messagesArea || !this.inputField || !this.sendBtn) return;
 
+    this.setInputVisible(false);
+
     if (!this.chatbotId) {
-      NotificationManager.error("Chatbot ID missing");
+      await this.resolveDefaultChatbotId();
+    }
+
+    if (!this.chatbotId) {
+      this.renderNoChatbotState();
       return;
     }
 
@@ -135,14 +143,41 @@ class ChatInterface {
       }
     });
 
-    this.loadMessages();
-    this.loadChatbotMeta();
+    const chatbotMeta = await this.loadChatbotMeta();
+    await this.playWelcomeIntro(chatbotMeta);
+    this.setInputVisible(true);
+    await this.loadMessages();
     this.setupAutoScroll();
   }
 
   getChatbotId() {
     const params = new URLSearchParams(window.location.search);
     return params.get("id") || null;
+  }
+
+  async resolveDefaultChatbotId() {
+    try {
+      const response = await API.get("/api/user/chatbots");
+      const chatbots = Array.isArray(response?.data) ? response.data : [];
+      const firstChatbot = chatbots[0];
+
+      if (!firstChatbot?.id) return;
+
+      this.chatbotId = String(firstChatbot.id);
+      const nextUrl = `chat.html?id=${firstChatbot.id}`;
+      window.history.replaceState({}, "", nextUrl);
+    } catch (error) {
+      console.error("Error resolving default chatbot:", error);
+    }
+  }
+
+  renderNoChatbotState() {
+    this.messagesArea.innerHTML = `
+      <div class="chat-empty-state">
+        <div class="chat-empty-title">No event chatbot assigned yet</div>
+        <div class="chat-empty-text">Contact your administrator to get access to an event chatbot.</div>
+      </div>
+    `;
   }
 
   async sendMessage() {
@@ -266,7 +301,7 @@ class ChatInterface {
     try {
       const response = await API.get(`/api/chatbots/${this.chatbotId}`);
       const chatbot = response?.data;
-      if (!chatbot) return;
+      if (!chatbot) return null;
 
       const titleEl = DomUtils.$(".chat-header-name");
       const statusEl = DomUtils.$(".chat-header-status");
@@ -281,9 +316,58 @@ class ChatInterface {
           ? '<span class="material-symbols-outlined icon-inline" style="color: var(--success); font-size: 0.95rem;">radio_button_checked</span>Online'
           : '<span class="material-symbols-outlined icon-inline" style="color: var(--warning); font-size: 0.95rem;">radio_button_checked</span>Offline';
       }
+
+      return chatbot;
     } catch (error) {
       console.error("Error loading chatbot meta:", error);
+      return null;
     }
+  }
+
+  async playWelcomeIntro(chatbot) {
+    const chatbotName = chatbot?.name || "ConvergeAI Assistant";
+    const eventName = chatbot?.event_name || "your event";
+    const description = (
+      chatbot?.description ||
+      "Ask anything related to this event and get instant help."
+    ).trim();
+    const introText = `Welcome to ${eventName}. You are now chatting with ${chatbotName}. ${description}`;
+
+    const introCard = DomUtils.create("div", "chat-welcome-card");
+    introCard.innerHTML = `
+      <div class="chat-welcome-title">Welcome</div>
+      <div class="chat-welcome-typing">
+        <span class="chat-welcome-text"></span><span class="chat-welcome-cursor">|</span>
+      </div>
+    `;
+
+    const textEl = introCard.querySelector(".chat-welcome-text");
+    this.messagesArea.appendChild(introCard);
+    this.scrollToBottom();
+
+    for (const character of introText) {
+      textEl.textContent += character;
+      await new Promise((resolve) => setTimeout(resolve, 18));
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  setInputVisible(visible) {
+    if (!this.inputArea) return;
+
+    if (!visible) {
+      this.inputArea.classList.add("chat-input-hidden");
+      this.inputArea.classList.remove("chat-input-reveal");
+      return;
+    }
+
+    this.inputArea.classList.remove("chat-input-hidden");
+    this.inputArea.classList.add("chat-input-reveal");
+    setTimeout(() => {
+      this.inputArea.classList.remove("chat-input-reveal");
+      this.inputField.focus();
+    }, 450);
   }
 
   escapeHtml(text) {
@@ -447,13 +531,26 @@ class LoginHandler {
         Storage.setToken(response.token);
 
         NotificationManager.success("Login successful!");
-        setTimeout(() => {
+        setTimeout(async () => {
           // Use the user role from the backend response
           const userRole = response.user.role;
-          const redirectUrl =
-            userRole === "admin"
-              ? "admin/dashboard.html"
-              : "user/dashboard.html";
+          let redirectUrl = "admin/dashboard.html";
+
+          if (userRole !== "admin") {
+            redirectUrl = "user/chat.html";
+            try {
+              const chatbotResponse = await API.get("/api/user/chatbots");
+              const chatbots = Array.isArray(chatbotResponse?.data)
+                ? chatbotResponse.data
+                : [];
+              if (chatbots[0]?.id) {
+                redirectUrl = `user/chat.html?id=${chatbots[0].id}`;
+              }
+            } catch (error) {
+              console.error("Failed loading user chatbots after login:", error);
+            }
+          }
+
           console.log(`Redirecting to: ${redirectUrl}`); // DEBUG
           window.location.href = redirectUrl;
         }, 500);

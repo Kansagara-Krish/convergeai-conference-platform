@@ -13,6 +13,7 @@ function resolveApiBaseUrl() {
   }
 
   const { protocol, hostname, port } = window.location;
+  const apiHost = hostname === "localhost" ? "127.0.0.1" : hostname;
 
   if (
     (hostname === "localhost" || hostname === "127.0.0.1") &&
@@ -21,12 +22,12 @@ function resolveApiBaseUrl() {
     return "";
   }
 
-  if (
-    protocol === "file:" ||
-    hostname === "localhost" ||
-    hostname === "127.0.0.1"
-  ) {
-    return "http://localhost:5000";
+  if (protocol === "file:") {
+    return "http://127.0.0.1:5000";
+  }
+
+  if (port === "8000") {
+    return `${protocol}//${apiHost}:5000`;
   }
 
   return "";
@@ -322,9 +323,68 @@ class API {
     return url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
   }
 
+  static getBaseCandidates() {
+    if (typeof window === "undefined") {
+      return ["http://127.0.0.1:5000", "http://localhost:5000"];
+    }
+
+    const { protocol, hostname } = window.location;
+    const currentHost = hostname || "127.0.0.1";
+
+    const candidates = [
+      API_BASE_URL,
+      `${protocol}//127.0.0.1:5000`,
+      `${protocol}//localhost:5000`,
+      `${protocol}//${currentHost}:5000`,
+      "",
+    ].filter((value) => typeof value === "string");
+
+    return [...new Set(candidates)];
+  }
+
+  static isNetworkFailure(error) {
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      message.includes("failed to fetch") ||
+      message.includes("internet_disconnected") ||
+      message.includes("networkerror")
+    );
+  }
+
+  static async request(method, url, data = null) {
+    const isAbsolute = url.startsWith("http");
+    const isFormData = data instanceof FormData;
+    const body =
+      data == null ? undefined : isFormData ? data : JSON.stringify(data);
+
+    const attemptUrls = isAbsolute
+      ? [url]
+      : this.getBaseCandidates().map((base) => `${base}${url}`);
+
+    let lastError = null;
+
+    for (const fullUrl of attemptUrls) {
+      try {
+        const response = await fetch(fullUrl, {
+          method,
+          headers: this.getHeaders(isFormData),
+          body,
+        });
+        return this.handleResponse(response, url);
+      } catch (error) {
+        lastError = error;
+        if (!this.isNetworkFailure(error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error("Failed to fetch");
+  }
+
   static handleNetworkError(error) {
     const message = (error && error.message) || "Failed to fetch";
-    if (message.toLowerCase().includes("failed to fetch")) {
+    if (this.isNetworkFailure(error)) {
       throw new Error(
         `Cannot connect to API server. Make sure backend is running at ${
           API_BASE_URL || window.location.origin
@@ -348,12 +408,7 @@ class API {
 
   static async get(url) {
     try {
-      const fullUrl = this.buildUrl(url);
-      const response = await fetch(fullUrl, {
-        method: "GET",
-        headers: this.getHeaders(),
-      });
-      return this.handleResponse(response);
+      return await this.request("GET", url);
     } catch (error) {
       console.error("API Error:", error);
       this.handleNetworkError(error);
@@ -362,14 +417,7 @@ class API {
 
   static async post(url, data) {
     try {
-      const fullUrl = this.buildUrl(url);
-      const isFormData = data instanceof FormData;
-      const response = await fetch(fullUrl, {
-        method: "POST",
-        headers: this.getHeaders(isFormData),
-        body: isFormData ? data : JSON.stringify(data),
-      });
-      return this.handleResponse(response);
+      return await this.request("POST", url, data);
     } catch (error) {
       console.error("API Error:", error);
       this.handleNetworkError(error);
@@ -378,14 +426,7 @@ class API {
 
   static async put(url, data) {
     try {
-      const fullUrl = this.buildUrl(url);
-      const isFormData = data instanceof FormData;
-      const response = await fetch(fullUrl, {
-        method: "PUT",
-        headers: this.getHeaders(isFormData),
-        body: isFormData ? data : JSON.stringify(data),
-      });
-      return this.handleResponse(response);
+      return await this.request("PUT", url, data);
     } catch (error) {
       console.error("API Error:", error);
       this.handleNetworkError(error);
@@ -394,25 +435,29 @@ class API {
 
   static async delete(url) {
     try {
-      const fullUrl = this.buildUrl(url);
-      const response = await fetch(fullUrl, {
-        method: "DELETE",
-        headers: this.getHeaders(),
-      });
-      return this.handleResponse(response);
+      return await this.request("DELETE", url);
     } catch (error) {
       console.error("API Error:", error);
       this.handleNetworkError(error);
     }
   }
 
-  static async handleResponse(response) {
+  static async handleResponse(response, requestUrl = "") {
     if (!response.ok) {
       if (response.status === 401) {
-        // Token expired or invalid
-        Storage.clear();
-        AppAuth.redirectToLogin();
-        throw new Error("Session expired. Please login again.");
+        const isAuthLoginRequest =
+          typeof requestUrl === "string" &&
+          (requestUrl.includes("/api/auth/login") ||
+            requestUrl.includes("/api/auth/register"));
+        const hasToken = Boolean(Storage.getToken());
+
+        // Token expired/invalid should only trigger redirect for authenticated requests,
+        // not for login/register failures that also legitimately return 401.
+        if (!isAuthLoginRequest && hasToken) {
+          Storage.clear();
+          AppAuth.redirectToLogin();
+          throw new Error("Session expired. Please login again.");
+        }
       }
       const data = await response.json().catch(() => ({}));
       throw new Error(
@@ -471,11 +516,7 @@ class AppAuth {
       return "../index.html";
     }
 
-    if (pagePath.includes("/frontend/")) {
-      return "index.html";
-    }
-
-    return "frontend/index.html";
+    return "index.html";
   }
 
   static redirectToLogin() {

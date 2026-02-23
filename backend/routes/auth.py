@@ -2,9 +2,12 @@
 # Authentication Routes
 # ============================================
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 from functools import wraps
+import smtplib
+import ssl
+from email.message import EmailMessage
 
 try:
     from models import db, User, SessionToken
@@ -12,6 +15,53 @@ except ImportError:
     from backend.models import db, User, SessionToken
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def send_reset_password_email(recipient_email, name, username, temp_password):
+    mail_server = current_app.config.get('MAIL_SERVER')
+    mail_port = current_app.config.get('MAIL_PORT', 587)
+    mail_username = current_app.config.get('MAIL_USERNAME')
+    mail_password = current_app.config.get('MAIL_PASSWORD')
+    mail_sender = current_app.config.get('MAIL_DEFAULT_SENDER') or mail_username or 'noreply@localhost'
+    use_tls = current_app.config.get('MAIL_USE_TLS', True)
+    use_ssl = current_app.config.get('MAIL_USE_SSL', False)
+
+    if not mail_server:
+        return False, 'MAIL_SERVER is not configured'
+
+    msg = EmailMessage()
+    msg['Subject'] = 'Your ConvergeAI Password Has Been Reset'
+    msg['From'] = mail_sender
+    msg['To'] = recipient_email
+    msg.set_content(
+        (
+            f"Hello {name},\n\n"
+            "Your password has been reset by an administrator.\n\n"
+            f"Username: {username}\n"
+            f"Temporary Password: {temp_password}\n\n"
+            "Please login and change your password immediately.\n\n"
+            "Regards,\nConvergeAI Admin"
+        )
+    )
+
+    try:
+        if use_ssl:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(mail_server, mail_port, context=context, timeout=20) as server:
+                if mail_username:
+                    server.login(mail_username, mail_password or '')
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(mail_server, mail_port, timeout=20) as server:
+                if use_tls:
+                    context = ssl.create_default_context()
+                    server.starttls(context=context)
+                if mail_username:
+                    server.login(mail_username, mail_password or '')
+                server.send_message(msg)
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
 
 # ============================================
 # Authentication Decorators
@@ -225,14 +275,25 @@ def reset_password(user, user_id):
         return jsonify({'success': False, 'message': 'User not found'}), 404
     
     # Generate temporary password
-    temp_password = SessionToken.generate_token()[:12]
+    temp_password = '123'
     target_user.set_password(temp_password)
     db.session.commit()
-    
-    # In production, send email with temporary password
-    
+
+    email_sent, email_error = send_reset_password_email(
+        recipient_email=target_user.email,
+        name=target_user.name or target_user.username,
+        username=target_user.username,
+        temp_password=temp_password
+    )
+
+    if email_sent:
+        message = 'Password reset email sent'
+    else:
+        message = f'Password reset, but email failed: {email_error}'
+
     return jsonify({
         'success': True,
-        'message': 'Password reset email sent',
+        'message': message,
+        'email_sent': email_sent,
         'temporary_password': temp_password  # Remove in production
     }), 200

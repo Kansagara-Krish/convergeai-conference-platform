@@ -86,12 +86,28 @@
                 <div class="header-title">
                     <h1>Guest Management</h1>
                 </div>
-                <div style="display: flex; gap: var(--spacing-md);">
-                    <select style="width: 150px;">
-                        <option>Filter by status</option>
-                        <option>Registered</option>
-                        <option>Checked In</option>
-                    </select>
+                <div class="header-actions">
+                    <div class="dashboard-bell-wrap" id="dashboard-bell-wrap">
+                        <button class="dashboard-bell-btn bell-ringing" id="dashboard-bell-btn" aria-label="Dashboard notifications">
+                            <i class="fas fa-bell"></i>
+                            <span class="dashboard-bell-dot" id="dashboard-bell-dot"></span>
+                        </button>
+                        <div class="dashboard-bell-panel" id="dashboard-bell-panel" aria-hidden="true">
+                            <div class="dashboard-bell-panel-title">Notifications</div>
+                            <div class="dashboard-bell-list" id="dashboard-bell-list">Loading notifications...</div>
+                        </div>
+                    </div>
+                    <div class="header-user-menu">
+                        <button class="header-user-btn">
+                            <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                            <a href="settings.html" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -109,18 +125,6 @@
                         <div class="stat-icon success"><i class="fas fa-check-circle"></i></div>
                         <div class="stat-value" id="active-guests-count">0</div>
                         <div class="stat-label">Active</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon warning"><i class="fas fa-clock"></i></div>
-                        <div class="stat-value" id="pending-guests-count">0</div>
-                        <div class="stat-label">Speakers</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon danger"><i class="fas fa-star"></i></div>
-                        <div class="stat-value" id="vip-guests-count">0</div>
-                        <div class="stat-label">Moderators</div>
                     </div>
                 </div>
 

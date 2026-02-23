@@ -34,7 +34,7 @@
 .user-header {
   background: linear-gradient(90deg, rgba(26, 31, 46, 0.8), rgba(30, 41, 59, 0.8));
   border-bottom: 1px solid var(--border-color);
-  padding: var(--spacing-lg) var(--spacing-xl);
+  padding: 1.25rem var(--spacing-xl);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   position: sticky;
@@ -49,6 +49,7 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: var(--spacing-2xl);
 }
 
 .user-logo {
@@ -66,7 +67,8 @@
 .user-nav {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xl);
+  gap: 2rem;
+  margin-left: auto;
 }
 
 .user-nav-item {
@@ -89,16 +91,16 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  background: rgba(79, 70, 229, 0.1);
-  border: 1px solid var(--border-color);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  padding: 0;
   cursor: pointer;
   transition: all var(--transition-base);
+  color: var(--text-primary);
 }
 
 .user-profile-btn:hover {
-  background: rgba(79, 70, 229, 0.2);
+  opacity: 0.8;
 }
 
 .user-profile-avatar {
@@ -111,6 +113,68 @@
   justify-content: center;
   font-weight: 700;
   color: white;
+}
+
+/* Header User Menu in Nav */
+.header-user-menu {
+  position: relative;
+}
+
+.header-user-btn {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.header-user-btn:hover {
+  opacity: 0.8;
+}
+
+.chat-header-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-top: 8px;
+  min-width: 200px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transition: all var(--transition-base);
+  z-index: 100;
+}
+
+.chat-header-dropdown.active {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: rgba(79, 70, 229, 0.1);
 }
 
 .user-main {
