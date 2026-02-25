@@ -31,6 +31,7 @@ const AdminPageSkeletonLoader = {
   init() {
     const adminContent = document.querySelector(".admin-content");
     const adminHeader = document.querySelector(".admin-header");
+    const adminSidebar = document.querySelector(".admin-sidebar");
     if (!adminContent) {
       this.isBooting = false;
       return;
@@ -39,6 +40,9 @@ const AdminPageSkeletonLoader = {
     adminContent.classList.add("page-skeleton-loading");
     if (adminHeader) {
       adminHeader.classList.add("page-skeleton-loading");
+    }
+    if (adminSidebar) {
+      adminSidebar.classList.add("page-skeleton-loading");
     }
     this.patchApiRequests();
 
@@ -84,11 +88,15 @@ const AdminPageSkeletonLoader = {
 
     const adminContent = document.querySelector(".admin-content");
     const adminHeader = document.querySelector(".admin-header");
+    const adminSidebar = document.querySelector(".admin-sidebar");
     if (adminContent) {
       adminContent.classList.remove("page-skeleton-loading");
     }
     if (adminHeader) {
       adminHeader.classList.remove("page-skeleton-loading");
+    }
+    if (adminSidebar) {
+      adminSidebar.classList.remove("page-skeleton-loading");
     }
 
     this.isBooting = false;
@@ -148,6 +156,7 @@ class AdminPanel {
       this.isBellPanelOpen = !this.isBellPanelOpen;
       bellPanel.classList.toggle("active", this.isBellPanelOpen);
       bellPanel.setAttribute("aria-hidden", String(!this.isBellPanelOpen));
+      this.updateMobileBellFocusState(this.isBellPanelOpen);
 
       if (this.isBellPanelOpen) {
         await this.loadDashboardNotifications();
@@ -162,11 +171,28 @@ class AdminPanel {
         this.isBellPanelOpen = false;
         bellPanel.classList.remove("active");
         bellPanel.setAttribute("aria-hidden", "true");
+        this.updateMobileBellFocusState(false);
       }
+    });
+
+    window.addEventListener("resize", () => {
+      if (!this.isBellPanelOpen) {
+        this.updateMobileBellFocusState(false);
+        return;
+      }
+      this.updateMobileBellFocusState(this.isBellPanelOpen);
     });
 
     this.loadDashboardNotifications();
     this.startDashboardNotificationRefresh();
+  }
+
+  updateMobileBellFocusState(isOpen) {
+    const isMobile = window.innerWidth <= 768;
+    document.body.classList.toggle(
+      "admin-mobile-bell-open",
+      Boolean(isOpen && isMobile),
+    );
   }
 
   setupSidebar() {
@@ -624,7 +650,9 @@ class AdminPanel {
       logoutBtns.forEach((btn) => {
         btn.addEventListener("click", (e) => {
           e.preventDefault();
-          this.logout();
+          ModalManager.confirm("Are you sure you want to logout?", () =>
+            this.logout(),
+          );
         });
       });
     }
@@ -1007,6 +1035,7 @@ class ChatbotFormHandler {
         start_date: bot.start_date,
         end_date: bot.end_date,
         description: bot.description,
+        gemini_api_key: bot.gemini_api_key || "",
         single_person_prompt:
           bot.single_person_prompt || this.defaultSinglePersonPrompt,
         multiple_person_prompt:
@@ -1253,6 +1282,7 @@ class ChatbotFormHandler {
         <span class="manual-guest-file-name">No image selected</span>
       </div>
       <button type="button" class="btn btn-ghost manual-guest-remove" title="Remove guest"><i class="fas fa-trash"></i></button>
+      <small class="manual-guest-file-hint">Image filename auto-follows guest name (updated when guest name changes).</small>
     `;
 
     const imageInput = row.querySelector(".manual-guest-image");
@@ -1495,6 +1525,7 @@ class ChatbotFormHandler {
     const multiplePersonPrompt = String(
       formData.get("multiple_person_prompt") || "",
     ).trim();
+    const geminiApiKey = String(formData.get("gemini_api_key") || "").trim();
 
     if (!singlePersonPrompt || !multiplePersonPrompt) {
       NotificationManager.error(
@@ -1503,8 +1534,14 @@ class ChatbotFormHandler {
       return;
     }
 
+    if (!geminiApiKey) {
+      NotificationManager.error("Gemini API Key is required");
+      return;
+    }
+
     formData.set("single_person_prompt", singlePersonPrompt);
     formData.set("multiple_person_prompt", multiplePersonPrompt);
+    formData.set("gemini_api_key", geminiApiKey);
 
     const guestListInput = this.form.querySelector('[name="guest_list"]');
     const hasExcelGuestList = Boolean(guestListInput?.files?.length);
@@ -2096,8 +2133,24 @@ class UserManagementHandler {
     const form = modal.querySelector("#single-user-form");
     const cancelBtn = modal.querySelector("#single-user-cancel");
     const chatbotsSelect = modal.querySelector("#single-user-chatbots");
+    const roleSelect = modal.querySelector("#single-user-role");
+    const submitBtn = modal.querySelector("#single-user-submit");
     const activeToggle = modal.querySelector("#single-user-active");
     const activeToggleText = modal.querySelector(".toggle-text");
+
+    const getCreateLabelByRole = (role) =>
+      role === "admin" ? "Create Admin" : "Create User";
+
+    const updateSubmitLabelByRole = () => {
+      if (!submitBtn || !roleSelect) return;
+      const label = getCreateLabelByRole(roleSelect.value);
+      submitBtn.innerHTML = `<i class="fas fa-user-plus"></i> ${label}`;
+    };
+
+    updateSubmitLabelByRole();
+    if (roleSelect) {
+      roleSelect.addEventListener("change", updateSubmitLabelByRole);
+    }
 
     if (activeToggle && activeToggleText) {
       const updateSingleUserActiveText = () => {
@@ -2188,9 +2241,14 @@ class UserManagementHandler {
     }
 
     const submitBtn = form.querySelector("#single-user-submit");
+    const submitLabel =
+      payload.role === "admin" ? "Creating Admin..." : "Creating User...";
+    const resetLabel =
+      payload.role === "admin" ? "Create Admin" : "Create User";
+
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = "Creating...";
+      submitBtn.textContent = submitLabel;
     }
 
     try {
@@ -2216,7 +2274,7 @@ class UserManagementHandler {
       NotificationManager.error(error.message || "Failed to create user");
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.textContent = "Create User";
+        submitBtn.innerHTML = `<i class="fas fa-user-plus"></i> ${resetLabel}`;
       }
     }
   }
@@ -2272,7 +2330,7 @@ class UserManagementHandler {
 
   async resetPassword(userId) {
     ModalManager.confirm(
-      "Reset password for this user? A new temporary password will be sent to their email.",
+      "Reset password for this user to 123? The email will include username, assigned event(s), and instruction to change password after login.",
       async () => {
         try {
           const response = await API.post(
@@ -2281,14 +2339,25 @@ class UserManagementHandler {
           );
           const message = response?.message || "Password reset completed";
           const emailSent = Boolean(response?.email_sent);
+          const username = response?.username || "user";
+          const events = Array.isArray(response?.event_names)
+            ? response.event_names
+            : [];
+          const eventsLabel = events.length
+            ? ` Event(s): ${events.join(", ")}.`
+            : " Event(s): No event assigned yet.";
 
           if (emailSent) {
-            NotificationManager.success(message);
+            NotificationManager.success(
+              `${message} Username: ${username}, temporary password: 123.${eventsLabel}`,
+            );
           } else {
             const tempPassword = response?.temporary_password
               ? ` Temporary password: ${response.temporary_password}`
               : "";
-            NotificationManager.warning(`${message}${tempPassword}`);
+            NotificationManager.warning(
+              `${message}${tempPassword}. Username: ${username}.${eventsLabel}`,
+            );
           }
         } catch (error) {
           NotificationManager.error("Failed to reset password");
@@ -2486,8 +2555,6 @@ class AdminProfileHandler {
     this.nameInput = this.form.querySelector('[name="name"]');
     this.usernameInput = this.form.querySelector('[name="username"]');
     this.emailInput = this.form.querySelector('[name="email"]');
-    this.organizationInput = this.form.querySelector('[name="organization"]');
-    this.bioInput = this.form.querySelector('[name="bio"]');
 
     this.init();
   }
@@ -2505,10 +2572,6 @@ class AdminProfileHandler {
       if (this.nameInput) this.nameInput.value = profile.name || "";
       if (this.usernameInput) this.usernameInput.value = profile.username || "";
       if (this.emailInput) this.emailInput.value = profile.email || "";
-      if (this.organizationInput) {
-        this.organizationInput.value = profile.organization || "";
-      }
-      if (this.bioInput) this.bioInput.value = profile.bio || "";
 
       const roleEl = DomUtils.$("#profile-role");
       if (roleEl) roleEl.textContent = profile.role || "Admin";
@@ -2537,8 +2600,6 @@ class AdminProfileHandler {
 
     const payload = {
       name: this.nameInput?.value?.trim() || "",
-      organization: this.organizationInput?.value?.trim() || "",
-      bio: this.bioInput?.value?.trim() || "",
     };
 
     if (!payload.name) {
@@ -2554,8 +2615,6 @@ class AdminProfileHandler {
       Storage.setUser({
         ...currentUser,
         name: updatedUser.name || payload.name,
-        organization: updatedUser.organization || payload.organization,
-        bio: updatedUser.bio || payload.bio,
       });
 
       NotificationManager.success("Profile updated successfully");
@@ -2937,7 +2996,7 @@ class ChatbotListHandler {
       const tbody = this.table.querySelector("tbody");
       if (tbody) {
         tbody.innerHTML =
-          '<tr><td colspan="8" class="text-center py-xl text-muted">Failed to load chatbots. Please refresh and try again.</td></tr>';
+          '<tr><td colspan="9" class="text-center py-xl text-muted">Failed to load chatbots. Please refresh and try again.</td></tr>';
       }
     }
 
@@ -2953,7 +3012,7 @@ class ChatbotListHandler {
       if (tbody) {
         if (chatbots.length === 0) {
           tbody.innerHTML =
-            '<tr><td colspan="8" class="text-center">No chatbots found.</td></tr>';
+            '<tr><td colspan="9" class="text-center">No chatbots found.</td></tr>';
         } else {
           tbody.innerHTML = chatbots
             .map(
@@ -2974,6 +3033,7 @@ class ChatbotListHandler {
                         </td>
                         <td>${bot.participants_count || 0}</td>
               <td>${bot.guests_count || 0}</td>
+                    <td>${this.formatGeminiKey(bot.gemini_api_key)}</td>
                         <td>
                             <div class="table-actions">
                                 <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-icon btn-secondary"><i class="fas fa-edit"></i></a>
@@ -3046,6 +3106,19 @@ class ChatbotListHandler {
         return "secondary";
     }
   }
+
+  formatGeminiKey(value) {
+    const key = String(value || "").trim();
+    if (!key) {
+      return "-";
+    }
+
+    if (key.length <= 8) {
+      return "••••••••";
+    }
+
+    return `${key.slice(0, 4)}••••••${key.slice(-4)}`;
+  }
 }
 
 // ============================================
@@ -3055,6 +3128,14 @@ class ChatbotListHandler {
 class GuestManagementHandler {
   constructor() {
     this.table = document.querySelector('table[data-table="guests"]');
+    this.statusFilter = DomUtils.$("#guest-status-filter");
+    this.eventFilter = DomUtils.$("#guest-event-filter");
+    this.paginationContainer = DomUtils.$("#guests-pagination-container");
+    this.paginationSummary = DomUtils.$("#guests-pagination-summary");
+    this.paginationButtons = DomUtils.$("#guests-pagination-buttons");
+    this.currentPage = 1;
+    this.perPage = 5;
+    this.allGuests = [];
     if (this.table) {
       this.init();
     }
@@ -3064,6 +3145,24 @@ class GuestManagementHandler {
     this.loadGuests();
     this.setupEventListeners();
     this.setupAddGuestButton();
+    this.setupFilters();
+    this.setupPaginationActions();
+  }
+
+  setupFilters() {
+    if (this.statusFilter) {
+      this.statusFilter.addEventListener("change", () => {
+        this.currentPage = 1;
+        this.renderCurrentPage();
+      });
+    }
+
+    if (this.eventFilter) {
+      this.eventFilter.addEventListener("change", () => {
+        this.currentPage = 1;
+        this.renderCurrentPage();
+      });
+    }
   }
 
   setupEventListeners() {
@@ -3110,22 +3209,85 @@ class GuestManagementHandler {
   async loadGuests() {
     try {
       const response = await API.get("/api/admin/guests");
-      const guests = response.data;
-      this.render(guests);
+      const guests = Array.isArray(response?.data) ? response.data : [];
+      this.allGuests = guests;
+      this.populateEventFilterOptions(guests);
+
+      const totalPages = Math.max(1, Math.ceil(guests.length / this.perPage));
+      if (this.currentPage > totalPages) {
+        this.currentPage = totalPages;
+      }
+
+      this.renderCurrentPage();
 
       // Update stats
       this.updateStats(guests);
     } catch (error) {
       console.error("Error loading guests:", error);
       NotificationManager.error("Failed to load guests");
+      this.allGuests = [];
+      this.currentPage = 1;
+      this.render([]);
+      this.renderPagination(0, 1, 1);
     }
   }
 
   updateStats(guests) {
     const total = guests.length;
+    const active = guests.filter((guest) => guest.active).length;
+    const inactive = Math.max(total - active, 0);
 
     this.setText("total-guests-count", total);
-    this.setText("active-guests-count", total);
+    this.setText("active-guests-count", active);
+    this.setText("inactive-guests-count", inactive);
+  }
+
+  populateEventFilterOptions(guests) {
+    if (!this.eventFilter) return;
+
+    const selected = String(this.eventFilter.value || "").trim();
+    const selectedNormalized = selected.toLowerCase();
+    const eventNames = Array.from(
+      new Set(
+        guests
+          .map((guest) => String(guest.event_name || "").trim())
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+
+    this.eventFilter.innerHTML =
+      '<option value="">Filter by event</option>' +
+      eventNames
+        .map(
+          (eventName) => `<option value="${eventName}">${eventName}</option>`,
+        )
+        .join("");
+
+    if (selected) {
+      const matchedEvent = eventNames.find(
+        (eventName) => eventName.toLowerCase() === selectedNormalized,
+      );
+      if (matchedEvent) {
+        this.eventFilter.value = matchedEvent;
+      }
+    }
+  }
+
+  getFilteredGuests() {
+    const status = (this.statusFilter?.value || "").toLowerCase();
+    const eventName = String(this.eventFilter?.value || "")
+      .trim()
+      .toLowerCase();
+
+    return this.allGuests.filter((guest) => {
+      const matchesStatus =
+        !status || (status === "active" ? guest.active : !guest.active);
+      const guestEvent = String(guest.event_name || "")
+        .trim()
+        .toLowerCase();
+      const matchesEvent = !eventName || guestEvent === eventName;
+      return matchesStatus && matchesEvent;
+    });
   }
 
   setText(id, value) {
@@ -3139,13 +3301,21 @@ class GuestManagementHandler {
 
     if (guests.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="3" class="text-center">No guests found.</td></tr>';
+        '<tr><td colspan="4" class="text-center">No guests found.</td></tr>';
       return;
     }
 
     tbody.innerHTML = guests
-      .map(
-        (guest) => `
+      .map((guest) => {
+        const eventDisplay = guest.event_name
+          ? `<div>${guest.event_name}</div><small style="color: var(--text-muted);">${guest.chatbot_name || ""}</small>`
+          : "<em>No Event</em>";
+
+        const statusBadge = guest.active
+          ? `<span class="admin-status status-active">Active</span>`
+          : `<span class="admin-status status-inactive">Inactive</span>`;
+
+        return `
             <tr>
                 <td>
                     <div style="display: flex; align-items: center; gap: var(--spacing-md);">
@@ -3155,7 +3325,10 @@ class GuestManagementHandler {
                         <div>${guest.name}</div>
                     </div>
                 </td>
-                <td>${guest.chatbot_id ? "Linked Event" : "General"}</td>
+                <td>
+                  ${eventDisplay}
+                </td>
+                <td>${statusBadge}</td>
                 <td>
                     <div class="table-actions">
                         <button class="btn btn-sm btn-secondary" data-action="edit" data-id="${guest.id}"><i class="fas fa-edit"></i></button>
@@ -3163,9 +3336,86 @@ class GuestManagementHandler {
                     </div>
                 </td>
             </tr>
-        `,
-      )
+          `;
+      })
       .join("");
+  }
+
+  renderCurrentPage() {
+    const filteredGuests = this.getFilteredGuests();
+    const totalGuests = filteredGuests.length;
+    const totalPages = Math.max(1, Math.ceil(totalGuests / this.perPage));
+    const safePage = Math.min(Math.max(this.currentPage, 1), totalPages);
+    this.currentPage = safePage;
+
+    const startIndex = (safePage - 1) * this.perPage;
+    const pageGuests = filteredGuests.slice(
+      startIndex,
+      startIndex + this.perPage,
+    );
+
+    this.render(pageGuests);
+    this.renderPagination(totalGuests, safePage, totalPages);
+  }
+
+  setupPaginationActions() {
+    if (!this.paginationButtons) return;
+
+    this.paginationButtons.addEventListener("click", (event) => {
+      const pageButton = event.target.closest("[data-page]");
+      if (!pageButton) return;
+
+      const nextPage = Number(pageButton.dataset.page);
+      if (
+        !Number.isFinite(nextPage) ||
+        nextPage < 1 ||
+        nextPage === this.currentPage
+      ) {
+        return;
+      }
+
+      this.currentPage = nextPage;
+      this.renderCurrentPage();
+    });
+  }
+
+  renderPagination(totalGuests, currentPage, totalPages) {
+    const start = totalGuests === 0 ? 0 : (currentPage - 1) * this.perPage + 1;
+    const end = Math.min(currentPage * this.perPage, totalGuests);
+
+    if (this.paginationSummary) {
+      this.paginationSummary.textContent = `Showing ${start}-${end} of ${totalGuests} guests`;
+    }
+
+    if (!this.paginationContainer || !this.paginationButtons) return;
+
+    const shouldShowPagination = totalGuests > this.perPage && totalPages > 1;
+    this.paginationContainer.style.display = shouldShowPagination
+      ? "flex"
+      : "none";
+
+    if (!shouldShowPagination) {
+      this.paginationButtons.innerHTML = "";
+      return;
+    }
+
+    const pageButtons = [];
+
+    pageButtons.push(`
+      <button class="btn btn-ghost btn-sm" data-page="${Math.max(currentPage - 1, 1)}" ${currentPage <= 1 ? "disabled" : ""}>← Previous</button>
+    `);
+
+    for (let page = 1; page <= totalPages; page += 1) {
+      pageButtons.push(`
+        <button class="btn ${page === currentPage ? "btn-primary" : "btn-ghost"} btn-sm" data-page="${page}">${page}</button>
+      `);
+    }
+
+    pageButtons.push(`
+      <button class="btn btn-ghost btn-sm" data-page="${Math.min(currentPage + 1, totalPages)}" ${currentPage >= totalPages ? "disabled" : ""}>Next →</button>
+    `);
+
+    this.paginationButtons.innerHTML = pageButtons.join("");
   }
 
   async openEditModal(id) {
@@ -3186,18 +3436,52 @@ class GuestManagementHandler {
 
       console.log(`[GuestEdit] Guest data:`, guest);
 
+      const resolveUploadUrl = (path) => {
+        const raw = String(path || "").trim();
+        if (!raw) return "";
+        if (/^https?:\/\//i.test(raw)) return raw;
+        const normalized = raw.replace(/^\/+/, "");
+        if (normalized.startsWith("uploads/")) {
+          return `${API_BASE_URL}/${normalized}`;
+        }
+        return `${API_BASE_URL}/uploads/${normalized}`;
+      };
+
+      const currentPhotoUrl = guest.photo ? resolveUploadUrl(guest.photo) : "";
+      const currentPhotoName = guest.photo
+        ? decodeURIComponent(String(guest.photo).split("/").pop() || "")
+        : "No image uploaded";
+
       const formHTML = `
+        <div class="form-group">
+          <label>Current Image</label>
+          <div style="display:flex; flex-direction:column; align-items:flex-start; gap: var(--spacing-sm); margin-top: 0.5rem;">
+            <img id="guest-photo-preview-edit" src="${currentPhotoUrl}" alt="Guest photo" style="width:180px; height:180px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color); background: var(--bg-tertiary); ${currentPhotoUrl ? "" : "display:none;"}" />
+            <span id="guest-photo-empty-edit" style="color: var(--text-muted); ${currentPhotoUrl ? "display:none;" : ""}">No image uploaded</span>
+            <small id="guest-photo-name-edit" style="color: var(--text-muted); word-break: break-all;">${currentPhotoName}</small>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="guest-photo-edit">Update Image</label>
+          <div class="guest-edit-file-wrap">
+            <input type="file" id="guest-photo-edit" class="guest-edit-file-input" accept="image/*">
+            <button type="button" id="guest-photo-pick-edit" class="btn btn-secondary btn-sm">
+              <i class="fas fa-upload"></i> Choose Image
+            </button>
+            <span id="guest-photo-picked-name-edit" class="guest-edit-file-name">No image selected</span>
+          </div>
+          <small style="color: var(--text-muted);">Image filename is auto-set from guest name on save.</small>
+        </div>
         <div class="form-group">
           <label for="guest-name-edit">Name <span class="text-danger">*</span></label>
           <input type="text" id="guest-name-edit" class="form-control" value="${guest.name || ""}" required>
         </div>
         <div class="form-group">
-          <label for="guest-title-edit">Title/Role</label>
-          <input type="text" id="guest-title-edit" class="form-control" value="${guest.title || ""}">
-        </div>
-        <div class="form-group">
-          <label for="guest-description-edit">Description</label>
-          <textarea id="guest-description-edit" class="form-control" rows="3">${guest.description || ""}</textarea>
+          <label for="guest-status-edit">Status</label>
+          <select id="guest-status-edit" class="form-control">
+            <option value="true" ${guest.active ? "selected" : ""}>Active</option>
+            <option value="false" ${guest.active ? "" : "selected"}>Inactive</option>
+          </select>
         </div>
       `;
 
@@ -3214,17 +3498,25 @@ class GuestManagementHandler {
           label: "Save Changes",
           class: "btn-primary",
           callback: async () => {
-            const updatedData = {
-              name: document.getElementById("guest-name-edit").value.trim(),
-              title: document.getElementById("guest-title-edit").value.trim(),
-              description: document
-                .getElementById("guest-description-edit")
-                .value.trim(),
-            };
+            const updatedName = document
+              .getElementById("guest-name-edit")
+              .value.trim();
+            const updatedActive =
+              document.getElementById("guest-status-edit").value === "true";
+            const selectedPhoto =
+              document.getElementById("guest-photo-edit").files?.[0];
 
-            if (!updatedData.name) {
+            if (!updatedName) {
               NotificationManager.error("Please enter a guest name");
               return;
+            }
+
+            const updatedData = new FormData();
+            updatedData.append("name", updatedName);
+            updatedData.append("active", String(updatedActive));
+            updatedData.append("photo_name", updatedName);
+            if (selectedPhoto) {
+              updatedData.append("photo", selectedPhoto);
             }
 
             try {
@@ -3240,6 +3532,40 @@ class GuestManagementHandler {
           },
         },
       ]);
+
+      const photoInput = document.getElementById("guest-photo-edit");
+      const photoPickBtn = document.getElementById("guest-photo-pick-edit");
+      const photoPickedName = document.getElementById(
+        "guest-photo-picked-name-edit",
+      );
+      const photoPreview = document.getElementById("guest-photo-preview-edit");
+      const photoEmpty = document.getElementById("guest-photo-empty-edit");
+      const photoName = document.getElementById("guest-photo-name-edit");
+
+      if (photoInput && photoPreview && photoEmpty && photoName) {
+        if (photoPickBtn) {
+          photoPickBtn.addEventListener("click", () => photoInput.click());
+        }
+
+        photoInput.addEventListener("change", () => {
+          const selected = photoInput.files?.[0];
+          if (!selected) {
+            if (photoPickedName) {
+              photoPickedName.textContent = "No image selected";
+            }
+            photoName.textContent = currentPhotoName;
+            return;
+          }
+
+          photoPreview.src = URL.createObjectURL(selected);
+          photoPreview.style.display = "block";
+          photoEmpty.style.display = "none";
+          if (photoPickedName) {
+            photoPickedName.textContent = selected.name;
+          }
+          photoName.textContent = selected.name;
+        });
+      }
     } catch (error) {
       console.error("[GuestEdit] Error loading guest:", error);
       console.error("[GuestEdit] Error message:", error.message);
@@ -3255,18 +3581,47 @@ class GuestManagementHandler {
   }
 
   async openAddGuestModal() {
+    let chatbots = [];
+    try {
+      const botsResponse = await API.get(
+        "/api/admin/chatbots?page=1&per_page=200",
+      );
+      chatbots = Array.isArray(botsResponse?.data) ? botsResponse.data : [];
+    } catch (error) {
+      console.error("[AddGuest] Failed to load chatbots:", error);
+      NotificationManager.error("Failed to load events/chatbots");
+      return;
+    }
+
+    const chatbotOptions = chatbots
+      .map((bot) => {
+        const eventName = bot.event_name || "Unknown Event";
+        const chatbotName = bot.name || "Unnamed Chatbot";
+        return `<option value="${bot.id}">${eventName} • ${chatbotName}</option>`;
+      })
+      .join("");
+
     const formHTML = `
       <div class="form-group">
         <label for="guest-name-add">Name <span class="text-danger">*</span></label>
         <input type="text" id="guest-name-add" class="form-control" placeholder="Guest name" required>
       </div>
       <div class="form-group">
-        <label for="guest-title-add">Title/Role</label>
-        <input type="text" id="guest-title-add" class="form-control" placeholder="e.g., Speaker, Moderator">
+        <label for="guest-chatbot-add">Event / Chatbot <span class="text-danger">*</span></label>
+        <select id="guest-chatbot-add" class="form-control" required>
+          <option value="">Select event/chatbot</option>
+          ${chatbotOptions}
+        </select>
       </div>
       <div class="form-group">
-        <label for="guest-description-add">Description</label>
-        <textarea id="guest-description-add" class="form-control" rows="3" placeholder="Brief bio or description"></textarea>
+        <label for="guest-photo-add">Image (Optional)</label>
+        <div class="guest-edit-file-wrap">
+          <input type="file" id="guest-photo-add" class="guest-edit-file-input" accept="image/*">
+          <button type="button" id="guest-photo-pick-add" class="btn btn-secondary btn-sm">
+            <i class="fas fa-upload"></i> Choose Image
+          </button>
+          <span id="guest-photo-picked-name-add" class="guest-edit-file-name">No image selected</span>
+        </div>
       </div>
     `;
 
@@ -3283,21 +3638,32 @@ class GuestManagementHandler {
         label: "Add Guest",
         class: "btn-primary",
         callback: async () => {
-          const guestData = {
-            name: document.getElementById("guest-name-add").value.trim(),
-            title: document.getElementById("guest-title-add").value.trim(),
-            description: document
-              .getElementById("guest-description-add")
-              .value.trim(),
-          };
+          const guestName = document
+            .getElementById("guest-name-add")
+            .value.trim();
+          const chatbotId = document.getElementById("guest-chatbot-add").value;
+          const selectedPhoto =
+            document.getElementById("guest-photo-add").files?.[0];
 
-          if (!guestData.name) {
+          if (!guestName) {
             NotificationManager.error("Please enter a guest name");
             return;
           }
 
+          if (!chatbotId) {
+            NotificationManager.error("Please select event/chatbot");
+            return;
+          }
+
+          const guestData = new FormData();
+          guestData.append("name", guestName);
+          guestData.append("chatbot_id", chatbotId);
+          if (selectedPhoto) {
+            guestData.append("photo", selectedPhoto);
+          }
+
           try {
-            console.log("[AddGuest] Creating guest:", guestData);
+            console.log("[AddGuest] Creating guest");
             const response = await API.post("/api/admin/guests", guestData);
             console.log("[AddGuest] Response:", response);
             NotificationManager.success("Guest added successfully");
@@ -3311,5 +3677,21 @@ class GuestManagementHandler {
         },
       },
     ]);
+
+    const photoInput = document.getElementById("guest-photo-add");
+    const photoPickBtn = document.getElementById("guest-photo-pick-add");
+    const photoPickedName = document.getElementById(
+      "guest-photo-picked-name-add",
+    );
+
+    if (photoInput && photoPickBtn && photoPickedName) {
+      photoPickBtn.addEventListener("click", () => photoInput.click());
+      photoInput.addEventListener("change", () => {
+        const selected = photoInput.files?.[0];
+        photoPickedName.textContent = selected
+          ? selected.name
+          : "No image selected";
+      });
+    }
   }
 }

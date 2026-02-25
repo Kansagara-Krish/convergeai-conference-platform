@@ -25,14 +25,8 @@ class User(db.Model):
     role = db.Column(db.String(50), default='user', nullable=False)  # admin, user, speaker
     active = db.Column(db.Boolean, default=True)
     
-    # Profile information
-    profile_picture = db.Column(db.String(255))
-    bio = db.Column(db.Text)
-    organization = db.Column(db.String(255))
-    
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     
     # Relationships
@@ -108,6 +102,7 @@ class Chatbot(db.Model):
     system_prompt = db.Column(db.Text, nullable=False)
     single_person_prompt = db.Column(db.Text, nullable=False, default=DEFAULT_SINGLE_PERSON_PROMPT)
     multiple_person_prompt = db.Column(db.Text, nullable=False, default=DEFAULT_MULTIPLE_PERSON_PROMPT)
+    gemini_api_key = db.Column(db.String(255))
     
     # Media
     background_image = db.Column(db.String(255))
@@ -119,7 +114,6 @@ class Chatbot(db.Model):
     # Admin tracking
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     guests = db.relationship('Guest', backref='chatbot', lazy=True, cascade='all, delete-orphan')
@@ -163,6 +157,7 @@ class Chatbot(db.Model):
             'system_prompt': self.system_prompt,
             'single_person_prompt': self.single_person_prompt,
             'multiple_person_prompt': self.multiple_person_prompt,
+            'gemini_api_key': self.gemini_api_key,
             'background_image': self.background_image,
             'guests_count': len(self.guests),
             'participants_count': len(self.participants),
@@ -183,22 +178,28 @@ class Guest(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     
     name = db.Column(db.String(255), nullable=False)
-    title = db.Column(db.String(255))
-    description = db.Column(db.Text)
     photo = db.Column(db.String(255))
+    active = db.Column(db.Boolean, default=True, nullable=False)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
         """Convert to dictionary"""
-        return {
+        data = {
             'id': self.id,
             'chatbot_id': self.chatbot_id,
             'name': self.name,
-            'title': self.title,
-            'description': self.description,
             'photo': self.photo,
+            'active': self.active,
         }
+        
+        # Include chatbot event name and status if available
+        if self.chatbot:
+            data['event_name'] = self.chatbot.event_name
+            data['chatbot_name'] = self.chatbot.name
+            data['chatbot_active'] = self.chatbot.active
+        
+        return data
 
 # ============================================
 # Message Model

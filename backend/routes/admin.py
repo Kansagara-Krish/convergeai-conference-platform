@@ -7,11 +7,14 @@ from datetime import datetime, timedelta
 from openpyxl import load_workbook
 from io import BytesIO
 from sqlalchemy import or_
+from werkzeug.utils import secure_filename
 import re
 import smtplib
 import ssl
 from email.message import EmailMessage
 import threading
+import os
+import uuid
 
 try:
     from models import db, User, Chatbot, Guest, Message, SessionToken, ChatbotParticipant, AdminNotification
@@ -23,6 +26,100 @@ except ImportError:
 admin_bp = Blueprint('admin', __name__)
 EMAIL_REGEX = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$')
 NOTIFICATION_RETENTION_DAYS = 7
+GUEST_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+
+def _to_bool(value, default=False):
+    if value is None:
+        return default
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, (int, float)):
+        return bool(value)
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ('1', 'true', 'yes', 'on'):
+            return True
+        if normalized in ('0', 'false', 'no', 'off', ''):
+            return False
+
+    return default
+
+
+def _is_allowed_file(filename, allowed_extensions):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+
+def _sanitize_image_stem(value):
+    stem = secure_filename(str(value or '').strip())
+    if not stem:
+        return ''
+    if '.' in stem:
+        stem = stem.rsplit('.', 1)[0]
+    return stem[:120]
+
+
+def _build_unique_filename(upload_root, stem, extension):
+    safe_stem = _sanitize_image_stem(stem) or uuid.uuid4().hex
+    candidate = f"{safe_stem}.{extension}"
+    counter = 1
+    while os.path.exists(os.path.join(upload_root, candidate)):
+        candidate = f"{safe_stem}_{counter}.{extension}"
+        counter += 1
+    return candidate
+
+
+def _save_guest_image(file_obj, desired_name=None):
+    if not file_obj or not file_obj.filename:
+        return None
+
+    filename = secure_filename(file_obj.filename)
+    if not filename:
+        return None
+
+    if not _is_allowed_file(filename, GUEST_IMAGE_EXTENSIONS):
+        return 'invalid-type'
+
+    extension = filename.rsplit('.', 1)[1].lower()
+
+    upload_root = os.path.join(current_app.root_path, 'uploads', 'guests')
+    os.makedirs(upload_root, exist_ok=True)
+
+    unique_filename = _build_unique_filename(upload_root, desired_name, extension)
+
+    absolute_path = os.path.join(upload_root, unique_filename)
+    file_obj.save(absolute_path)
+    return f"uploads/guests/{unique_filename}"
+
+
+def _rename_guest_image(existing_photo_path, desired_name):
+    if not existing_photo_path:
+        return None
+
+    current_relative = str(existing_photo_path).replace('\\', '/')
+    current_filename = current_relative.split('/')[-1]
+    if '.' not in current_filename:
+        return None
+
+    extension = current_filename.rsplit('.', 1)[1].lower()
+    upload_root = os.path.join(current_app.root_path, 'uploads', 'guests')
+    os.makedirs(upload_root, exist_ok=True)
+
+    current_abs = os.path.join(current_app.root_path, current_relative.replace('/', os.sep))
+    if not os.path.exists(current_abs):
+        return None
+
+    new_filename = _build_unique_filename(upload_root, desired_name, extension)
+    new_abs = os.path.join(upload_root, new_filename)
+
+    if os.path.normcase(current_abs) == os.path.normcase(new_abs):
+        return current_relative
+
+    os.rename(current_abs, new_abs)
+    return f"uploads/guests/{new_filename}"
 
 
 def purge_old_notifications():
@@ -543,9 +640,7 @@ def add_guest(user, chatbot_id):
     
     guest = Guest(
         chatbot_id=chatbot_id,
-        name=data.get('name'),
-        title=data.get('title'),
-        description=data.get('description')
+        name=data.get('name')
     )
     
     db.session.add(guest)
@@ -570,7 +665,8 @@ def add_guest(user, chatbot_id):
 def list_all_guests(user):
     """List all guests across all chatbots"""
     
-    guests = Guest.query.all()
+    # Eager load chatbot relationship to avoid N+1 queries
+    guests = Guest.query.options(db.joinedload(Guest.chatbot)).all()
     
     return jsonify({
         'success': True,
@@ -584,17 +680,35 @@ def list_all_guests(user):
 @admin_required
 def create_guest(user):
     """Create a new guest"""
-    
-    data = request.get_json()
-    
-    if not data.get('name'):
+
+    data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'message': 'Invalid request payload'}), 400
+
+    guest_name = str(data.get('name', '')).strip()
+    chatbot_id = data.get('chatbot_id')
+
+    if not guest_name:
         return jsonify({'success': False, 'message': 'Guest name is required'}), 400
+
+    if not chatbot_id:
+        return jsonify({'success': False, 'message': 'Please select chatbot/event'}), 400
+
+    chatbot = Chatbot.query.get(chatbot_id)
+    if not chatbot:
+        return jsonify({'success': False, 'message': 'Chatbot not found'}), 404
+
+    photo_path = None
+    if 'photo' in request.files:
+        photo_path = _save_guest_image(request.files.get('photo'), guest_name)
+        if photo_path == 'invalid-type':
+            return jsonify({'success': False, 'message': 'Invalid image type. Allowed: png, jpg, jpeg, gif, webp'}), 400
     
     guest = Guest(
-        chatbot_id=data.get('chatbot_id'),
-        name=data.get('name'),
-        title=data.get('title'),
-        description=data.get('description')
+        chatbot_id=chatbot.id,
+        name=guest_name,
+        photo=photo_path or None
     )
     
     db.session.add(guest)
@@ -621,7 +735,7 @@ def create_guest(user):
 def get_guest(user, guest_id):
     """Get a single guest"""
     
-    guest = Guest.query.get(guest_id)
+    guest = Guest.query.options(db.joinedload(Guest.chatbot)).get(guest_id)
     
     if not guest:
         return jsonify({'success': False, 'message': 'Guest not found'}), 404
@@ -663,16 +777,43 @@ def update_guest(user, guest_id):
     if not guest:
         return jsonify({'success': False, 'message': 'Guest not found'}), 404
     
-    data = request.get_json()
+    data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'message': 'Invalid request payload'}), 400
     
-    if 'name' in data:
-        guest.name = data['name']
-    if 'title' in data:
-        guest.title = data['title']
-    if 'description' in data:
-        guest.description = data['description']
+    name_updated = False
+    if 'name' in data and str(data.get('name', '')).strip():
+        guest.name = str(data.get('name')).strip()
+        name_updated = True
+    if 'active' in data:
+        guest.active = _to_bool(data.get('active'), guest.active)
+    if 'chatbot_id' in data:
+        # Validate chatbot exists if provided
+        if data['chatbot_id']:
+            chatbot = Chatbot.query.get(data['chatbot_id'])
+            if not chatbot:
+                return jsonify({'success': False, 'message': 'Chatbot not found'}), 404
+        guest.chatbot_id = data['chatbot_id']
+
+    auto_photo_name = guest.name
+
+    if 'photo' in request.files:
+        photo_path = _save_guest_image(request.files.get('photo'), auto_photo_name)
+        if photo_path == 'invalid-type':
+            return jsonify({'success': False, 'message': 'Invalid image type. Allowed: png, jpg, jpeg, gif, webp'}), 400
+        if photo_path:
+            guest.photo = photo_path
+    elif name_updated and guest.photo:
+        renamed_photo_path = _rename_guest_image(guest.photo, auto_photo_name)
+        if renamed_photo_path:
+            guest.photo = renamed_photo_path
     
     db.session.commit()
+    
+    # Reload with chatbot relationship
+    db.session.refresh(guest)
+    guest = Guest.query.options(db.joinedload(Guest.chatbot)).get(guest_id)
     
     return jsonify({
         'success': True,

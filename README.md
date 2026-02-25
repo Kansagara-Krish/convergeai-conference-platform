@@ -91,7 +91,7 @@ convergeai_conference_chatbot_system/
 ### Prerequisites
 - Python 3.8+
 - Modern web browser
-- SQLite or MySQL
+- PostgreSQL 13+
 
 ### Installation
 
@@ -208,7 +208,7 @@ FLASK_DEBUG=True
 SECRET_KEY=your-secret-key
 
 # Database
-DATABASE_URL=sqlite:///chat_system.db
+DATABASE_URL=postgresql+psycopg2://username:password@localhost:5432/database_name
 
 # JWT
 JWT_SECRET_KEY=your-jwt-secret
@@ -216,6 +216,15 @@ JWT_SECRET_KEY=your-jwt-secret
 # Upload
 MAX_UPLOAD_SIZE=52428800
 UPLOAD_FOLDER=uploads
+```
+
+### Flask-Migrate (Database Migrations)
+```bash
+# from project root
+set FLASK_APP=backend.app:create_app
+flask db init
+flask db migrate -m "initial"
+flask db upgrade
 ```
 
 ## 📊 Database Schema

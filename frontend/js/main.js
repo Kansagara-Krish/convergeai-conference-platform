@@ -20,33 +20,53 @@ class UserPanel {
   }
 
   setupHeader() {
-    // Chat header user dropdown
-    const chatHeaderUserBtn = DomUtils.$(".header-user-btn");
-    const chatHeaderDropdown = DomUtils.$(".chat-header-dropdown");
+    const userMenu =
+      DomUtils.$(".header-user-menu") || DomUtils.$(".user-profile-menu");
+    const userBtn =
+      userMenu?.querySelector(".header-user-btn") ||
+      userMenu?.querySelector(".user-profile-btn");
+    const userDropdown =
+      userMenu?.querySelector(".chat-header-dropdown") ||
+      userMenu?.querySelector(".dropdown-menu");
 
-    if (chatHeaderUserBtn && chatHeaderDropdown) {
-      chatHeaderUserBtn.addEventListener("click", (e) => {
+    if (userBtn && userDropdown) {
+      userBtn.addEventListener("click", (e) => {
+        e.preventDefault();
         e.stopPropagation();
-        DomUtils.toggleClass(chatHeaderDropdown, "active");
+        DomUtils.toggleClass(userDropdown, "active");
+      });
+
+      userDropdown.addEventListener("click", (e) => {
+        e.stopPropagation();
       });
 
       document.addEventListener("click", () => {
-        DomUtils.removeClass(chatHeaderDropdown, "active");
+        DomUtils.removeClass(userDropdown, "active");
       });
     }
 
-    // Update user avatar in chat header
-    const userAvatar = DomUtils.$("[data-user-avatar]");
-    if (userAvatar && this.currentUser.name) {
-      userAvatar.textContent = this.currentUser.name.charAt(0).toUpperCase();
+    const avatarTargets = [
+      ...DomUtils.$$("[data-user-avatar]"),
+      ...DomUtils.$$("[data-user-name]"),
+    ];
+
+    if (this.currentUser?.name) {
+      avatarTargets.forEach((avatar) => {
+        avatar.textContent = this.currentUser.name.charAt(0).toUpperCase();
+      });
     }
   }
 
   setupLogout() {
-    const logoutBtn = DomUtils.$('[data-action="logout"]');
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", () => this.logout());
-    }
+    const logoutBtns = DomUtils.$$('[data-action="logout"]');
+    logoutBtns.forEach((logoutBtn) => {
+      logoutBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        ModalManager.confirm("Are you sure you want to logout?", () =>
+          this.logout(),
+        );
+      });
+    });
   }
 
   async loadChatbots() {
@@ -390,6 +410,9 @@ class LoginHandler {
   }
 
   init() {
+    this.restoreRememberPreference();
+    this.redirectIfAuthenticated();
+
     console.log("LoginHandler initialized"); // DEBUG
     // Form submission
     this.form.addEventListener("submit", (e) => {
@@ -418,6 +441,55 @@ class LoginHandler {
         this.clearError("password"),
       );
     }
+  }
+
+  restoreRememberPreference() {
+    const rememberInput = this.form.querySelector('input[name="remember"]');
+    if (!rememberInput) return;
+
+    rememberInput.checked = Boolean(Storage.getRememberMe());
+  }
+
+  async redirectIfAuthenticated() {
+    const token = Storage.getToken();
+    const user = Storage.getUser();
+
+    if (!token || !user) {
+      return;
+    }
+
+    let role = String(user.role || "").toLowerCase();
+
+    try {
+      const verifyResponse = await API.get("/api/auth/verify");
+      const verifiedUser = verifyResponse?.user || user;
+      Storage.setUser(verifiedUser);
+      role = String(verifiedUser.role || role).toLowerCase();
+    } catch (error) {
+      console.warn("Existing session is not valid:", error);
+      return;
+    }
+
+    if (role === "admin") {
+      window.location.href = "admin/dashboard.html";
+      return;
+    }
+
+    let redirectUrl = "user/chat.html";
+
+    try {
+      const chatbotResponse = await API.get("/api/user/chatbots");
+      const chatbots = Array.isArray(chatbotResponse?.data)
+        ? chatbotResponse.data
+        : [];
+      if (chatbots[0]?.id) {
+        redirectUrl = `user/chat.html?id=${chatbots[0].id}`;
+      }
+    } catch (error) {
+      console.error("Failed loading user chatbots for auto-redirect:", error);
+    }
+
+    window.location.href = redirectUrl;
   }
 
   // ... (keeping validation methods same, skipping to handleLogin)
@@ -503,6 +575,9 @@ class LoginHandler {
       .querySelector('input[name="username"]')
       .value.trim();
     const password = this.form.querySelector('input[name="password"]').value;
+    const remember = Boolean(
+      this.form.querySelector('input[name="remember"]')?.checked,
+    );
 
     console.log(`Attempting login for: ${username}`); // DEBUG
 
@@ -522,13 +597,17 @@ class LoginHandler {
       const response = await API.post("/api/auth/login", {
         username: username,
         password: password,
+        remember: remember,
       });
 
       console.log("API Response:", response); // DEBUG
 
       if (response.success) {
-        Storage.setUser(response.user);
-        Storage.setToken(response.token);
+        Storage.setAuthSession({
+          user: response.user,
+          token: response.token,
+          remember,
+        });
 
         NotificationManager.success("Login successful!");
         setTimeout(async () => {
@@ -746,7 +825,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.loginHandler = new LoginHandler();
   }
 
-  if (page.includes("user/dashboard")) {
+  if (page.includes("user/")) {
     window.userPanel = new UserPanel();
   }
 

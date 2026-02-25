@@ -526,6 +526,7 @@ textarea {
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.2);
 }
 
 .card::before {
@@ -573,6 +574,14 @@ textarea {
 .card-glass {
   background: rgba(30, 41, 59, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Gradient Card */
@@ -1221,6 +1230,23 @@ textarea {
     padding: var(--spacing-lg);
   }
 
+  .card-header,
+  .card-footer,
+  .flex-between {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .table {
+    min-width: 640px;
+  }
+
+  .table th,
+  .table td {
+    white-space: nowrap;
+  }
+
   .modal {
     width: 95%;
     max-height: 95vh;
@@ -1361,7 +1387,7 @@ input[type="password"]:invalid:not(:placeholder-shown):focus {
 /* Select dropdown styling - fix white text on white background */
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23888' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e2e8f0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 16px;
@@ -1520,6 +1546,10 @@ select option:checked {
 
   .card {
     padding: var(--spacing-md);
+  }
+
+  .table {
+    min-width: 560px;
   }
 
   .modal-header,

@@ -134,10 +134,6 @@ def update_profile(user):
     
     if 'name' in data:
         user.name = data['name']
-    if 'bio' in data:
-        user.bio = data['bio']
-    if 'organization' in data:
-        user.organization = data['organization']
     
     db.session.commit()
     
