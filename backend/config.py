@@ -5,6 +5,40 @@
 import os
 from datetime import timedelta
 
+
+def _build_database_uri():
+    """Return normalized SQLAlchemy DB URI from environment."""
+    database_url = os.environ.get(
+        'DATABASE_URL',
+        'postgresql+psycopg2://username:password@localhost:5432/database_name'
+    )
+
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+
+    return database_url
+
+
+def _validate_production_env():
+    """Ensure required environment variables are set for production."""
+    missing = []
+
+    if not os.environ.get('DATABASE_URL'):
+        missing.append('DATABASE_URL')
+
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key or secret_key == 'your-secret-key-change-in-production':
+        missing.append('SECRET_KEY')
+
+    jwt_secret = os.environ.get('JWT_SECRET_KEY')
+    if not jwt_secret or jwt_secret == 'jwt-secret-key':
+        missing.append('JWT_SECRET_KEY')
+
+    if missing:
+        raise RuntimeError(
+            f"Missing required production environment variables: {', '.join(missing)}"
+        )
+
 class Config:
     """Base configuration"""
     # Flask
@@ -12,11 +46,16 @@ class Config:
     DEBUG = False
     TESTING = False
     
-    # Database - Use absolute path to avoid ambiguity
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    DB_PATH = os.path.join(BASE_DIR, 'backend', 'instance', 'chat_system.db')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{DB_PATH}'
+    # Database
+    SQLALCHEMY_DATABASE_URI = _build_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': int(os.environ.get('DB_POOL_SIZE', 10)),
+        'max_overflow': int(os.environ.get('DB_MAX_OVERFLOW', 20)),
+        'pool_timeout': int(os.environ.get('DB_POOL_TIMEOUT', 30)),
+    }
     
     # Session
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
@@ -51,6 +90,11 @@ class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
     SESSION_COOKIE_SECURE = True
+    PREFERRED_URL_SCHEME = 'https'
+
+    @staticmethod
+    def validate():
+        _validate_production_env()
 
 class TestingConfig(Config):
     """Testing configuration"""

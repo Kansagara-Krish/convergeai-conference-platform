@@ -29,7 +29,7 @@ services:
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=False
-      - DATABASE_URL=sqlite:///./chat_system.db
+      - DATABASE_URL=postgresql+psycopg2://convergeai:change-in-production@db:5432/convergeai_chatbot
       - SECRET_KEY=docker-secret-key-change-in-production
       - JWT_SECRET_KEY=docker-jwt-secret-change-in-production
     ports:
@@ -45,32 +45,20 @@ services:
       - convergeai-network
     restart: unless-stopped
 
-  # Database Service (Optional - SQLite runs in file)
-  # Uncomment for PostgreSQL or MySQL
-  
-  # PostgreSQL Example:
-  # db:
-  #   image: postgres:15-alpine
-  #   container_name: convergeai-db
-  #   environment:
-  #     POSTGRES_DB: convergeai_chatbot
-  #     POSTGRES_USER: convergeai
-  #     POSTGRES_PASSWORD: change-in-production
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - db_data:/var/lib/postgresql/data
-  #   networks:
-  #     - convergeai-network
-  #   restart: unless-stopped
-  
-  # SQLite runs file-based, no separate service needed
   db:
-    image: alpine:latest
-    container_name: convergeai-db-init
-    command: echo "Using SQLite - no separate database container needed"
+    image: postgres:15-alpine
+    container_name: convergeai-db
+    environment:
+      - POSTGRES_DB=convergeai_chatbot
+      - POSTGRES_USER=convergeai
+      - POSTGRES_PASSWORD=change-in-production
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
     networks:
       - convergeai-network
+    restart: unless-stopped
 
   # Redis (Optional - for caching/sessions)
   # Uncomment to enable Redis

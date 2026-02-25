@@ -10,14 +10,14 @@ import ssl
 from email.message import EmailMessage
 
 try:
-    from models import db, User, SessionToken
+    from models import db, User, SessionToken, ChatbotParticipant, Chatbot
 except ImportError:
-    from backend.models import db, User, SessionToken
+    from backend.models import db, User, SessionToken, ChatbotParticipant, Chatbot
 
 auth_bp = Blueprint('auth', __name__)
 
 
-def send_reset_password_email(recipient_email, name, username, temp_password):
+def send_reset_password_email(recipient_email, name, username, temp_password, event_names, admin_name):
     mail_server = current_app.config.get('MAIL_SERVER')
     mail_port = current_app.config.get('MAIL_PORT', 587)
     mail_username = current_app.config.get('MAIL_USERNAME')
@@ -33,13 +33,20 @@ def send_reset_password_email(recipient_email, name, username, temp_password):
     msg['Subject'] = 'Your ConvergeAI Password Has Been Reset'
     msg['From'] = mail_sender
     msg['To'] = recipient_email
+
+    events_text = ', '.join(event_names) if event_names else 'No event assigned yet'
+    admin_label = admin_name or 'Admin'
+
     msg.set_content(
         (
             f"Hello {name},\n\n"
             "Your password has been reset by an administrator.\n\n"
             f"Username: {username}\n"
             f"Temporary Password: {temp_password}\n\n"
-            "Please login and change your password immediately.\n\n"
+            f"Assigned Event(s): {events_text}\n"
+            f"Reset by Admin: {admin_label}\n\n"
+            "Important: Please login and update your password immediately.\n"
+            "You may remember this temporary password only for first login, then change it.\n\n"
             "Regards,\nConvergeAI Admin"
         )
     )
@@ -116,6 +123,7 @@ def login():
     data = request.get_json() or {}
     login_id = (data.get('username') or '').strip()
     password = data.get('password')
+    remember = bool(data.get('remember', False))
     
     if not login_id or password is None or password == '':
         return jsonify({'success': False, 'message': 'Username and password required'}), 400
@@ -146,7 +154,9 @@ def login():
     db.session.commit()
     
     # Create session token
-    token = SessionToken.create_token(user.id)
+    # Remember me: longer-lived token; otherwise shorter-lived session token
+    expires_in_days = 30 if remember else 1
+    token = SessionToken.create_token(user.id, expires_in_days=expires_in_days)
     
     return jsonify({
         'success': True,
@@ -279,11 +289,22 @@ def reset_password(user, user_id):
     target_user.set_password(temp_password)
     db.session.commit()
 
+    assigned_events = (
+        db.session.query(Chatbot.event_name)
+        .join(ChatbotParticipant, ChatbotParticipant.chatbot_id == Chatbot.id)
+        .filter(ChatbotParticipant.user_id == target_user.id)
+        .distinct()
+        .all()
+    )
+    event_names = [event_name for (event_name,) in assigned_events if event_name]
+
     email_sent, email_error = send_reset_password_email(
         recipient_email=target_user.email,
         name=target_user.name or target_user.username,
         username=target_user.username,
-        temp_password=temp_password
+        temp_password=temp_password,
+        event_names=event_names,
+        admin_name=user.name or user.username
     )
 
     if email_sent:
@@ -295,5 +316,8 @@ def reset_password(user, user_id):
         'success': True,
         'message': message,
         'email_sent': email_sent,
-        'temporary_password': temp_password  # Remove in production
+        'temporary_password': temp_password,  # Remove in production
+        'username': target_user.username,
+        'event_names': event_names,
+        'reset_by': user.name or user.username
     }), 200

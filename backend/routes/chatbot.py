@@ -133,6 +133,61 @@ def save_uploaded_file(file_obj, subdirectory):
     return destination_path, str(relative_path).replace('\\', '/')
 
 
+def sanitize_guest_image_stem(value):
+    stem = secure_filename(str(value or '').strip())
+    if not stem:
+        return ''
+    if '.' in stem:
+        stem = stem.rsplit('.', 1)[0]
+    return stem[:120]
+
+
+def build_unique_guest_filename(upload_dir, stem, extension):
+    safe_stem = sanitize_guest_image_stem(stem) or uuid.uuid4().hex
+    candidate = f"{safe_stem}.{extension}"
+    counter = 1
+    while os.path.exists(os.path.join(upload_dir, candidate)):
+        candidate = f"{safe_stem}_{counter}.{extension}"
+        counter += 1
+    return candidate
+
+
+def save_guest_image_by_name(file_obj, guest_name):
+    upload_dir = get_upload_directory('guests')
+    extension = get_file_extension(file_obj.filename)
+    unique_name = build_unique_guest_filename(upload_dir, guest_name, extension)
+    destination_path = os.path.join(upload_dir, unique_name)
+    file_obj.save(destination_path)
+    relative_path = Path('uploads') / 'guests' / unique_name
+    return destination_path, str(relative_path).replace('\\', '/')
+
+
+def rename_guest_image_by_name(existing_photo_path, guest_name):
+    if not existing_photo_path:
+        return None
+
+    relative_path = str(existing_photo_path).replace('\\', '/').lstrip('/')
+    current_abs = os.path.join(current_app.root_path, relative_path.replace('/', os.sep))
+    if not os.path.exists(current_abs):
+        return None
+
+    current_filename = os.path.basename(current_abs)
+    extension = get_file_extension(current_filename)
+    if not extension:
+        return None
+
+    upload_dir = get_upload_directory('guests')
+    new_filename = build_unique_guest_filename(upload_dir, guest_name, extension)
+    new_abs = os.path.join(upload_dir, new_filename)
+
+    if os.path.normcase(current_abs) == os.path.normcase(new_abs):
+        return existing_photo_path
+
+    os.rename(current_abs, new_abs)
+    new_relative = Path('uploads') / 'guests' / new_filename
+    return str(new_relative).replace('\\', '/')
+
+
 def normalize_guest_row(row):
     """Normalize guest columns from CSV/XLSX rows."""
     normalized = {}
@@ -231,13 +286,14 @@ def create_chatbot(user):
         return jsonify({'success': False, 'message': 'Invalid request body'}), 400
 
     # Validate required fields
-    required_fields = ['name', 'event_name', 'start_date', 'single_person_prompt', 'multiple_person_prompt']
+    required_fields = ['name', 'event_name', 'start_date', 'single_person_prompt', 'multiple_person_prompt', 'gemini_api_key']
     if not all(str(data.get(field, '')).strip() for field in required_fields):
         return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
     system_prompt = str(data.get('system_prompt', '')).strip()
     single_person_prompt = str(data.get('single_person_prompt', '')).strip()
     multiple_person_prompt = str(data.get('multiple_person_prompt', '')).strip()
+    gemini_api_key = str(data.get('gemini_api_key', '')).strip()
 
     if not system_prompt:
         system_prompt = single_person_prompt
@@ -349,6 +405,7 @@ def create_chatbot(user):
             system_prompt=system_prompt,
             single_person_prompt=single_person_prompt,
             multiple_person_prompt=multiple_person_prompt,
+            gemini_api_key=gemini_api_key,
             background_image=background_image_path,
             public=to_bool(data.get('public'), True),
             active=to_bool(data.get('active'), True),
@@ -363,13 +420,7 @@ def create_chatbot(user):
             guest = Guest(
                 chatbot=chatbot,
                 name=guest_row.get('name', ''),
-                title=guest_row.get('title') or guest_row.get('designation') or guest_row.get('role') or '',
-                description=guest_row.get('description') or guest_row.get('bio') or '',
-                photo=photo_path,
-                organization=guest_row.get('organization') or guest_row.get('company') or '',
-                email=guest_row.get('email') or '',
-                is_speaker=to_bool(guest_row.get('is_speaker') or guest_row.get('speaker'), False),
-                is_moderator=to_bool(guest_row.get('is_moderator') or guest_row.get('moderator'), False)
+                photo=photo_path
             )
             db.session.add(guest)
 
@@ -383,18 +434,14 @@ def create_chatbot(user):
             if photo_field:
                 manual_photo_file = request.files.get(photo_field)
                 if manual_photo_file and manual_photo_file.filename:
-                    saved_abs, saved_relative = save_uploaded_file(manual_photo_file, 'guests')
+                    saved_abs, saved_relative = save_guest_image_by_name(manual_photo_file, name)
                     saved_guest_image_abs_paths.append(saved_abs)
                     photo_path = saved_relative
 
             guest = Guest(
                 chatbot=chatbot,
                 name=name,
-                photo=photo_path,
-                title='',
-                description='',
-                organization='',
-                email=''
+                photo=photo_path
             )
             db.session.add(guest)
 
@@ -456,6 +503,10 @@ def update_chatbot(user, chatbot_id):
     if not isinstance(data, dict):
         return jsonify({'success': False, 'message': 'Invalid request body'}), 400
     
+    gemini_api_key = str(data.get('gemini_api_key', '')).strip()
+    if not gemini_api_key:
+        return jsonify({'success': False, 'message': 'Gemini API key is required'}), 400
+
     # Update fields
     if 'name' in data:
         chatbot.name = data['name']
@@ -477,6 +528,7 @@ def update_chatbot(user, chatbot_id):
         if not multiple_person_prompt:
             return jsonify({'success': False, 'message': 'Multiple person prompt cannot be empty'}), 400
         chatbot.multiple_person_prompt = multiple_person_prompt
+    chatbot.gemini_api_key = gemini_api_key
     if 'public' in data:
         chatbot.public = to_bool(data['public'], chatbot.public)
     if 'active' in data:
@@ -525,13 +577,7 @@ def update_chatbot(user, chatbot_id):
                 db.session.add(Guest(
                     chatbot=chatbot,
                     name=name,
-                    title=guest_row.get('title') or guest_row.get('designation') or guest_row.get('role') or '',
-                    description=guest_row.get('description') or guest_row.get('bio') or '',
-                    photo=photo_path,
-                    organization=guest_row.get('organization') or guest_row.get('company') or '',
-                    email=guest_row.get('email') or '',
-                    is_speaker=to_bool(guest_row.get('is_speaker') or guest_row.get('speaker'), False),
-                    is_moderator=to_bool(guest_row.get('is_moderator') or guest_row.get('moderator'), False)
+                    photo=photo_path
                 ))
 
         for raw_id in deleted_guest_ids:
@@ -555,7 +601,7 @@ def update_chatbot(user, chatbot_id):
                 if manual_photo_file and manual_photo_file.filename:
                     if not is_allowed_file(manual_photo_file.filename, GUEST_IMAGE_EXTENSIONS):
                         return jsonify({'success': False, 'message': f'Invalid image type for manual guest #{index + 1}'}), 400
-                    _, photo_path = save_uploaded_file(manual_photo_file, 'guests')
+                    _, photo_path = save_guest_image_by_name(manual_photo_file, name)
 
             guest_id = manual_guest.get('id')
             existing_guest = None
@@ -567,18 +613,19 @@ def update_chatbot(user, chatbot_id):
                     existing_guest = None
 
             if existing_guest:
+                previous_name = str(existing_guest.name or '').strip()
                 existing_guest.name = name
                 if photo_path:
                     existing_guest.photo = photo_path
+                elif existing_guest.photo and previous_name != name:
+                    renamed_photo_path = rename_guest_image_by_name(existing_guest.photo, name)
+                    if renamed_photo_path:
+                        existing_guest.photo = renamed_photo_path
             else:
                 db.session.add(Guest(
                     chatbot=chatbot,
                     name=name,
-                    photo=photo_path,
-                    title='',
-                    description='',
-                    organization='',
-                    email=''
+                    photo=photo_path
                 ))
         
         # Handle image clearing

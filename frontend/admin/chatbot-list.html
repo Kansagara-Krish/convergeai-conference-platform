@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="../css/admin.css">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="../js/utils.js?v=3"></script>
-    <script src="../js/admin.js?v=3"></script>
+    <script src="../js/utils.js?v=5"></script>
+    <script src="../js/admin.js?v=5"></script>
 </head>
 
 <body>
@@ -107,7 +107,6 @@
                             <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
                         </div>
                     </div>
-                    <a href="create-chatbot.html" class="btn btn-primary"><i class="fas fa-plus"></i> New Chatbot</a>
                 </div>
             </header>
 
@@ -116,14 +115,16 @@
                 <!-- Filter & Search -->
                 <div class="card mb-lg">
                     <div class="card-body">
-                        <div class="flex">
-                            <input type="text" id="chatbot-search" placeholder="Search chatbots..."
-                                style="flex: 1; margin-right: var(--spacing-md);">
-                            <select id="chatbot-status-filter" style="width: 200px;">
-                                <option value="">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
+                        <div class="chatbot-list-filter-row">
+                            <input type="text" id="chatbot-search" placeholder="Search chatbots...">
+                            <div class="chatbot-list-actions-row">
+                                <a href="create-chatbot.html" class="btn btn-sm btn-primary chatbot-new-btn"><i class="fas fa-plus"></i> New Chatbot</a>
+                                <select id="chatbot-status-filter">
+                                    <option value="">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -150,13 +151,14 @@
                                     <th>Admin Status</th>
                                     <th>Users</th>
                                     <th>Guests</th>
+                                    <th>Gemini API Key</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <!-- Dynamic Content -->
                                 <tr>
-                                    <td colspan="8" class="text-center py-xl text-muted">Loading chatbots...</td>
+                                    <td colspan="9" class="text-center py-xl text-muted">Loading chatbots...</td>
                                 </tr>
                             </tbody>
                         </table>

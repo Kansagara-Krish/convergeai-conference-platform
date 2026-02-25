@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/user.css">
+    <link rel="stylesheet" href="../css/user.css?v=3">
     <script src="../js/utils.js?v=2"></script>
-    <script src="../js/main.js?v=2"></script>
+    <script src="../js/main.js?v=4"></script>
 </head>
 <body>
     <div class="user-container">
@@ -20,8 +20,6 @@
                 </div>
 
                 <nav class="user-nav">
-                    <a href="dashboard.html" class="user-nav-item">Dashboard</a>
-                    <a href="profile.html" class="user-nav-item active">Profile</a>
                     <div class="user-profile-menu">
                         <button class="user-profile-btn">
                             <div class="user-profile-avatar" data-user-name>U</div>
@@ -44,7 +42,10 @@
                     <div class="profile-avatar" data-profile-avatar>JD</div>
                     <h1 class="profile-name" data-profile-name>John Doe</h1>
                     <p class="profile-role" data-profile-role>User</p>
+                    <p class="profile-subtitle">Manage your account details, event participation, and security settings.</p>
                 </div>
+
+                <div class="profile-grid">
 
                 <!-- Account Information -->
                 <div class="profile-section">
@@ -96,21 +97,21 @@
                 </div>
 
                 <!-- Security & Password -->
-                <div class="profile-section">
+                <div class="profile-section profile-section-wide">
                     <h3 class="profile-section-title"><span class="material-symbols-outlined icon-inline">security</span>Security</h3>
 
-                    <form data-form="change-password" style="display: flex; flex-direction: column; gap: var(--spacing-lg);">
-                        <div class="form-group" style="margin-bottom: 0;">
+                    <form data-form="change-password" class="profile-form">
+                        <div class="form-group">
                             <label for="current-password">Current Password</label>
                             <input type="password" id="current-password" name="current-password" placeholder="Enter your current password" required>
                         </div>
 
-                        <div class="form-group" style="margin-bottom: 0;">
+                        <div class="form-group">
                             <label for="new-password">New Password</label>
                             <input type="password" id="new-password" name="new-password" placeholder="Enter a new password" required>
                         </div>
 
-                        <div class="form-group" style="margin-bottom: 0;">
+                        <div class="form-group">
                             <label for="confirm-password">Confirm Password</label>
                             <input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm your new password" required>
                         </div>
@@ -135,7 +136,7 @@
 
                     <div class="profile-item">
                         <div class="profile-item-label">Theme</div>
-                        <select style="width: auto; min-width: 150px;">
+                        <select class="profile-select">
                             <option>Dark (Current)</option>
                             <option>Light</option>
                         </select>
@@ -143,13 +144,14 @@
                 </div>
 
                 <!-- Danger Zone -->
-                <div class="profile-section" style="border-left: 3px solid var(--danger);">
-                    <h3 class="profile-section-title" style="color: var(--danger);"><span class="material-symbols-outlined icon-inline">warning</span>Danger Zone</h3>
+                <div class="profile-section profile-section-danger">
+                    <h3 class="profile-section-title profile-section-title-danger"><span class="material-symbols-outlined icon-inline">warning</span>Danger Zone</h3>
 
                     <div class="profile-item">
                         <div class="profile-item-label">Delete Account</div>
                         <button class="btn btn-danger btn-sm">Delete Permanently</button>
                     </div>
+                </div>
                 </div>
             </div>
         </div>

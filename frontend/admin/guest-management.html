@@ -62,6 +62,18 @@
                         <span>Import Users</span>
                     </a>
                 </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Settings</div>
+                    <a href="profile.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
+                        <span>My Profile</span>
+                    </a>
+                    <a href="settings.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-lock"></i></span>
+                        <span>Security</span>
+                    </a>
+                </div>
             </nav>
 
             <div class="sidebar-footer">
@@ -126,13 +138,29 @@
                         <div class="stat-value" id="active-guests-count">0</div>
                         <div class="stat-label">Active</div>
                     </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon warning"><i class="fas fa-pause-circle"></i></div>
+                        <div class="stat-value" id="inactive-guests-count">0</div>
+                        <div class="stat-label">Inactive</div>
+                    </div>
                 </div>
 
                 <!-- Guests Table -->
-                <div class="card">
-                    <div class="card-header">
+                <div class="card guest-management-card">
+                    <div class="card-header guest-management-header">
                         <h2>All Guests</h2>
                         <button class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add Guest</button>
+                    </div>
+                    <div class="users-filter-row guest-filter-row">
+                        <select id="guest-status-filter" class="users-filter-select">
+                            <option value="">Filter by status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                        <select id="guest-event-filter" class="users-filter-select">
+                            <option value="">Filter by event</option>
+                        </select>
                     </div>
                     <div class="table-container">
                         <table class="table" data-table="guests">
@@ -140,6 +168,7 @@
                                 <tr>
                                     <th>Guest Name</th>
                                     <th>Event Name</th>
+                                    <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -147,6 +176,13 @@
                                 <!-- Data will be loaded via JavaScript -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div class="flex-between mt-lg" id="guests-pagination-container">
+                    <p style="color: var(--text-secondary);" id="guests-pagination-summary">Showing 0-0 of 0 guests</p>
+                    <div class="flex" gap="var(--spacing-md)" id="guests-pagination-buttons">
                     </div>
                 </div>
             </div>

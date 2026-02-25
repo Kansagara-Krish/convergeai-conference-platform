@@ -474,6 +474,10 @@ class API {
 // ============================================
 
 class Storage {
+  static AUTH_USER_KEY = "currentUser";
+  static AUTH_TOKEN_KEY = "authToken";
+  static AUTH_REMEMBER_KEY = "authRemember";
+
   static set(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
   }
@@ -488,23 +492,77 @@ class Storage {
   }
 
   static clear() {
-    localStorage.clear();
+    const authKeys = [
+      this.AUTH_USER_KEY,
+      this.AUTH_TOKEN_KEY,
+      this.AUTH_REMEMBER_KEY,
+    ];
+
+    authKeys.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
   }
 
   static setUser(user) {
-    this.set("currentUser", user);
+    if (this.getRememberMe()) {
+      localStorage.setItem(this.AUTH_USER_KEY, JSON.stringify(user));
+      sessionStorage.removeItem(this.AUTH_USER_KEY);
+      return;
+    }
+
+    sessionStorage.setItem(this.AUTH_USER_KEY, JSON.stringify(user));
+    localStorage.removeItem(this.AUTH_USER_KEY);
   }
 
   static getUser() {
-    return this.get("currentUser");
+    const sessionUser = sessionStorage.getItem(this.AUTH_USER_KEY);
+    if (sessionUser) return JSON.parse(sessionUser);
+
+    const localUser = localStorage.getItem(this.AUTH_USER_KEY);
+    return localUser ? JSON.parse(localUser) : null;
   }
 
-  static setToken(token) {
-    this.set("authToken", token);
+  static setToken(token, remember = null) {
+    const shouldRemember =
+      typeof remember === "boolean" ? remember : this.getRememberMe();
+
+    if (shouldRemember) {
+      localStorage.setItem(this.AUTH_TOKEN_KEY, JSON.stringify(token));
+      sessionStorage.removeItem(this.AUTH_TOKEN_KEY);
+      return;
+    }
+
+    sessionStorage.setItem(this.AUTH_TOKEN_KEY, JSON.stringify(token));
+    localStorage.removeItem(this.AUTH_TOKEN_KEY);
   }
 
   static getToken() {
-    return this.get("authToken");
+    const sessionToken = sessionStorage.getItem(this.AUTH_TOKEN_KEY);
+    if (sessionToken) return JSON.parse(sessionToken);
+
+    const localToken = localStorage.getItem(this.AUTH_TOKEN_KEY);
+    return localToken ? JSON.parse(localToken) : null;
+  }
+
+  static setRememberMe(remember) {
+    const value = Boolean(remember);
+    localStorage.setItem(this.AUTH_REMEMBER_KEY, JSON.stringify(value));
+    sessionStorage.setItem(this.AUTH_REMEMBER_KEY, JSON.stringify(value));
+  }
+
+  static getRememberMe() {
+    const sessionRemember = sessionStorage.getItem(this.AUTH_REMEMBER_KEY);
+    if (sessionRemember !== null) return JSON.parse(sessionRemember);
+
+    const localRemember = localStorage.getItem(this.AUTH_REMEMBER_KEY);
+    return localRemember ? JSON.parse(localRemember) : false;
+  }
+
+  static setAuthSession({ user, token, remember = false }) {
+    this.setRememberMe(remember);
+    this.setUser(user);
+    this.setToken(token, remember);
   }
 }
 

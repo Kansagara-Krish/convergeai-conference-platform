@@ -8,6 +8,7 @@ from flask_migrate import Migrate
 from dotenv import load_dotenv
 from sqlalchemy import inspect, text
 import os
+import sys
 from datetime import datetime
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -35,6 +36,9 @@ def create_app(config_name=None):
 
     app = Flask(__name__)
     app.config.from_object(config.get(config_name, config['default']))
+
+    if config_name == 'production':
+        config['production'].validate()
     
     # Initialize extensions
     db.init_app(app)
@@ -46,7 +50,7 @@ def create_app(config_name=None):
         "supports_credentials": False,
         "max_age": 3600
     }})
-    Migrate(app, db)
+    Migrate(app, db, compare_type=True)
     
     # Register blueprints
     try:
@@ -162,32 +166,50 @@ Requirements:
                 """
             ))
 
+        if 'gemini_api_key' not in columns:
+            db.session.execute(text(
+                """
+                ALTER TABLE chatbots
+                ADD COLUMN gemini_api_key VARCHAR(255)
+                """
+            ))
+
         db.session.commit()
 
-    def remove_unused_chatbot_columns():
+    def remove_unused_model_columns():
         inspector = inspect(db.engine)
         table_names = inspector.get_table_names()
-        if 'chatbots' not in table_names:
-            return
+        removable_by_table = {
+            'chatbots': ['single_mode', 'multiple_mode', 'logo', 'updated_at'],
+            'users': ['profile_picture', 'updated_at', 'bio', 'organization'],
+            'guests': ['title', 'description']
+        }
 
-        columns = {column['name'] for column in inspector.get_columns('chatbots')}
-        removable_columns = ['single_mode', 'multiple_mode', 'logo']
+        for table_name, removable_columns in removable_by_table.items():
+            if table_name not in table_names:
+                continue
 
-        for column_name in removable_columns:
-            if column_name in columns:
-                try:
-                    db.session.execute(text(f'ALTER TABLE chatbots DROP COLUMN {column_name}'))
-                except Exception:
-                    db.session.rollback()
-                    continue
+            columns = {column['name'] for column in inspector.get_columns(table_name)}
+            for column_name in removable_columns:
+                if column_name in columns:
+                    try:
+                        db.session.execute(text(f'ALTER TABLE {table_name} DROP COLUMN {column_name}'))
+                    except Exception:
+                        db.session.rollback()
+                        continue
 
         db.session.commit()
 
-    # Create database tables
-    with app.app_context():
-        db.create_all()
-        ensure_chatbot_prompt_columns()
-        remove_unused_chatbot_columns()
+    should_bootstrap_db = not (
+        len(sys.argv) > 1 and sys.argv[1] == 'db'
+    )
+
+    # Create database tables for normal app startup, but skip during Flask-Migrate commands
+    if should_bootstrap_db:
+        with app.app_context():
+            db.create_all()
+            ensure_chatbot_prompt_columns()
+            remove_unused_model_columns()
     
     return app
 
@@ -199,6 +221,6 @@ if __name__ == '__main__':
     app = create_app()
     app.run(
         host='0.0.0.0',
-        port=5000,
+        port=5050,
         debug=app.config['DEBUG']
     )
