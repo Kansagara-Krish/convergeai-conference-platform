@@ -662,12 +662,24 @@ def get_chatbot(user, chatbot_id):
     
     if not chatbot:
         return jsonify({'success': False, 'message': 'Chatbot not found'}), 404
+
+    today = datetime.utcnow().date()
+    has_expired = (
+        chatbot.end_date
+        and chatbot.end_date != Chatbot.INFINITE_END_DATE
+        and chatbot.end_date < today
+    )
+    if has_expired and chatbot.active:
+        chatbot.active = False
+        db.session.commit()
     
     # Check access (user can only see public chatbots or their own)
     if not chatbot.public and chatbot.created_by_id != user.id and user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
     chatbot_data = chatbot.to_dict()
+    if user.role != 'admin':
+        chatbot_data.pop('gemini_api_key', None)
     chatbot_data['guests'] = [guest.to_dict() for guest in chatbot.guests]
     
     return jsonify({

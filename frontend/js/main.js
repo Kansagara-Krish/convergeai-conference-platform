@@ -134,6 +134,13 @@ class ChatInterface {
     this.inputField = DomUtils.$(".input-field");
     this.sendBtn = DomUtils.$(".send-btn");
     this.inputArea = DomUtils.$(".input-area");
+    this.attachBtn = DomUtils.$("#chat-attach-btn");
+    this.imageInput = DomUtils.$("#chat-image-input");
+    this.filePreview = DomUtils.$("#chat-file-preview");
+    this.selectedImageFile = null;
+    this.typingIndicatorEl = null;
+    this.chatUnavailable = false;
+    this.chatUnavailableMessage = "";
     this.chatbotId = this.getChatbotId();
     this.messages = [];
     this.init();
@@ -163,8 +170,18 @@ class ChatInterface {
       }
     });
 
+    this.setupAttachmentHandlers();
+
     const chatbotMeta = await this.loadChatbotMeta();
     await this.playWelcomeIntro(chatbotMeta);
+    if (this.chatUnavailable) {
+      this.renderChatUnavailableNotice();
+      this.setInputVisible(false);
+      await this.loadMessages();
+      this.setupAutoScroll();
+      return;
+    }
+
     this.setInputVisible(true);
     await this.loadMessages();
     this.setupAutoScroll();
@@ -201,42 +218,171 @@ class ChatInterface {
   }
 
   async sendMessage() {
+    if (this.chatUnavailable) {
+      NotificationManager.warning(
+        this.chatUnavailableMessage ||
+          "This chatbot is inactive and cannot accept new messages.",
+      );
+      return;
+    }
+
     const text = this.inputField.value.trim();
-    if (!text) return;
+    const selectedImage = this.selectedImageFile;
+    if (!text && !selectedImage) return;
+
+    const userMessagePreview = text || "[Image uploaded]";
+
+    this.addMessage(userMessagePreview, "user");
 
     this.inputField.value = "";
     this.inputField.style.height = "auto";
+    this.clearSelectedImage();
     this.sendBtn.disabled = true;
 
     try {
-      await this.showTypingIndicator();
+      this.startTypingIndicator();
 
-      const response = await API.post(
-        `/api/user/chatbots/${this.chatbotId}/messages`,
-        {
-          content: text,
-        },
-      );
+      let response;
+      try {
+        response = await this.postChatMessage(text, selectedImage);
+      } catch (error) {
+        if (this.isNotJoinedError(error)) {
+          const joined = await this.joinCurrentChatbotSilently();
+          if (!joined) {
+            throw error;
+          }
+          response = await this.postChatMessage(text, selectedImage);
+        } else {
+          throw error;
+        }
+      }
 
       const payload = response?.data || {};
-      const userMessage = payload.user_message;
       const botResponse = payload.bot_response;
 
-      if (userMessage?.content) {
-        this.addMessage(userMessage.content, "user", userMessage.timestamp);
-      }
       if (botResponse?.content) {
         this.addMessage(botResponse.content, "bot", botResponse.timestamp);
       }
-      if (!userMessage?.content && !botResponse?.content) {
-        this.addMessage(text, "user");
-      }
     } catch (error) {
       console.error("Error sending message:", error);
-      NotificationManager.error("Failed to send message");
+      NotificationManager.error(error.message || "Failed to send message");
     } finally {
+      this.stopTypingIndicator();
       this.sendBtn.disabled = false;
       this.inputField.focus();
+    }
+  }
+
+  async postChatMessage(text, selectedImage) {
+    if (selectedImage) {
+      const formData = new FormData();
+      formData.append("content", text);
+      formData.append("image", selectedImage);
+      return API.post(
+        `/api/user/chatbots/${this.chatbotId}/messages`,
+        formData,
+      );
+    }
+
+    return API.post(`/api/user/chatbots/${this.chatbotId}/messages`, {
+      content: text,
+    });
+  }
+
+  isNotJoinedError(error) {
+    const message = String(error?.message || "").toLowerCase();
+    return message.includes("not joined this chatbot");
+  }
+
+  async joinCurrentChatbotSilently() {
+    if (!this.chatbotId) return false;
+
+    try {
+      await API.post(`/api/user/chatbots/${this.chatbotId}/join`, {});
+      return true;
+    } catch (joinError) {
+      const message = String(joinError?.message || "").toLowerCase();
+      if (message.includes("already joined")) {
+        return true;
+      }
+      return false;
+    }
+  }
+
+  setupAttachmentHandlers() {
+    if (this.attachBtn && this.imageInput) {
+      this.attachBtn.addEventListener("click", () => {
+        this.imageInput.click();
+      });
+
+      this.imageInput.addEventListener("change", () => {
+        const file = this.imageInput.files?.[0] || null;
+        if (!file) {
+          this.clearSelectedImage();
+          return;
+        }
+
+        const allowedMime = [
+          "image/png",
+          "image/jpeg",
+          "image/jpg",
+          "image/webp",
+          "image/gif",
+        ];
+
+        if (!allowedMime.includes(file.type)) {
+          NotificationManager.error(
+            "Please choose PNG, JPG, JPEG, WEBP or GIF image",
+          );
+          this.clearSelectedImage();
+          return;
+        }
+
+        if (file.size > 8 * 1024 * 1024) {
+          NotificationManager.error("Image must be 8MB or smaller");
+          this.clearSelectedImage();
+          return;
+        }
+
+        this.selectedImageFile = file;
+        this.renderAttachmentPreview();
+      });
+    }
+  }
+
+  renderAttachmentPreview() {
+    if (!this.filePreview) return;
+
+    if (!this.selectedImageFile) {
+      this.filePreview.innerHTML = "";
+      this.filePreview.style.display = "none";
+      return;
+    }
+
+    const sizeMb = (this.selectedImageFile.size / (1024 * 1024)).toFixed(2);
+    this.filePreview.innerHTML = `
+      <div class="file-preview-item">
+        <span class="material-symbols-outlined">image</span>
+        <span>${this.escapeHtml(this.selectedImageFile.name)} (${sizeMb} MB)</span>
+        <span class="file-preview-remove" id="chat-file-remove">×</span>
+      </div>
+    `;
+    this.filePreview.style.display = "flex";
+
+    const removeBtn = document.getElementById("chat-file-remove");
+    if (removeBtn) {
+      removeBtn.addEventListener("click", () => this.clearSelectedImage());
+    }
+  }
+
+  clearSelectedImage() {
+    this.selectedImageFile = null;
+    if (this.imageInput) {
+      this.imageInput.value = "";
+    }
+    if (this.filePreview) {
+      this.filePreview.innerHTML = "";
+      this.filePreview.style.display = "none";
     }
   }
 
@@ -266,7 +412,9 @@ class ChatInterface {
     this.scrollToBottom();
   }
 
-  async showTypingIndicator() {
+  startTypingIndicator() {
+    this.stopTypingIndicator();
+
     const indicator = DomUtils.create("div", "message-group");
     indicator.innerHTML = `
       <div class="message-avatar bot"><i class="fas fa-robot"></i></div>
@@ -279,13 +427,17 @@ class ChatInterface {
     indicator.id = "typing-indicator";
 
     this.messagesArea.appendChild(indicator);
+    this.typingIndicatorEl = indicator;
     this.scrollToBottom();
+  }
 
-    // Simulate thinking time
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    const indicator_el = DomUtils.$("#typing-indicator");
-    if (indicator_el) indicator_el.remove();
+  stopTypingIndicator() {
+    const indicatorEl =
+      this.typingIndicatorEl || DomUtils.$("#typing-indicator");
+    if (indicatorEl) {
+      indicatorEl.remove();
+    }
+    this.typingIndicatorEl = null;
   }
 
   scrollToBottom() {
@@ -304,9 +456,26 @@ class ChatInterface {
 
   async loadMessages() {
     try {
-      const response = await API.get(
-        `/api/user/chatbots/${this.chatbotId}/messages`,
-      );
+      let response;
+      try {
+        response = await API.get(
+          `/api/user/chatbots/${this.chatbotId}/messages`,
+        );
+      } catch (error) {
+        if (!this.isNotJoinedError(error)) {
+          throw error;
+        }
+
+        const joined = await this.joinCurrentChatbotSilently();
+        if (!joined) {
+          throw error;
+        }
+
+        response = await API.get(
+          `/api/user/chatbots/${this.chatbotId}/messages`,
+        );
+      }
+
       const messages = Array.isArray(response?.data) ? response.data : [];
       messages.forEach((msg) => {
         if (!msg?.content) return;
@@ -314,6 +483,7 @@ class ChatInterface {
       });
     } catch (error) {
       console.error("Error loading messages:", error);
+      NotificationManager.error(error.message || "Failed to load messages");
     }
   }
 
@@ -331,10 +501,25 @@ class ChatInterface {
       }
 
       if (statusEl) {
-        const isActive = chatbot.status === "active";
+        const isActive =
+          chatbot.status === "active" && Boolean(chatbot.active !== false);
         statusEl.innerHTML = isActive
           ? '<span class="material-symbols-outlined icon-inline" style="color: var(--success); font-size: 0.95rem;">radio_button_checked</span>Online'
-          : '<span class="material-symbols-outlined icon-inline" style="color: var(--warning); font-size: 0.95rem;">radio_button_checked</span>Offline';
+          : '<span class="material-symbols-outlined icon-inline" style="color: var(--warning); font-size: 0.95rem;">radio_button_checked</span>Inactive';
+      }
+
+      const isExpired = chatbot.status === "expired";
+      const isInactive =
+        chatbot.active === false || chatbot.status === "inactive";
+      this.chatUnavailable = Boolean(isExpired || isInactive);
+
+      if (this.chatUnavailable) {
+        const endDateText = chatbot.end_date
+          ? DateUtils.formatDate(chatbot.end_date)
+          : "its end date";
+        this.chatUnavailableMessage = isExpired
+          ? `This chatbot is inactive because the event ended on ${endDateText}.`
+          : "This chatbot is currently inactive and cannot accept new messages.";
       }
 
       return chatbot;
@@ -342,6 +527,19 @@ class ChatInterface {
       console.error("Error loading chatbot meta:", error);
       return null;
     }
+  }
+
+  renderChatUnavailableNotice() {
+    const notice = DomUtils.create("div", "chat-empty-state");
+    notice.innerHTML = `
+      <div class="chat-empty-title">Chat is unavailable</div>
+      <div class="chat-empty-text">${this.escapeHtml(
+        this.chatUnavailableMessage ||
+          "This chatbot is inactive and cannot accept new messages.",
+      )}</div>
+    `;
+    this.messagesArea.appendChild(notice);
+    this.scrollToBottom();
   }
 
   async playWelcomeIntro(chatbot) {
@@ -522,7 +720,7 @@ class LoginHandler {
     // Update UI
     if (isValid) {
       field.classList.remove("input-error");
-      field.classList.add("input-success");
+      field.classList.remove("input-success");
       if (errorElement) {
         errorElement.textContent = "";
         errorElement.style.display = "none";
@@ -545,6 +743,7 @@ class LoginHandler {
 
     if (field) {
       field.classList.remove("input-error");
+      field.classList.remove("input-success");
     }
     if (errorElement) {
       errorElement.textContent = "";

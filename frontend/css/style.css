@@ -1346,16 +1346,16 @@ textarea:focus {
   background: rgba(79, 70, 229, 0.05);
 }
 
-input[type="text"]:invalid:not(:placeholder-shown),
-input[type="email"]:invalid:not(:placeholder-shown),
-input[type="password"]:invalid:not(:placeholder-shown) {
+input[type="text"]:user-invalid,
+input[type="email"]:user-invalid,
+input[type="password"]:user-invalid {
   border-color: var(--danger);
   background: rgba(239, 68, 68, 0.05);
 }
 
-input[type="text"]:invalid:not(:placeholder-shown):focus,
-input[type="email"]:invalid:not(:placeholder-shown):focus,
-input[type="password"]:invalid:not(:placeholder-shown):focus {
+input[type="text"]:user-invalid:focus,
+input[type="email"]:user-invalid:focus,
+input[type="password"]:user-invalid:focus {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 
@@ -1450,16 +1450,75 @@ select option:checked {
 }
 
 .login-form-forgot {
-  color: var(--accent-blue);
+  color: var(--accent-light);
   text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   transition: color var(--transition-base);
 }
 
 .login-form-forgot:hover,
 .login-form-forgot:focus {
-  color: var(--accent-cyan);
+  color: #ffffff;
   text-decoration: underline;
   outline: none;
+}
+
+.forgot-password-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-xs);
+}
+
+.forgot-password-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: var(--spacing-lg);
+}
+
+.forgot-step {
+  display: none;
+}
+
+.forgot-step.active {
+  display: block;
+}
+
+.forgot-step.step-enter {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.forgot-otp-banner {
+  margin-bottom: var(--spacing-md);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(79, 70, 229, 0.15);
+  border: 1px solid rgba(79, 70, 229, 0.35);
+  color: var(--accent-light);
+  font-size: 0.9rem;
+}
+
+.forgot-resend-row {
+  margin-top: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.forgot-timer {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  min-height: 20px;
+}
+
+.forgot-footer-actions {
+  margin-top: var(--spacing-lg);
+}
+
+.forgot-footer-actions .btn {
+  width: 100%;
+  justify-content: center;
 }
 
 /* Loading state for form */
@@ -1647,6 +1706,15 @@ select option:checked {
 
   .login-form-forgot {
     font-size: 0.9rem;
+  }
+
+  .forgot-resend-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .forgot-resend-row .btn {
+    width: 100%;
   }
 
   .login-form-btn {

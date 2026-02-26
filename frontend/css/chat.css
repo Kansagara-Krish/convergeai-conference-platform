@@ -210,6 +210,7 @@
   border-top: 1px solid var(--border-color);
   padding: var(--spacing-lg) var(--spacing-xl);
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-md);
   align-items: flex-end;
   backdrop-filter: blur(10px);
@@ -379,6 +380,9 @@
   border: 1px solid rgba(79, 70, 229, 0.2);
   border-radius: var(--radius-md);
   margin-bottom: var(--spacing-md);
+  flex-basis: 100%;
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .file-preview-item {

@@ -37,9 +37,6 @@
         <section class="login-form-section" aria-label="Login form section">
             <div class="login-form-container">
                 <form class="login-form" id="login-form" data-form="login" novalidate>
-                    <h2 class="login-form-title">Welcome Back</h2>
-                    <p class="login-form-subtitle">Enter your credentials to access the system</p>
-
                     <!-- Username -->
                     <div class="login-form-group">
                         <label for="username">Username <span aria-label="required">*</span></label>
@@ -56,8 +53,8 @@
                                 required aria-required="true" aria-describedby="password-error"
                                 autocomplete="current-password">
                             <button type="button" class="password-toggle" id="password-toggle"
-                                aria-label="Toggle password visibility" tabindex="0">
-                                👁️
+                                aria-label="Show password" tabindex="0">
+                                <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
                             </button>
                         </div>
                         <span id="password-error" class="form-error"></span>
@@ -69,7 +66,7 @@
                             <input type="checkbox" name="remember">
                             <span>Remember me</span>
                         </label>
-                        <a href="#" class="login-form-forgot" tabindex="0">Forgot password?</a>
+                        <a href="forgot-password.html" class="login-form-forgot" tabindex="0">Forgot password?</a>
                     </div>
 
                     <!-- Submit Button -->
@@ -99,7 +96,13 @@
                 toggle.addEventListener('click', function () {
                     const isPassword = passwordInput.type === 'password';
                     passwordInput.type = isPassword ? 'text' : 'password';
-                    this.textContent = isPassword ? '🙈' : '👁️';
+
+                    const icon = this.querySelector('.material-symbols-outlined');
+                    if (icon) {
+                        icon.textContent = isPassword ? 'visibility_off' : 'visibility';
+                    }
+
+                    this.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
                 });
             }
         });
