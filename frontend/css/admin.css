@@ -1294,7 +1294,8 @@
   display: grid;
   grid-template-columns: auto minmax(140px, 200px);
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
+  margin-left: auto;
   gap: var(--spacing-md);
 }
 
@@ -2304,15 +2305,24 @@ table[data-table="users"] .table-actions .btn {
   }
 
   .form-actions {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 
   .form-actions .btn {
-    width: 100%;
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .form-actions-chatbot .btn {
+    flex: 1 1 calc(50% - (var(--spacing-md) / 2));
+    min-width: 0;
   }
 
   .form-actions-chatbot .btn-create-chatbot {
-    min-width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
   }
 
   .users-filter-row {
