@@ -137,7 +137,13 @@ class ChatInterface {
     this.attachBtn = DomUtils.$("#chat-attach-btn");
     this.imageInput = DomUtils.$("#chat-image-input");
     this.filePreview = DomUtils.$("#chat-file-preview");
+    this.overlay = DomUtils.$("#chat-overlay");
+    this.overlayContent = DomUtils.$("#chat-overlay-content");
+    this.overlayImage = DomUtils.$("#chat-overlay-image");
+    this.overlayTitle = DomUtils.$("#chat-overlay-title");
+    this.overlayHideTimer = null;
     this.selectedImageFile = null;
+    this.selectedImagePreviewUrl = null;
     this.typingIndicatorEl = null;
     this.chatUnavailable = false;
     this.chatUnavailableMessage = "";
@@ -152,6 +158,35 @@ class ChatInterface {
   getChatbotId() {
     const params = new URLSearchParams(window.location.search);
     return params.get("id") || null;
+  }
+
+  resolveMediaUrl(pathValue) {
+    if (!pathValue) return null;
+
+    const raw = String(pathValue).trim();
+    if (!raw) return null;
+
+    if (
+      raw.startsWith("http://") ||
+      raw.startsWith("https://") ||
+      raw.startsWith("data:") ||
+      raw.startsWith("blob:")
+    ) {
+      return raw;
+    }
+
+    let normalized = raw.replace(/\\/g, "/").replace(/^\/+/, "");
+
+    if (
+      normalized.startsWith("backgrounds/") ||
+      normalized.startsWith("guests/") ||
+      normalized.startsWith("guest_lists/")
+    ) {
+      normalized = `uploads/${normalized}`;
+    }
+
+    const base = String(API_BASE_URL || "").replace(/\/+$/, "");
+    return `${base}/${normalized}`;
   }
 
   async resolveDefaultChatbotId() {
@@ -197,6 +232,7 @@ class ChatInterface {
         this.sendMessage();
       }
     });
+    this.inputField.addEventListener("input", () => this.autoResizeInput());
 
     this.setupAttachmentHandlers();
 
@@ -213,9 +249,9 @@ class ChatInterface {
     }
 
     // prepare overlay support
-    this.backgroundImageUrl = chatbotMeta?.background_image
-      ? `${API_BASE_URL}/uploads/${chatbotMeta.background_image}`
-      : null;
+    this.backgroundImageUrl = this.resolveMediaUrl(
+      chatbotMeta?.background_image,
+    );
     this.renderGuestWall(chatbotMeta?.guests || []);
 
     // Handle unavailable chatbot
@@ -233,7 +269,17 @@ class ChatInterface {
 
     // Enable input and show it
     this.setInputVisible(true);
+    this.autoResizeInput();
     this.setupAutoScroll();
+  }
+
+  autoResizeInput() {
+    if (!this.inputField) return;
+    this.inputField.style.height = "auto";
+    const nextHeight = Math.min(this.inputField.scrollHeight, 160);
+    this.inputField.style.height = `${Math.max(nextHeight, 24)}px`;
+    this.inputField.style.overflowY =
+      this.inputField.scrollHeight > 160 ? "auto" : "hidden";
   }
 
   renderNoChatbotState() {
@@ -263,7 +309,7 @@ class ChatInterface {
     this.addMessage(userMessagePreview, "user");
 
     this.inputField.value = "";
-    this.inputField.style.height = "auto";
+    this.autoResizeInput();
     this.clearSelectedImage();
     this.sendBtn.disabled = true;
 
@@ -384,15 +430,22 @@ class ChatInterface {
     if (!this.selectedImageFile) {
       this.filePreview.innerHTML = "";
       this.filePreview.style.display = "none";
+      if (this.selectedImagePreviewUrl) {
+        URL.revokeObjectURL(this.selectedImagePreviewUrl);
+        this.selectedImagePreviewUrl = null;
+      }
       return;
     }
 
-    const sizeMb = (this.selectedImageFile.size / (1024 * 1024)).toFixed(2);
+    if (this.selectedImagePreviewUrl) {
+      URL.revokeObjectURL(this.selectedImagePreviewUrl);
+    }
+    this.selectedImagePreviewUrl = URL.createObjectURL(this.selectedImageFile);
+
     this.filePreview.innerHTML = `
       <div class="file-preview-item">
-        <span class="material-symbols-outlined">image</span>
-        <span>${this.escapeHtml(this.selectedImageFile.name)} (${sizeMb} MB)</span>
-        <span class="file-preview-remove" id="chat-file-remove">×</span>
+        <img class="file-preview-thumb" src="${this.selectedImagePreviewUrl}" alt="Selected image preview" />
+        <button type="button" class="file-preview-remove" id="chat-file-remove" aria-label="Remove image">×</button>
       </div>
     `;
     this.filePreview.style.display = "flex";
@@ -416,22 +469,23 @@ class ChatInterface {
 
   addMessage(text, sender, messageTimestamp = null) {
     const timestamp = DateUtils.formatTime(messageTimestamp || new Date());
+    const normalizedSender = sender === "user" ? "user" : "assistant";
     const message = {
       id: Date.now(),
       text: text,
-      sender: sender,
+      sender: normalizedSender,
       timestamp: timestamp,
     };
 
     this.messages.push(message);
 
-    const messageEl = DomUtils.create("div", `message-group ${sender}`);
+    const messageEl = DomUtils.create(
+      "div",
+      `message-group ${normalizedSender}`,
+    );
     messageEl.innerHTML = `
-      <div class="message-avatar ${sender}">
-        ${sender === "user" ? "You" : '<i class="fas fa-robot"></i>'}
-      </div>
       <div class="message-bubble">
-        <div class="message-text">${this.escapeHtml(text)}</div>
+        <div class="message-text">${this.renderMessageContent(text)}</div>
         <div class="message-time">${timestamp}</div>
       </div>
     `;
@@ -443,13 +497,14 @@ class ChatInterface {
   startTypingIndicator() {
     this.stopTypingIndicator();
 
-    const indicator = DomUtils.create("div", "message-group");
+    const indicator = DomUtils.create("div", "message-group assistant");
     indicator.innerHTML = `
-      <div class="message-avatar bot"><i class="fas fa-robot"></i></div>
-      <div class="typing-indicator">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
+      <div class="message-bubble">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
       </div>
     `;
     indicator.id = "typing-indicator";
@@ -521,19 +576,10 @@ class ChatInterface {
       const chatbot = response?.data;
       if (!chatbot) return null;
 
-      const titleEl = DomUtils.$(".chat-header-name");
-      const statusEl = DomUtils.$(".chat-header-status");
+      const topTitleEl = DomUtils.$("#chatbot-top-title");
 
-      if (titleEl) {
-        titleEl.textContent = chatbot.name || "Chatbot";
-      }
-
-      if (statusEl) {
-        const isActive =
-          chatbot.status === "active" && Boolean(chatbot.active !== false);
-        statusEl.innerHTML = isActive
-          ? '<span class="material-symbols-outlined icon-inline" style="color: var(--success); font-size: 0.95rem;">radio_button_checked</span>Online'
-          : '<span class="material-symbols-outlined icon-inline" style="color: var(--warning); font-size: 0.95rem;">radio_button_checked</span>Inactive';
+      if (topTitleEl) {
+        topTitleEl.textContent = chatbot.name || "Chatbot";
       }
 
       const isExpired = chatbot.status === "expired";
@@ -563,53 +609,99 @@ class ChatInterface {
     const listEl = DomUtils.$("#chat-guest-wall-list");
     if (!listEl) return;
     listEl.innerHTML = "";
-    if (!Array.isArray(guests) || guests.length === 0) {
-      listEl.innerHTML = '<div class="chat-guest-wall-empty">No guests</div>';
-      return;
+    const hasGuests = Array.isArray(guests) && guests.length > 0;
+
+    if (hasGuests) {
+      guests.forEach((g) => {
+        const pill = document.createElement("div");
+        pill.className = "chat-guest-pill";
+        pill.textContent = g.name || "";
+        pill.dataset.photo = g.photo || "";
+        listEl.appendChild(pill);
+
+        pill.addEventListener("mouseenter", () => {
+          const url = this.resolveMediaUrl(pill.dataset.photo);
+          this.showFocusPreview(url, "Guest");
+        });
+      });
     }
 
-    guests.forEach((g) => {
-      const pill = document.createElement("div");
-      pill.className = "chat-guest-pill";
-      pill.textContent = g.name || "";
-      pill.dataset.photo = g.photo || "";
-      listEl.appendChild(pill);
+    if (this.backgroundImageUrl) {
+      const backgroundPill = document.createElement("div");
+      backgroundPill.className = "chat-guest-pill chat-guest-pill-bg";
+      backgroundPill.textContent = "Event Background";
+      listEl.appendChild(backgroundPill);
 
-      pill.addEventListener("mouseenter", () => {
-        const url = pill.dataset.photo
-          ? `${API_BASE_URL}/uploads/${pill.dataset.photo}`
-          : this.backgroundImageUrl;
-        this.showOverlayImage(url);
+      backgroundPill.addEventListener("mouseenter", () => {
+        this.showFocusPreview(this.backgroundImageUrl, "Background");
       });
-      pill.addEventListener("mouseleave", () => {
-        this.hideOverlay();
-      });
-    });
+    }
 
-    // also show background when hovering over wall container
+    if (!hasGuests && !this.backgroundImageUrl) {
+      listEl.innerHTML = '<div class="chat-guest-wall-empty">No guests</div>';
+    }
+
     const wall = DomUtils.$("#chat-guest-wall");
-    if (wall && this.backgroundImageUrl) {
+
+    if (wall) {
+      const firstGuestWithPhoto = Array.isArray(guests)
+        ? guests.find((g) => Boolean(g?.photo))
+        : null;
+      const defaultGuestUrl = firstGuestWithPhoto?.photo
+        ? this.resolveMediaUrl(firstGuestWithPhoto.photo)
+        : null;
+
       wall.addEventListener("mouseenter", () => {
-        this.showOverlayImage(this.backgroundImageUrl);
+        this.showFocusPreview(defaultGuestUrl, "Guest");
       });
       wall.addEventListener("mouseleave", () => {
-        this.hideOverlay();
+        this.hideFocusPreview();
       });
     }
   }
 
-  showOverlayImage(url) {
-    const overlay = DomUtils.$("#chat-overlay");
-    if (!overlay) return;
-    if (!url) return;
-    overlay.style.backgroundImage = `url(${url})`;
-    overlay.classList.add("active");
+  showFocusPreview(url, label = "Guest Preview") {
+    if (!this.overlay || !this.overlayImage || !url) return;
+
+    if (this.overlayHideTimer) {
+      clearTimeout(this.overlayHideTimer);
+      this.overlayHideTimer = null;
+    }
+
+    if (this.overlayTitle) {
+      this.overlayTitle.textContent = `${label} Preview`;
+    }
+
+    this.overlay.classList.remove("leaving");
+    this.overlay.classList.add("active", "entering");
+    document.body.classList.add("chat-focus-active");
+
+    this.overlayImage.onerror = () => {
+      this.hideFocusPreview();
+    };
+    this.overlayImage.onload = () => {
+      this.overlay.classList.remove("entering");
+      void this.overlay.offsetWidth;
+      this.overlay.classList.add("entering");
+    };
+
+    this.overlayImage.src = url;
   }
 
-  hideOverlay() {
-    const overlay = DomUtils.$("#chat-overlay");
-    if (!overlay) return;
-    overlay.classList.remove("active");
+  hideFocusPreview() {
+    if (!this.overlay || !this.overlay.classList.contains("active")) return;
+
+    this.overlay.classList.remove("entering");
+    this.overlay.classList.add("leaving");
+
+    if (this.overlayHideTimer) {
+      clearTimeout(this.overlayHideTimer);
+    }
+
+    this.overlayHideTimer = setTimeout(() => {
+      this.overlay.classList.remove("active", "leaving");
+      document.body.classList.remove("chat-focus-active");
+    }, 280);
   }
 
   renderChatUnavailableNotice() {
@@ -669,6 +761,86 @@ class ChatInterface {
       this.inputArea.classList.remove("chat-input-reveal");
       this.inputField.focus();
     }, 450);
+  }
+
+  renderMessageContent(text) {
+    const normalized = String(text || "").replace(/\r\n/g, "\n");
+    const lines = normalized.split("\n");
+    const htmlParts = [];
+    let inUl = false;
+    let inOl = false;
+
+    const closeLists = () => {
+      if (inUl) {
+        htmlParts.push("</ul>");
+        inUl = false;
+      }
+      if (inOl) {
+        htmlParts.push("</ol>");
+        inOl = false;
+      }
+    };
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        closeLists();
+        htmlParts.push("<p></p>");
+        return;
+      }
+
+      const unorderedMatch = trimmed.match(/^[-*]\s+(.+)$/);
+      if (unorderedMatch) {
+        if (inOl) {
+          htmlParts.push("</ol>");
+          inOl = false;
+        }
+        if (!inUl) {
+          htmlParts.push("<ul>");
+          inUl = true;
+        }
+        htmlParts.push(
+          `<li>${this.formatInlineMarkdown(unorderedMatch[1])}</li>`,
+        );
+        return;
+      }
+
+      const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+      if (orderedMatch) {
+        if (inUl) {
+          htmlParts.push("</ul>");
+          inUl = false;
+        }
+        if (!inOl) {
+          htmlParts.push("<ol>");
+          inOl = true;
+        }
+        htmlParts.push(
+          `<li>${this.formatInlineMarkdown(orderedMatch[1])}</li>`,
+        );
+        return;
+      }
+
+      closeLists();
+      htmlParts.push(`<p>${this.formatInlineMarkdown(trimmed)}</p>`);
+    });
+
+    closeLists();
+
+    return htmlParts
+      .join("")
+      .replace(/(<p><\/p>){2,}/g, "<p></p>")
+      .replace(/^<p><\/p>|<p><\/p>$/g, "");
+  }
+
+  formatInlineMarkdown(text) {
+    let escaped = this.escapeHtml(text);
+    escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+    escaped = escaped.replace(/\*\*([^*][\s\S]*?)\*\*/g, "<strong>$1</strong>");
+    escaped = escaped.replace(/__([^_][\s\S]*?)__/g, "<strong>$1</strong>");
+    escaped = escaped.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+    escaped = escaped.replace(/_([^_\n]+)_/g, "<em>$1</em>");
+    return escaped;
   }
 
   escapeHtml(text) {
