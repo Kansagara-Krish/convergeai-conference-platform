@@ -18,7 +18,8 @@ except ImportError:
 
 user_bp = Blueprint('user', __name__)
 
-GEMINI_MODEL = 'gemini-1.5-flash'
+# default to a free flash model
+GEMINI_MODEL = 'gemini-flash-latest'
 ALLOWED_IMAGE_MIME_TYPES = {
     'image/png',
     'image/jpeg',
@@ -253,17 +254,24 @@ def get_my_chatbots(user):
     chatbots = Chatbot.query.filter(Chatbot.id.in_(chatbot_ids)).all()
 
     changed = False
+    results = []
     for chatbot in chatbots:
         if _is_chatbot_expired(chatbot) and chatbot.active:
             chatbot.active = False
             changed = True
 
+        # Provide full chatbot details for participants, including gemini key, guests and background image
+        chatbot_data = chatbot.to_dict()
+        chatbot_data['guests'] = [g.to_dict() for g in chatbot.guests]
+        # background_image is present in to_dict already; keep gemini_api_key present for frontend confirmation
+        results.append(chatbot_data)
+
     if changed:
         db.session.commit()
-    
+
     return jsonify({
         'success': True,
-        'data': [_sanitize_chatbot_payload(chatbot) for chatbot in chatbots]
+        'data': results
     }), 200
 
 # ============================================

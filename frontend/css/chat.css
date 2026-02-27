@@ -78,6 +78,27 @@
   font-size: 0.82rem;
 }
 
+/* full-screen overlay for guest/background images */
+.chat-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-color: rgba(0,0,0,0.8);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 12;
+}
+.chat-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .chat-header-bar {
   background: transparent;
   border-bottom: 1px solid var(--border-color);

@@ -315,7 +315,7 @@ def create_chatbot(user):
     if not has_excel_guest_list and not has_manual_guests:
         return jsonify({
             'success': False,
-            'message': 'Add at least one manual guest (name + image) or upload guest Excel file'
+            'message': 'Add at least one manual guest (name + image) or upload a guest Excel file (image columns are optional)'
         }), 400
 
     if not background_image or not background_image.filename:
@@ -381,7 +381,7 @@ def create_chatbot(user):
             if len(guest_rows) == 0:
                 return jsonify({
                     'success': False,
-                    'message': 'Guest list must contain at least one row with a name column'
+                    'message': 'Guest list must contain at least one row with a name column (images are optional)'
                 }), 400
 
         guest_image_lookup = build_guest_image_lookup(guest_images)
@@ -677,11 +677,11 @@ def get_chatbot(user, chatbot_id):
     if not chatbot.public and chatbot.created_by_id != user.id and user.role != 'admin':
         return jsonify({'success': False, 'message': 'Access denied'}), 403
     
+    # include full chatbot info for user; key may be shown for confirmation
     chatbot_data = chatbot.to_dict()
-    if user.role != 'admin':
-        chatbot_data.pop('gemini_api_key', None)
+    # guests and background image should be exposed to frontend
     chatbot_data['guests'] = [guest.to_dict() for guest in chatbot.guests]
-    
+    # note: gemini_api_key intentionally kept in response to allow frontend confirmation
     return jsonify({
         'success': True,
         'data': chatbot_data

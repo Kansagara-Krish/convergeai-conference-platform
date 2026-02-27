@@ -526,6 +526,9 @@
 .sidebar-backdrop.active {
   opacity: 1;
   pointer-events: auto;
+  /* add a blur effect behind the sliding menu for better focus on mobile */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .dashboard-bell-wrap {

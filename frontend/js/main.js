@@ -141,13 +141,41 @@ class ChatInterface {
     this.typingIndicatorEl = null;
     this.chatUnavailable = false;
     this.chatUnavailableMessage = "";
-    this.chatbotId = this.getChatbotId();
+    // chatbotId will be initialized via helper below
+    this.chatbotId = null;
     this.messages = [];
+    // set id then start
+    this.chatbotId = this.getChatbotId();
     this.init();
   }
 
+  getChatbotId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("id") || null;
+  }
+
+  async resolveDefaultChatbotId() {
+    try {
+      const response = await API.get("/api/user/my-chatbots");
+      const chatbots = response?.data || [];
+      if (chatbots.length > 0) {
+        this.chatbotId = chatbots[0].id;
+      }
+    } catch (error) {
+      console.error("Error resolving default chatbot:", error);
+    }
+  }
+
   async init() {
-    if (!this.messagesArea || !this.inputField || !this.sendBtn) return;
+    console.log("ChatInterface.init() called", { chatbotId: this.chatbotId });
+    if (!this.messagesArea || !this.inputField || !this.sendBtn) {
+      console.warn("ChatInterface missing required DOM elements", {
+        messagesArea: this.messagesArea,
+        inputField: this.inputField,
+        sendBtn: this.sendBtn,
+      });
+      return;
+    }
 
     this.setInputVisible(false);
 
@@ -173,39 +201,39 @@ class ChatInterface {
     this.setupAttachmentHandlers();
 
     const chatbotMeta = await this.loadChatbotMeta();
-    await this.playWelcomeIntro(chatbotMeta);
-    if (this.chatUnavailable) {
-      this.renderChatUnavailableNotice();
+
+    if (!chatbotMeta) {
       this.setInputVisible(false);
-      await this.loadMessages();
-      this.setupAutoScroll();
       return;
     }
 
-    this.setInputVisible(true);
-    await this.loadMessages();
-    this.setupAutoScroll();
-  }
-
-  getChatbotId() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("id") || null;
-  }
-
-  async resolveDefaultChatbotId() {
-    try {
-      const response = await API.get("/api/user/chatbots");
-      const chatbots = Array.isArray(response?.data) ? response.data : [];
-      const firstChatbot = chatbots[0];
-
-      if (!firstChatbot?.id) return;
-
-      this.chatbotId = String(firstChatbot.id);
-      const nextUrl = `chat.html?id=${firstChatbot.id}`;
-      window.history.replaceState({}, "", nextUrl);
-    } catch (error) {
-      console.error("Error resolving default chatbot:", error);
+    // show gemini key if present for confirmation
+    if (chatbotMeta && chatbotMeta.gemini_api_key) {
+      this.addMessage(`Gemini API key: ${chatbotMeta.gemini_api_key}`, "bot");
     }
+
+    // prepare overlay support
+    this.backgroundImageUrl = chatbotMeta?.background_image
+      ? `${API_BASE_URL}/uploads/${chatbotMeta.background_image}`
+      : null;
+    this.renderGuestWall(chatbotMeta?.guests || []);
+
+    // Handle unavailable chatbot
+    if (this.chatUnavailable) {
+      this.renderChatUnavailableNotice();
+      this.setInputVisible(false);
+      return;
+    }
+
+    // Play welcome intro first
+    await this.playWelcomeIntro(chatbotMeta);
+
+    // Load message history
+    await this.loadMessages();
+
+    // Enable input and show it
+    this.setInputVisible(true);
+    this.setupAutoScroll();
   }
 
   renderNoChatbotState() {
@@ -529,6 +557,61 @@ class ChatInterface {
     }
   }
 
+  // ----- guest wall support -----
+
+  renderGuestWall(guests) {
+    const listEl = DomUtils.$("#chat-guest-wall-list");
+    if (!listEl) return;
+    listEl.innerHTML = "";
+    if (!Array.isArray(guests) || guests.length === 0) {
+      listEl.innerHTML = '<div class="chat-guest-wall-empty">No guests</div>';
+      return;
+    }
+
+    guests.forEach((g) => {
+      const pill = document.createElement("div");
+      pill.className = "chat-guest-pill";
+      pill.textContent = g.name || "";
+      pill.dataset.photo = g.photo || "";
+      listEl.appendChild(pill);
+
+      pill.addEventListener("mouseenter", () => {
+        const url = pill.dataset.photo
+          ? `${API_BASE_URL}/uploads/${pill.dataset.photo}`
+          : this.backgroundImageUrl;
+        this.showOverlayImage(url);
+      });
+      pill.addEventListener("mouseleave", () => {
+        this.hideOverlay();
+      });
+    });
+
+    // also show background when hovering over wall container
+    const wall = DomUtils.$("#chat-guest-wall");
+    if (wall && this.backgroundImageUrl) {
+      wall.addEventListener("mouseenter", () => {
+        this.showOverlayImage(this.backgroundImageUrl);
+      });
+      wall.addEventListener("mouseleave", () => {
+        this.hideOverlay();
+      });
+    }
+  }
+
+  showOverlayImage(url) {
+    const overlay = DomUtils.$("#chat-overlay");
+    if (!overlay) return;
+    if (!url) return;
+    overlay.style.backgroundImage = `url(${url})`;
+    overlay.classList.add("active");
+  }
+
+  hideOverlay() {
+    const overlay = DomUtils.$("#chat-overlay");
+    if (!overlay) return;
+    overlay.classList.remove("active");
+  }
+
   renderChatUnavailableNotice() {
     const notice = DomUtils.create("div", "chat-empty-state");
     notice.innerHTML = `
@@ -676,10 +759,20 @@ class LoginHandler {
     let redirectUrl = "user/chat.html";
 
     try {
-      const chatbotResponse = await API.get("/api/user/chatbots");
-      const chatbots = Array.isArray(chatbotResponse?.data)
+      // Prefer chatbots the user has been assigned/joined
+      let chatbotResponse = await API.get("/api/user/my-chatbots");
+      let chatbots = Array.isArray(chatbotResponse?.data)
         ? chatbotResponse.data
         : [];
+
+      // Fallback to public available chatbots if none assigned
+      if (!chatbots || chatbots.length === 0) {
+        chatbotResponse = await API.get("/api/user/chatbots");
+        chatbots = Array.isArray(chatbotResponse?.data)
+          ? chatbotResponse.data
+          : [];
+      }
+
       if (chatbots[0]?.id) {
         redirectUrl = `user/chat.html?id=${chatbots[0].id}`;
       }
