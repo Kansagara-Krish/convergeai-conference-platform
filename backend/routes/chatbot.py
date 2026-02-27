@@ -373,10 +373,18 @@ def create_chatbot(user):
         if guest_list and guest_list.filename:
             saved_guest_list_abs, _ = save_uploaded_file(guest_list, 'guest_lists')
 
-            guest_rows = parse_guest_list_file(
-                saved_guest_list_abs,
-                get_file_extension(guest_list.filename)
-            )
+            try:
+                guest_rows = parse_guest_list_file(
+                    saved_guest_list_abs,
+                    get_file_extension(guest_list.filename)
+                )
+            finally:
+                if saved_guest_list_abs and os.path.exists(saved_guest_list_abs):
+                    try:
+                        os.remove(saved_guest_list_abs)
+                    except OSError:
+                        pass
+                saved_guest_list_abs = None
 
             if len(guest_rows) == 0:
                 return jsonify({
@@ -472,8 +480,14 @@ def create_chatbot(user):
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Error creating chatbot: {str(e)}'}), 500
     finally:
+        if saved_guest_list_abs and os.path.exists(saved_guest_list_abs):
+            try:
+                os.remove(saved_guest_list_abs)
+            except OSError:
+                pass
+
         if not created_successfully:
-            for file_path in (saved_background_abs, saved_guest_list_abs, *saved_guest_image_abs_paths):
+            for file_path in (saved_background_abs, *saved_guest_image_abs_paths):
                 if file_path and os.path.exists(file_path):
                     try:
                         os.remove(file_path)
@@ -566,7 +580,14 @@ def update_chatbot(user, chatbot_id):
 
         if guest_list and guest_list.filename:
             saved_guest_list_abs, _ = save_uploaded_file(guest_list, 'guest_lists')
-            imported_rows = parse_guest_list_file(saved_guest_list_abs, get_file_extension(guest_list.filename))
+            try:
+                imported_rows = parse_guest_list_file(saved_guest_list_abs, get_file_extension(guest_list.filename))
+            finally:
+                if saved_guest_list_abs and os.path.exists(saved_guest_list_abs):
+                    try:
+                        os.remove(saved_guest_list_abs)
+                    except OSError:
+                        pass
 
             for guest_row in imported_rows:
                 name = str(guest_row.get('name', '')).strip()

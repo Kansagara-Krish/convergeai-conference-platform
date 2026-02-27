@@ -122,6 +122,54 @@ def _rename_guest_image(existing_photo_path, desired_name):
     return f"uploads/guests/{new_filename}"
 
 
+def _normalize_upload_relative_path(raw_path):
+    if not raw_path:
+        return None
+
+    normalized = str(raw_path).strip().replace('\\', '/').lstrip('/')
+    if not normalized:
+        return None
+
+    if '/uploads/' in normalized:
+        normalized = normalized.split('/uploads/', 1)[1]
+        normalized = f"uploads/{normalized}"
+    elif not normalized.startswith('uploads/'):
+        if normalized.startswith(('backgrounds/', 'guests/', 'guest_lists/')):
+            normalized = f"uploads/{normalized}"
+        else:
+            return None
+
+    return normalized
+
+
+def _resolve_upload_absolute_path(raw_path):
+    relative_path = _normalize_upload_relative_path(raw_path)
+    if not relative_path:
+        return None
+
+    uploads_root = os.path.abspath(os.path.join(current_app.root_path, 'uploads'))
+    absolute_path = os.path.abspath(
+        os.path.join(current_app.root_path, relative_path.replace('/', os.sep))
+    )
+
+    if absolute_path != uploads_root and not absolute_path.startswith(uploads_root + os.sep):
+        return None
+
+    return absolute_path
+
+
+def _delete_uploaded_file(raw_path):
+    absolute_path = _resolve_upload_absolute_path(raw_path)
+    if not absolute_path:
+        return
+    if not os.path.exists(absolute_path):
+        return
+    try:
+        os.remove(absolute_path)
+    except OSError:
+        pass
+
+
 def purge_old_notifications():
     cutoff = datetime.utcnow() - timedelta(days=NOTIFICATION_RETENTION_DAYS)
     AdminNotification.query.filter(AdminNotification.created_at < cutoff).delete(synchronize_session=False)
@@ -594,9 +642,19 @@ def delete_chatbot(user, chatbot_id):
     
     if not chatbot:
         return jsonify({'success': False, 'message': 'Chatbot not found'}), 404
+
+    files_to_delete = []
+    if chatbot.background_image:
+        files_to_delete.append(chatbot.background_image)
+
+    guest_photos = [g.photo for g in chatbot.guests if g.photo]
+    files_to_delete.extend(guest_photos)
     
     db.session.delete(chatbot)
     db.session.commit()
+
+    for file_path in set(files_to_delete):
+        _delete_uploaded_file(file_path)
     
     return jsonify({
         'success': True,
@@ -756,9 +814,14 @@ def delete_guest(user, guest_id):
     
     if not guest:
         return jsonify({'success': False, 'message': 'Guest not found'}), 404
+
+    photo_path = guest.photo
     
     db.session.delete(guest)
     db.session.commit()
+
+    if photo_path:
+        _delete_uploaded_file(photo_path)
     
     return jsonify({
         'success': True,
