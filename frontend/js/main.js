@@ -157,6 +157,11 @@ class ChatInterface {
     this.messages = [];
     this.conversations = [];
     this.currentConversationId = null;
+    // Guest and background image tracking
+    this.selectedGuest = null;
+    this.selectedGuestImage = null;
+    this.backgroundImageUrl = null;
+    this.guests = [];
     // set id then start
     this.chatbotId = this.getChatbotId();
     this.init();
@@ -577,7 +582,7 @@ class ChatInterface {
     const isInputVisible =
       this.inputArea && !this.inputArea.classList.contains("chat-input-hidden");
     const bottomInset = isInputVisible
-      ? Math.max((this.inputArea?.offsetHeight || 0) + 18, 110)
+      ? Math.max((this.inputArea?.offsetHeight || 0) + 6, 90)
       : 24;
 
     this.messagesArea.style.setProperty(
@@ -606,6 +611,15 @@ class ChatInterface {
 
     const text = this.inputField.value.trim();
     const selectedImage = this.selectedImageFile;
+
+    // VALIDATION: User must upload an image
+    if (!selectedImage) {
+      NotificationManager.warning(
+        "Please upload an image before sending a message. Click the + button to add an image.",
+      );
+      return;
+    }
+
     if (!text && !selectedImage) return;
 
     if (!this.currentConversationId) {
@@ -614,7 +628,7 @@ class ChatInterface {
 
     const userMessagePreview = text || "[Image uploaded]";
 
-    this.addMessage(userMessagePreview, "user");
+    this.addMessage(userMessagePreview, "user", null, selectedImage);
 
     this.inputField.value = "";
     this.autoResizeInput();
@@ -624,12 +638,34 @@ class ChatInterface {
     try {
       this.startTypingIndicator();
 
+      // Fetch guest image if a guest is selected
+      let guestImageBlob = null;
+      if (this.selectedGuestImage) {
+        console.log("📸 Fetching guest image...", this.selectedGuestImage);
+        guestImageBlob = await this.urlToBlob(
+          this.selectedGuestImage,
+          "guest_image.jpg",
+        );
+      }
+
+      // Fetch background image if available
+      let backgroundImageBlob = null;
+      if (this.backgroundImageUrl) {
+        console.log("🖼️ Fetching background image...", this.backgroundImageUrl);
+        backgroundImageBlob = await this.urlToBlob(
+          this.backgroundImageUrl,
+          "background_image.jpg",
+        );
+      }
+
       let response;
       try {
         response = await this.postChatMessage(
           text,
           selectedImage,
           this.currentConversationId,
+          guestImageBlob, // Pass fetched guest image blob
+          backgroundImageBlob, // Pass fetched background image blob
         );
       } catch (error) {
         if (this.isNotJoinedError(error)) {
@@ -641,6 +677,8 @@ class ChatInterface {
             text,
             selectedImage,
             this.currentConversationId,
+            guestImageBlob,
+            backgroundImageBlob,
           );
         } else {
           throw error;
@@ -663,7 +701,28 @@ class ChatInterface {
       }
 
       if (botResponse?.content) {
-        this.addMessage(botResponse.content, "bot", botResponse.timestamp);
+        let botImageFile = null;
+
+        // Check if bot response contains an image URL or image data
+        if (botResponse?.image_url) {
+          console.log("🤖 Bot response includes image:", botResponse.image_url);
+          try {
+            // Fetch and convert bot image URL to blob for display
+            botImageFile = await this.urlToBlob(
+              botResponse.image_url,
+              "bot_image.jpg",
+            );
+          } catch (error) {
+            console.error("Failed to fetch bot image:", error);
+          }
+        }
+
+        this.addMessage(
+          botResponse.content,
+          "bot",
+          botResponse.timestamp,
+          botImageFile,
+        );
       }
     } catch (error) {
       console.error("Error sending message:", error);
@@ -675,11 +734,34 @@ class ChatInterface {
     }
   }
 
-  async postChatMessage(text, selectedImage, conversationId) {
+  async postChatMessage(
+    text,
+    selectedImage,
+    conversationId,
+    guestImage,
+    backgroundImage,
+  ) {
     if (selectedImage) {
       const formData = new FormData();
       formData.append("content", text);
       formData.append("image", selectedImage);
+
+      // Include guest image if selected
+      if (guestImage) {
+        formData.append("guest_image", guestImage);
+      }
+
+      // Include background image if available
+      if (backgroundImage) {
+        formData.append("background_image", backgroundImage);
+      }
+
+      // Include guest info if selected
+      if (this.selectedGuest) {
+        formData.append("guest_id", this.selectedGuest.id);
+        formData.append("guest_name", this.selectedGuest.name);
+      }
+
       if (conversationId) {
         formData.append("conversation_id", String(conversationId));
       }
@@ -965,7 +1047,7 @@ class ChatInterface {
     this.updateSendButtonState();
   }
 
-  addMessage(text, sender, messageTimestamp = null) {
+  addMessage(text, sender, messageTimestamp = null, imageFile = null) {
     const timestamp = DateUtils.formatTime(messageTimestamp || new Date());
     const normalizedSender = sender === "user" ? "user" : "assistant";
     const message = {
@@ -981,9 +1063,20 @@ class ChatInterface {
       "div",
       `message-group ${normalizedSender}`,
     );
+
+    let imageHtml = "";
+    let imageSrc = "";
+
+    // Create image URL if imageFile is provided
+    if (imageFile) {
+      imageSrc = URL.createObjectURL(imageFile);
+      imageHtml = `<img class="message-image" src="${imageSrc}" alt="Message image" />`;
+    }
+
     messageEl.innerHTML = `
       <div class="message-bubble">
         <div class="message-text">${this.renderMessageContent(text)}</div>
+        ${imageHtml}
         <div class="message-time">${timestamp}</div>
       </div>
     `;
@@ -1134,17 +1227,33 @@ class ChatInterface {
     listEl.innerHTML = "";
     const hasGuests = Array.isArray(guests) && guests.length > 0;
 
+    // Store guests for tracking
+    this.guests = hasGuests ? guests : [];
+
     if (hasGuests) {
       guests.forEach((g) => {
         const pill = document.createElement("div");
         pill.className = "chat-guest-pill";
         pill.textContent = g.name || "";
         pill.dataset.photo = g.photo || "";
+        pill.dataset.guestId = g.id || "";
+        pill.dataset.guestName = g.name || "";
         listEl.appendChild(pill);
 
+        // Hover preview
         pill.addEventListener("mouseenter", () => {
           const url = this.resolveMediaUrl(pill.dataset.photo);
           this.showFocusPreview(url, "Guest");
+        });
+
+        // CLICK: Select guest
+        pill.addEventListener("click", () => {
+          this.selectGuest(g);
+          pill.classList.add("active");
+          // Remove active class from other pills
+          listEl.querySelectorAll(".chat-guest-pill").forEach((p) => {
+            if (p !== pill) p.classList.remove("active");
+          });
         });
       });
     }
@@ -1180,6 +1289,49 @@ class ChatInterface {
       wall.addEventListener("mouseleave", () => {
         this.hideFocusPreview();
       });
+    }
+  }
+
+  /**
+   * Select a guest and store their image URL
+   */
+  selectGuest(guest) {
+    this.selectedGuest = guest;
+    this.selectedGuestImage = guest.photo
+      ? this.resolveMediaUrl(guest.photo)
+      : null;
+
+    console.log("💬 Guest selected:", {
+      name: guest.name,
+      id: guest.id,
+      photo: this.selectedGuestImage,
+    });
+
+    NotificationManager.success(`Selected: ${guest.name}`);
+  }
+
+  /**
+   * Convert an image URL to a Blob for FormData submission
+   * @param {string} imageUrl - The URL of the image to convert
+   * @param {string} filename - The filename to use for the Blob
+   * @returns {Promise<Blob|null>} The Blob object or null if conversion fails
+   */
+  async urlToBlob(imageUrl, filename = "image.jpg") {
+    try {
+      if (!imageUrl) return null;
+
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        console.error(`Failed to fetch image: ${response.status}`);
+        return null;
+      }
+
+      const blob = await response.blob();
+      console.log(`✅ Converted image to Blob:`, filename, blob.size, "bytes");
+      return blob;
+    } catch (error) {
+      console.error(`Error converting image URL to Blob:`, error);
+      return null;
     }
   }
 

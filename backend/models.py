@@ -245,12 +245,13 @@ class Message(db.Model):
     
     content = db.Column(db.Text, nullable=False)
     is_user_message = db.Column(db.Boolean, default=True)
+    image_url = db.Column(db.String(512), nullable=True)  # For bot-generated or attached images
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     def to_dict(self):
         """Convert to dictionary"""
-        return {
+        result = {
             'id': self.id,
             'content': self.content,
             'sender': 'user' if self.is_user_message else 'bot',
@@ -258,6 +259,9 @@ class Message(db.Model):
             'conversation_id': self.conversation_id,
             'user': self.user.to_dict() if self.user else None,
         }
+        if self.image_url:
+            result['image_url'] = self.image_url
+        return result
 
 # ============================================
 # Admin Notification Model
