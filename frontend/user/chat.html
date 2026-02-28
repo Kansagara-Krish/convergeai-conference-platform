@@ -6,20 +6,11 @@
     <title>Chat - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/user.css?v=3">
-    <link rel="stylesheet" href="../css/chat.css">
-    <script src="../js/utils.js?v=2"></script>
-    <script src="../js/main.js?v=4"></script>
+    <link rel="stylesheet" href="../css/chat.css?v=13">
+    <script src="../js/utils.js?v=3"></script>
+    <script src="../js/main.js?v=13"></script>
 </head>
 <body>
-    <!-- overlay used to show guest or background images full-screen -->
-    <div id="chat-overlay" class="chat-overlay" aria-hidden="true">
-        <div class="chat-overlay-content" id="chat-overlay-content">
-            <div class="chat-overlay-chip" id="chat-overlay-title">Guest Preview</div>
-            <div class="chat-overlay-frame">
-                <img id="chat-overlay-image" class="chat-overlay-image" alt="Preview image" />
-            </div>
-        </div>
-    </div>
     <div class="user-container">
         <!-- Header -->
         <header class="user-header">
@@ -33,6 +24,7 @@
                     <div class="header-user-menu">
                         <button class="header-user-btn">
                             <span class="chat-top-user-avatar" data-user-avatar>U</span>
+                            <span class="material-symbols-outlined chat-user-chevron" aria-hidden="true">expand_more</span>
                         </button>
                         <div class="dropdown-menu chat-header-dropdown">
                             <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> Profile</a>
@@ -44,16 +36,40 @@
         </header>
 
         <div class="chat-main">
+            <aside class="chat-conversations" id="chat-conversations" aria-label="Conversations">
+                <div class="chat-conversations-header">
+                    <span class="chat-conversations-title">Conversations</span>
+                    <button type="button" id="new-chat-btn" title="New Chat" class="new-chat-btn" aria-label="Create new conversation">
+                        <span class="material-symbols-outlined">add</span>
+                    </button>
+                </div>
+                <div class="chat-conversations-list" id="chat-conversations-list">
+                    <!-- Skeleton loaders for conversations -->
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    
+                    <div class="chat-conversations-empty">No conversations yet. Start a new chat!</div>
+                </div>
+            </aside>
+
             <div class="chat-wrapper">
-                <aside class="chat-guest-wall" id="chat-guest-wall" aria-label="Event guests">
-                    <div class="chat-guest-wall-title">Guests</div>
-                    <div class="chat-guest-wall-list" id="chat-guest-wall-list">
-                        <div class="chat-guest-wall-empty">Loading guests...</div>
-                    </div>
-                </aside>
 
                 <!-- Messages Area -->
                 <div class="messages-area">
+                    <!-- Skeleton loaders for messages -->
+                    <div class="skeleton-message assistant">
+                        <div class="skeleton-message-bubble"></div>
+                    </div>
+                    <div class="skeleton-message user">
+                        <div class="skeleton-message-bubble"></div>
+                    </div>
+                    <div class="skeleton-message assistant">
+                        <div class="skeleton-message-bubble"></div>
+                    </div>
+                    
                     <div class="message-group assistant">
                         <div class="message-bubble">
                             <div class="message-text">Loading chat history...</div>
@@ -65,9 +81,22 @@
                 <!-- Input Area -->
                 <div class="input-area">
                     <div class="chat-composer">
-                        <button class="input-action-btn input-plus-btn" id="chat-attach-btn" title="Upload image">
-                            <span class="material-symbols-outlined">add</span>
-                        </button>
+                        <div class="attach-wrap">
+                          <button class="input-action-btn input-plus-btn" id="chat-attach-btn" aria-haspopup="true" aria-expanded="false" title="Attachments">
+                              <span class="material-symbols-outlined">add</span>
+                          </button>
+
+                          <div class="attach-menu" id="chat-attach-menu" aria-hidden="true">
+                              <button type="button" class="attach-option" id="chat-attach-upload">
+                                  <span class="material-symbols-outlined">attach_file</span>
+                                  <span class="attach-text">Upload image</span>
+                              </button>
+                              <button type="button" class="attach-option" id="chat-attach-camera">
+                                  <span class="material-symbols-outlined">photo_camera</span>
+                                  <span class="attach-text">Take photo</span>
+                              </button>
+                          </div>
+                        </div>
 
                         <div class="input-wrapper">
                             <div class="file-preview" id="chat-file-preview"></div>
@@ -75,9 +104,7 @@
                         </div>
 
                         <div class="composer-right-actions">
-                            <button class="input-action-btn mic-btn" id="chat-mic-btn" title="Voice input">
-                                <span class="material-symbols-outlined">mic</span>
-                            </button>
+                            <!-- mic removed per design -->
                             <button class="send-btn" title="Send message">
                                 <span class="material-symbols-outlined">arrow_upward</span>
                             </button>
@@ -85,7 +112,21 @@
 
                         <input type="file" id="chat-image-input" class="chat-hidden-file-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" aria-label="Upload image">
                     </div>
+                    <p class="chat-input-info">Image responses may take a few seconds to generate.</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- camera modal for capturing photos -->
+    <div class="camera-modal" id="chat-camera-modal" aria-hidden="true">
+        <div class="camera-modal-content">
+            <div class="camera-modal-instructions">Please make sure you're photographing a person before capturing.</div>
+            <video id="chat-camera-video" autoplay playsinline></video>
+            <canvas id="chat-camera-canvas" style="display:none;"></canvas>
+            <div class="camera-actions">
+                <button type="button" id="chat-camera-capture" class="btn btn-primary btn-sm">Capture</button>
+                <button type="button" id="chat-camera-close" class="btn btn-secondary btn-sm">Cancel</button>
             </div>
         </div>
     </div>
@@ -100,7 +141,21 @@
         .chat-main {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: 260px 1fr;
+            gap: 0;
+            min-height: 0;
+            margin-top: 56px;
+        }
+
+        .chat-wrapper {
+            display: grid;
+            grid-template-rows: 1fr auto;
+            gap: 0;
+            min-height: 0;
+        }
+
+        .input-area {
+            flex-shrink: 0;
         }
 
         .user-main {

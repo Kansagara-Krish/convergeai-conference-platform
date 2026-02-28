@@ -200,6 +200,21 @@ Requirements:
 
         db.session.commit()
 
+    def ensure_conversation_schema():
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+
+        if 'messages' in table_names:
+            columns = {column['name'] for column in inspector.get_columns('messages')}
+            if 'conversation_id' not in columns:
+                db.session.execute(text(
+                    """
+                    ALTER TABLE messages
+                    ADD COLUMN conversation_id INTEGER
+                    """
+                ))
+                db.session.commit()
+
     should_bootstrap_db = not (
         len(sys.argv) > 1 and sys.argv[1] == 'db'
     )
@@ -209,6 +224,7 @@ Requirements:
         with app.app_context():
             db.create_all()
             ensure_chatbot_prompt_columns()
+            ensure_conversation_schema()
             remove_unused_model_columns()
     
     return app
@@ -221,6 +237,6 @@ if __name__ == '__main__':
     app = create_app()
     app.run(
         host='0.0.0.0',
-        port=5050,
+        port=5000,
         debug=app.config['DEBUG']
     )

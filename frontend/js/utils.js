@@ -13,24 +13,19 @@ function resolveApiBaseUrl() {
   }
 
   const { protocol, hostname, port } = window.location;
-  const apiHost = hostname === "localhost" ? "127.0.0.1" : hostname;
 
-  if (
-    (hostname === "localhost" || hostname === "127.0.0.1") &&
-    port === "5000"
-  ) {
+  // If running on the same host but different ports, use the same hostname
+  if ((hostname === "localhost" || hostname === "127.0.0.1") && port === "5000") {
     return "";
   }
 
   if (protocol === "file:") {
-    return "http://127.0.0.1:5000";
+    return "http://localhost:5000";
   }
 
-  if (port === "8000") {
-    return `${protocol}//${apiHost}:5000`;
-  }
-
-  return "";
+  // For remote development/Docker: use same hostname as frontend but port 5000
+  // This prevents CORS issues when frontend and backend are on same network
+  return `${protocol}//${hostname}:5000`;
 }
 
 const API_BASE_URL = resolveApiBaseUrl();

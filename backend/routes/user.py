@@ -10,10 +10,10 @@ import os
 import requests
 
 try:
-    from models import db, Chatbot, Message, ChatbotParticipant, User
+    from models import db, Chatbot, Message, ChatbotParticipant, User, Conversation
     from routes.auth import token_required
 except ImportError:
-    from backend.models import db, Chatbot, Message, ChatbotParticipant, User
+    from backend.models import db, Chatbot, Message, ChatbotParticipant, User, Conversation
     from backend.routes.auth import token_required
 
 user_bp = Blueprint('user', __name__)
@@ -152,6 +152,44 @@ def _sync_inactive_if_expired(chatbot):
         chatbot.active = False
         db.session.commit()
     return expired
+
+
+def _get_participant(chatbot_id, user_id):
+    return ChatbotParticipant.query.filter(
+        and_(
+            ChatbotParticipant.chatbot_id == chatbot_id,
+            ChatbotParticipant.user_id == user_id
+        )
+    ).first()
+
+
+def _get_conversation_for_user(chatbot_id, conversation_id, user_id):
+    if not conversation_id:
+        return None
+
+    return Conversation.query.filter(
+        and_(
+            Conversation.id == conversation_id,
+            Conversation.chatbot_id == chatbot_id,
+            Conversation.user_id == user_id,
+        )
+    ).first()
+
+
+def _serialize_conversation(conversation):
+    data = conversation.to_dict()
+    latest_message = (
+        Message.query
+        .filter_by(conversation_id=conversation.id)
+        .order_by(Message.created_at.desc())
+        .first()
+    )
+    message_count = Message.query.filter_by(conversation_id=conversation.id).count()
+
+    data['message_count'] = message_count
+    data['last_message_at'] = latest_message.created_at.isoformat() if latest_message else None
+    data['last_message_preview'] = (latest_message.content[:120] if latest_message and latest_message.content else '')
+    return data
 
 # ============================================
 # Available Chatbots
@@ -311,26 +349,150 @@ def update_profile(user):
     }), 200
 
 # ============================================
-# Messages (Placeholder for future chat feature)
+# Conversations
+# ============================================
+
+@user_bp.route('/chatbots/<int:chatbot_id>/conversations', methods=['GET'])
+@token_required
+def list_conversations(user, chatbot_id):
+    participant = _get_participant(chatbot_id, user.id)
+    if not participant:
+        return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
+
+    rows = (
+        Conversation.query
+        .filter_by(chatbot_id=chatbot_id, user_id=user.id)
+        .order_by(Conversation.updated_at.desc(), Conversation.id.desc())
+        .all()
+    )
+
+    return jsonify({
+        'success': True,
+        'data': [_serialize_conversation(row) for row in rows]
+    }), 200
+
+
+@user_bp.route('/chatbots/<int:chatbot_id>/conversations', methods=['POST'])
+@token_required
+def create_conversation(user, chatbot_id):
+    participant = _get_participant(chatbot_id, user.id)
+    if not participant:
+        return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
+
+    data = request.get_json(silent=True) or {}
+    title = str(data.get('title', '')).strip() or 'New chat'
+
+    conversation = Conversation(
+        chatbot_id=chatbot_id,
+        user_id=user.id,
+        title=title,
+        updated_at=datetime.utcnow(),
+    )
+    db.session.add(conversation)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Conversation created',
+        'data': _serialize_conversation(conversation)
+    }), 201
+
+
+@user_bp.route('/chatbots/<int:chatbot_id>/conversations/<int:conversation_id>', methods=['PUT'])
+@token_required
+def rename_conversation(user, chatbot_id, conversation_id):
+    participant = _get_participant(chatbot_id, user.id)
+    if not participant:
+        return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
+
+    conversation = _get_conversation_for_user(chatbot_id, conversation_id, user.id)
+    if not conversation:
+        return jsonify({'success': False, 'message': 'Conversation not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    title = str(data.get('title', '')).strip()
+    if not title:
+        return jsonify({'success': False, 'message': 'Conversation title is required'}), 400
+
+    conversation.title = title
+    conversation.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Conversation updated',
+        'data': _serialize_conversation(conversation)
+    }), 200
+
+
+@user_bp.route('/chatbots/<int:chatbot_id>/conversations/<int:conversation_id>', methods=['DELETE'])
+@token_required
+def delete_conversation(user, chatbot_id, conversation_id):
+    participant = _get_participant(chatbot_id, user.id)
+    if not participant:
+        return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
+
+    conversation = _get_conversation_for_user(chatbot_id, conversation_id, user.id)
+    if not conversation:
+        return jsonify({'success': False, 'message': 'Conversation not found'}), 404
+
+    Message.query.filter_by(conversation_id=conversation.id).delete()
+    db.session.delete(conversation)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Conversation deleted'
+    }), 200
+
+
+@user_bp.route('/chatbots/<int:chatbot_id>/conversations/<int:conversation_id>/messages', methods=['GET'])
+@token_required
+def get_conversation_messages(user, chatbot_id, conversation_id):
+    participant = _get_participant(chatbot_id, user.id)
+    if not participant:
+        return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
+
+    conversation = _get_conversation_for_user(chatbot_id, conversation_id, user.id)
+    if not conversation:
+        return jsonify({'success': False, 'message': 'Conversation not found'}), 404
+
+    messages = (
+        Message.query
+        .filter_by(chatbot_id=chatbot_id, user_id=user.id, conversation_id=conversation.id)
+        .order_by(Message.created_at)
+        .all()
+    )
+
+    return jsonify({
+        'success': True,
+        'data': [message.to_dict() for message in messages]
+    }), 200
+
+
+# ============================================
+# Messages
 # ============================================
 
 @user_bp.route('/chatbots/<int:chatbot_id>/messages', methods=['GET'])
 @token_required
 def get_chatbot_messages(user, chatbot_id):
     """Get messages for a chatbot"""
-    
-    # Check if user is participant
-    participant = ChatbotParticipant.query.filter(
-        and_(
-            ChatbotParticipant.chatbot_id == chatbot_id,
-            ChatbotParticipant.user_id == user.id
-        )
-    ).first()
-    
+
+    participant = _get_participant(chatbot_id, user.id)
     if not participant:
         return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
-    
-    messages = Message.query.filter_by(chatbot_id=chatbot_id).order_by(Message.created_at).all()
+
+    conversation_id = request.args.get('conversation_id', type=int)
+    query = Message.query.filter_by(chatbot_id=chatbot_id, user_id=user.id)
+
+    if conversation_id:
+        conversation = _get_conversation_for_user(chatbot_id, conversation_id, user.id)
+        if not conversation:
+            return jsonify({'success': False, 'message': 'Conversation not found'}), 404
+        query = query.filter_by(conversation_id=conversation.id)
+
+    messages = query.order_by(Message.created_at).all()
     
     return jsonify({
         'success': True,
@@ -341,15 +503,8 @@ def get_chatbot_messages(user, chatbot_id):
 @token_required
 def send_message(user, chatbot_id):
     """Send message in chatbot"""
-    
-    # Check if user is participant
-    participant = ChatbotParticipant.query.filter(
-        and_(
-            ChatbotParticipant.chatbot_id == chatbot_id,
-            ChatbotParticipant.user_id == user.id
-        )
-    ).first()
-    
+
+    participant = _get_participant(chatbot_id, user.id)
     if not participant:
         return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
 
@@ -366,6 +521,26 @@ def send_message(user, chatbot_id):
     
     data = request.form.to_dict() if request.form else (request.get_json() or {})
     content = str(data.get('content', '')).strip()
+    conversation_id = data.get('conversation_id')
+
+    try:
+        conversation_id = int(conversation_id) if conversation_id is not None and str(conversation_id).strip() else None
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Invalid conversation_id'}), 400
+
+    conversation = _get_conversation_for_user(chatbot_id, conversation_id, user.id) if conversation_id else None
+    if conversation_id and not conversation:
+        return jsonify({'success': False, 'message': 'Conversation not found'}), 404
+
+    if not conversation:
+        conversation = Conversation(
+            chatbot_id=chatbot_id,
+            user_id=user.id,
+            title='New chat',
+            updated_at=datetime.utcnow(),
+        )
+        db.session.add(conversation)
+        db.session.flush()
 
     uploaded_image = request.files.get('image') if request.files else None
     image_payload = None
@@ -396,6 +571,7 @@ def send_message(user, chatbot_id):
     message = Message(
         chatbot_id=chatbot_id,
         user_id=user.id,
+        conversation_id=conversation.id,
         content=content,
         is_user_message=True
     )
@@ -405,6 +581,10 @@ def send_message(user, chatbot_id):
     # Update participant activity
     participant.last_active = db.func.now()
     participant.message_count += 1
+    conversation.updated_at = datetime.utcnow()
+
+    if conversation.title == 'New chat' and content and content != '[Image uploaded]':
+        conversation.title = content[:60]
     
     db.session.commit()
     
@@ -419,6 +599,7 @@ def send_message(user, chatbot_id):
     bot_response = Message(
         chatbot_id=chatbot_id,
         user_id=user.id,
+        conversation_id=conversation.id,
         content=bot_reply_text,
         is_user_message=False
     )
@@ -430,6 +611,7 @@ def send_message(user, chatbot_id):
         'success': True,
         'message': 'Message sent successfully',
         'data': {
+            'conversation': _serialize_conversation(conversation),
             'user_message': message.to_dict(),
             'bot_response': bot_response.to_dict()
         }
