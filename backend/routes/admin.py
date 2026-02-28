@@ -434,6 +434,10 @@ def create_user(user):
     if role not in ['admin', 'user', 'speaker']:
         return jsonify({'success': False, 'message': 'Invalid role'}), 400
 
+    # Prevent regular admin users from creating other admin accounts
+    if role == 'admin' and getattr(user, 'role', None) == 'admin':
+        return jsonify({'success': False, 'message': 'You are not allowed to create admin users'}), 403
+
     if User.query.filter_by(email=email).first():
         return jsonify({'success': False, 'message': 'Email already exists'}), 409
 
@@ -543,6 +547,9 @@ def update_user(user, user_id):
     if 'active' in data:
         target_user.active = data['active']
     if 'role' in data and data['role'] in ['admin', 'user', 'speaker']:
+        # Prevent regular admin users from promoting others to admin
+        if data['role'] == 'admin' and getattr(user, 'role', None) == 'admin':
+            return jsonify({'success': False, 'message': 'You are not allowed to assign admin role'}), 403
         target_user.role = data['role']
     if 'name' in data:
         target_user.name = data['name']
@@ -1053,6 +1060,10 @@ def import_users_from_excel(user):
                 continue
 
             if role not in ['admin', 'user', 'speaker']:
+                role = 'user'
+
+            # Prevent regular admin users from importing/creating admin accounts
+            if role == 'admin' and getattr(user, 'role', None) == 'admin':
                 role = 'user'
 
             if User.query.filter_by(email=email).first() is not None:

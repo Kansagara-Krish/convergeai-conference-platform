@@ -32,6 +32,7 @@ class User(db.Model):
     # Relationships
     chatbots = db.relationship('Chatbot', backref='creator', lazy=True, foreign_keys='Chatbot.created_by_id')
     messages = db.relationship('Message', backref='user', lazy=True, cascade='all, delete-orphan')
+    conversations = db.relationship('Conversation', backref='user', lazy=True, cascade='all, delete-orphan')
     guests = db.relationship('Guest', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
@@ -118,6 +119,7 @@ class Chatbot(db.Model):
     # Relationships
     guests = db.relationship('Guest', backref='chatbot', lazy=True, cascade='all, delete-orphan')
     messages = db.relationship('Message', backref='chatbot', lazy=True, cascade='all, delete-orphan')
+    conversations = db.relationship('Conversation', backref='chatbot', lazy=True, cascade='all, delete-orphan')
     participants = db.relationship('ChatbotParticipant', backref='chatbot', lazy=True, cascade='all, delete-orphan')
     
     @property
@@ -202,6 +204,33 @@ class Guest(db.Model):
         return data
 
 # ============================================
+# Conversation Model
+# ============================================
+
+class Conversation(db.Model):
+    """Per-user conversation history for a chatbot."""
+    __tablename__ = 'conversations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chatbot_id = db.Column(db.Integer, db.ForeignKey('chatbots.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    title = db.Column(db.String(255), nullable=False, default='New chat')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    messages = db.relationship('Message', backref='conversation', lazy=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'chatbot_id': self.chatbot_id,
+            'user_id': self.user_id,
+            'title': self.title,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+# ============================================
 # Message Model
 # ============================================
 
@@ -212,6 +241,7 @@ class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     chatbot_id = db.Column(db.Integer, db.ForeignKey('chatbots.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('conversations.id'), nullable=True, index=True)
     
     content = db.Column(db.Text, nullable=False)
     is_user_message = db.Column(db.Boolean, default=True)
@@ -225,6 +255,7 @@ class Message(db.Model):
             'content': self.content,
             'sender': 'user' if self.is_user_message else 'bot',
             'timestamp': self.created_at.isoformat(),
+            'conversation_id': self.conversation_id,
             'user': self.user.to_dict() if self.user else None,
         }
 

@@ -2087,7 +2087,6 @@ class UserManagementHandler {
               <label for="single-user-role">User Role</label>
               <select id="single-user-role" name="role" class="single-user-role-select" style="width: 100%;">
                 <option value="user">User</option>
-                <option value="admin">Admin</option>
               </select>
             </div>
             <div class="form-group single-user-active-wrap" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
@@ -2149,6 +2148,9 @@ class UserManagementHandler {
 
     updateSubmitLabelByRole();
     if (roleSelect) {
+      // restrict role selection to 'user' only; admins cannot create admins here
+      roleSelect.innerHTML = '<option value="user">User</option>';
+      roleSelect.value = "user";
       roleSelect.addEventListener("change", updateSubmitLabelByRole);
     }
 

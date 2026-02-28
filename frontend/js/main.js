@@ -34,6 +34,7 @@ class UserPanel {
         e.preventDefault();
         e.stopPropagation();
         DomUtils.toggleClass(userDropdown, "active");
+        DomUtils.toggleClass(userBtn, "active");
       });
 
       userDropdown.addEventListener("click", (e) => {
@@ -42,6 +43,7 @@ class UserPanel {
 
       document.addEventListener("click", () => {
         DomUtils.removeClass(userDropdown, "active");
+        DomUtils.removeClass(userBtn, "active");
       });
     }
 
@@ -133,6 +135,8 @@ class ChatInterface {
     this.messagesArea = DomUtils.$(".messages-area");
     this.inputField = DomUtils.$(".input-field");
     this.sendBtn = DomUtils.$(".send-btn");
+    this.convListEl = DomUtils.$("#chat-conversations-list");
+    this.newChatBtn = DomUtils.$("#new-chat-btn");
     this.inputArea = DomUtils.$(".input-area");
     this.attachBtn = DomUtils.$("#chat-attach-btn");
     this.imageInput = DomUtils.$("#chat-image-input");
@@ -145,14 +149,255 @@ class ChatInterface {
     this.selectedImageFile = null;
     this.selectedImagePreviewUrl = null;
     this.typingIndicatorEl = null;
+    this.handleWindowResize = () => this.updateMessageViewportInset();
     this.chatUnavailable = false;
     this.chatUnavailableMessage = "";
     // chatbotId will be initialized via helper below
     this.chatbotId = null;
     this.messages = [];
+    this.conversations = [];
+    this.currentConversationId = null;
     // set id then start
     this.chatbotId = this.getChatbotId();
     this.init();
+  }
+
+  // --- Conversation API helpers ---
+  async loadConversations() {
+    const response = await API.get(
+      `/api/user/chatbots/${this.chatbotId}/conversations`,
+    );
+    this.conversations = Array.isArray(response?.data) ? response.data : [];
+    this.renderConversations();
+    return this.conversations;
+  }
+
+  renderConversations() {
+    if (!this.convListEl) return;
+
+    // Hide skeleton loaders
+    const skeletons = this.convListEl.querySelectorAll(
+      ".skeleton-conversation",
+    );
+    skeletons.forEach((s) => (s.style.display = "none"));
+
+    if (!this.conversations || this.conversations.length === 0) {
+      this.convListEl.innerHTML =
+        '<div class="chat-conversations-empty">No conversations</div>';
+      return;
+    }
+    this.convListEl.innerHTML = this.conversations
+      .map(
+        (
+          c,
+        ) => `<div class="conversation-item ${this.currentConversationId === c.id ? "active" : ""}" data-id="${c.id}">
+        <span class="conv-title">${this.escapeHtml(c.title || "New chat")}</span>
+        <div class="conv-menu-container">
+          <button class="conv-menu-btn" title="More options" aria-label="More options">
+            <span class="material-symbols-outlined">more_vert</span>
+          </button>
+          <div class="conv-menu-dropdown">
+            <button class="conv-menu-item conv-rename-item">Rename</button>
+            <button class="conv-menu-item conv-delete-item">Delete</button>
+          </div>
+        </div>
+      </div>`,
+      )
+      .join("");
+
+    this.convListEl.querySelectorAll(".conversation-item").forEach((el) => {
+      const id = parseInt(el.dataset.id);
+      const titleEl = el.querySelector(".conv-title");
+      const menuBtn = el.querySelector(".conv-menu-btn");
+      const dropdown = el.querySelector(".conv-menu-dropdown");
+      const renameBtn = el.querySelector(".conv-rename-item");
+      const deleteBtn = el.querySelector(".conv-delete-item");
+
+      // Handle conversation selection
+      titleEl.addEventListener("click", () => this.selectConversation(id));
+
+      // Handle menu toggle
+      menuBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains("active");
+        this.convListEl
+          .querySelectorAll(".conv-menu-dropdown")
+          .forEach((d) => d.classList.remove("active"));
+        if (!isOpen) {
+          dropdown.classList.add("active");
+        }
+      });
+
+      // Handle rename
+      renameBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        dropdown.classList.remove("active");
+        this.showRenameConversationModal(id, titleEl.textContent);
+      });
+
+      // Handle delete
+      deleteBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        dropdown.classList.remove("active");
+        this.showDeleteConversationModal(id, titleEl.textContent);
+      });
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener("click", () => {
+      this.convListEl
+        .querySelectorAll(".conv-menu-dropdown")
+        .forEach((d) => d.classList.remove("active"));
+    });
+  }
+
+  showDeleteConversationModal(conversationId, conversationTitle) {
+    const modal = document.createElement("div");
+    modal.className = "delete-modal-overlay";
+    modal.innerHTML = `
+      <div class="delete-modal">
+        <div class="delete-modal-header">
+          <h3>Delete Conversation?</h3>
+          <button class="delete-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="delete-modal-body">
+          <p>Are you sure you want to delete <strong>${this.escapeHtml(conversationTitle || "this conversation")}</strong>? This action cannot be undone.</p>
+        </div>
+        <div class="delete-modal-footer">
+          <button class="delete-modal-cancel">Cancel</button>
+          <button class="delete-modal-confirm">Delete</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    const confirm = async () => {
+      closeModal();
+      try {
+        await API.delete(
+          `/api/user/chatbots/${this.chatbotId}/conversations/${conversationId}`,
+        );
+        this.conversations = this.conversations.filter(
+          (row) => row.id !== conversationId,
+        );
+        if (this.currentConversationId === conversationId) {
+          this.currentConversationId = null;
+          this.messagesArea.innerHTML = "";
+          if (this.conversations.length > 0) {
+            await this.selectConversation(this.conversations[0].id);
+          }
+        }
+        this.renderConversations();
+        NotificationManager.success("Conversation deleted");
+      } catch (error) {
+        NotificationManager.error(
+          error.message || "Failed to delete conversation",
+        );
+      }
+    };
+
+    modal
+      .querySelector(".delete-modal-close")
+      .addEventListener("click", closeModal);
+    modal
+      .querySelector(".delete-modal-cancel")
+      .addEventListener("click", closeModal);
+    modal
+      .querySelector(".delete-modal-confirm")
+      .addEventListener("click", confirm);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  showRenameConversationModal(conversationId, currentTitle) {
+    const modal = document.createElement("div");
+    modal.className = "rename-modal-overlay";
+    modal.innerHTML = `
+      <div class="rename-modal">
+        <div class="rename-modal-header">
+          <h3>Rename Conversation</h3>
+          <button class="rename-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="rename-modal-body">
+          <input type="text" class="rename-modal-input" value="${this.escapeHtml(currentTitle)}" placeholder="Enter new name" autofocus>
+        </div>
+        <div class="rename-modal-footer">
+          <button class="rename-modal-cancel">Cancel</button>
+          <button class="rename-modal-confirm">Rename</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    const inputEl = modal.querySelector(".rename-modal-input");
+
+    const confirmRename = async () => {
+      const newTitle = (inputEl.value || "").trim();
+      if (!newTitle) {
+        NotificationManager.error("Name cannot be empty");
+        return;
+      }
+      closeModal();
+      try {
+        const response = await API.put(
+          `/api/user/chatbots/${this.chatbotId}/conversations/${conversationId}`,
+          { title: newTitle },
+        );
+        const updated = response?.data;
+        if (updated) {
+          this.conversations = this.conversations.map((row) =>
+            row.id === conversationId ? updated : row,
+          );
+          this.renderConversations();
+          NotificationManager.success("Conversation renamed");
+        }
+      } catch (error) {
+        NotificationManager.error(
+          error.message || "Failed to rename conversation",
+        );
+      }
+    };
+
+    modal
+      .querySelector(".rename-modal-close")
+      .addEventListener("click", closeModal);
+    modal
+      .querySelector(".rename-modal-cancel")
+      .addEventListener("click", closeModal);
+    modal
+      .querySelector(".rename-modal-confirm")
+      .addEventListener("click", confirmRename);
+    inputEl.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") confirmRename();
+    });
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  async createConversation(title = "New chat") {
+    const response = await API.post(
+      `/api/user/chatbots/${this.chatbotId}/conversations`,
+      { title },
+    );
+    const created = response?.data;
+    if (!created) return;
+    this.conversations = [
+      created,
+      ...this.conversations.filter((row) => row.id !== created.id),
+    ];
+    this.renderConversations();
+    await this.selectConversation(created.id);
+  }
+
+  async selectConversation(id) {
+    this.currentConversationId = id;
+    this.renderConversations();
+    this.messagesArea.innerHTML = "";
+    await this.loadMessages(id);
   }
 
   getChatbotId() {
@@ -213,6 +458,7 @@ class ChatInterface {
     }
 
     this.setInputVisible(false);
+    this.updateMessageViewportInset();
 
     if (!this.chatbotId) {
       await this.resolveDefaultChatbotId();
@@ -232,20 +478,47 @@ class ChatInterface {
         this.sendMessage();
       }
     });
-    this.inputField.addEventListener("input", () => this.autoResizeInput());
+    this.inputField.addEventListener("input", () => {
+      this.autoResizeInput();
+      this.updateSendButtonState();
+    });
 
     this.setupAttachmentHandlers();
+
+    try {
+      await this.loadConversations();
+      if (this.conversations.length === 0) {
+        await this.createConversation("New chat");
+      } else {
+        await this.selectConversation(this.conversations[0].id);
+      }
+    } catch (error) {
+      console.error("Error loading conversations:", error);
+      NotificationManager.error(
+        error.message || "Failed to load conversations",
+      );
+    }
+
+    if (this.newChatBtn) {
+      this.newChatBtn.addEventListener("click", async () => {
+        try {
+          await this.createConversation("New chat");
+        } catch (error) {
+          NotificationManager.error(
+            error.message || "Failed to create conversation",
+          );
+        }
+      });
+    }
+
+    // initialize send button state
+    this.updateSendButtonState();
 
     const chatbotMeta = await this.loadChatbotMeta();
 
     if (!chatbotMeta) {
       this.setInputVisible(false);
       return;
-    }
-
-    // show gemini key if present for confirmation
-    if (chatbotMeta && chatbotMeta.gemini_api_key) {
-      this.addMessage(`Gemini API key: ${chatbotMeta.gemini_api_key}`, "bot");
     }
 
     // prepare overlay support
@@ -261,16 +534,31 @@ class ChatInterface {
       return;
     }
 
-    // Play welcome intro first
-    await this.playWelcomeIntro(chatbotMeta);
-
-    // Load message history
-    await this.loadMessages();
+    // Load message history for selected conversation
+    if (this.currentConversationId) {
+      await this.loadMessages(this.currentConversationId);
+    }
 
     // Enable input and show it
     this.setInputVisible(true);
     this.autoResizeInput();
     this.setupAutoScroll();
+    this.updateMessageViewportInset();
+  }
+
+  updateSendButtonState() {
+    const hasText = Boolean(this.inputField && this.inputField.value.trim());
+    const hasImage = Boolean(this.selectedImageFile);
+    if (!this.sendBtn) return;
+    if (hasText || hasImage) {
+      this.sendBtn.disabled = false;
+      this.sendBtn.style.opacity = "";
+      this.sendBtn.classList.remove("send-disabled");
+    } else {
+      this.sendBtn.disabled = true;
+      this.sendBtn.style.opacity = "0.45";
+      this.sendBtn.classList.add("send-disabled");
+    }
   }
 
   autoResizeInput() {
@@ -280,6 +568,22 @@ class ChatInterface {
     this.inputField.style.height = `${Math.max(nextHeight, 24)}px`;
     this.inputField.style.overflowY =
       this.inputField.scrollHeight > 160 ? "auto" : "hidden";
+    this.updateMessageViewportInset();
+  }
+
+  updateMessageViewportInset() {
+    if (!this.messagesArea) return;
+
+    const isInputVisible =
+      this.inputArea && !this.inputArea.classList.contains("chat-input-hidden");
+    const bottomInset = isInputVisible
+      ? Math.max((this.inputArea?.offsetHeight || 0) + 18, 110)
+      : 24;
+
+    this.messagesArea.style.setProperty(
+      "--chat-bottom-inset",
+      `${bottomInset}px`,
+    );
   }
 
   renderNoChatbotState() {
@@ -304,6 +608,10 @@ class ChatInterface {
     const selectedImage = this.selectedImageFile;
     if (!text && !selectedImage) return;
 
+    if (!this.currentConversationId) {
+      await this.createConversation("New chat");
+    }
+
     const userMessagePreview = text || "[Image uploaded]";
 
     this.addMessage(userMessagePreview, "user");
@@ -318,14 +626,22 @@ class ChatInterface {
 
       let response;
       try {
-        response = await this.postChatMessage(text, selectedImage);
+        response = await this.postChatMessage(
+          text,
+          selectedImage,
+          this.currentConversationId,
+        );
       } catch (error) {
         if (this.isNotJoinedError(error)) {
           const joined = await this.joinCurrentChatbotSilently();
           if (!joined) {
             throw error;
           }
-          response = await this.postChatMessage(text, selectedImage);
+          response = await this.postChatMessage(
+            text,
+            selectedImage,
+            this.currentConversationId,
+          );
         } else {
           throw error;
         }
@@ -333,6 +649,18 @@ class ChatInterface {
 
       const payload = response?.data || {};
       const botResponse = payload.bot_response;
+      const updatedConversation = payload.conversation;
+
+      if (updatedConversation?.id) {
+        this.conversations = [
+          updatedConversation,
+          ...this.conversations.filter(
+            (row) => row.id !== updatedConversation.id,
+          ),
+        ];
+        this.currentConversationId = updatedConversation.id;
+        this.renderConversations();
+      }
 
       if (botResponse?.content) {
         this.addMessage(botResponse.content, "bot", botResponse.timestamp);
@@ -347,11 +675,14 @@ class ChatInterface {
     }
   }
 
-  async postChatMessage(text, selectedImage) {
+  async postChatMessage(text, selectedImage, conversationId) {
     if (selectedImage) {
       const formData = new FormData();
       formData.append("content", text);
       formData.append("image", selectedImage);
+      if (conversationId) {
+        formData.append("conversation_id", String(conversationId));
+      }
       return API.post(
         `/api/user/chatbots/${this.chatbotId}/messages`,
         formData,
@@ -360,6 +691,7 @@ class ChatInterface {
 
     return API.post(`/api/user/chatbots/${this.chatbotId}/messages`, {
       content: text,
+      conversation_id: conversationId,
     });
   }
 
@@ -385,9 +717,58 @@ class ChatInterface {
 
   setupAttachmentHandlers() {
     if (this.attachBtn && this.imageInput) {
-      this.attachBtn.addEventListener("click", () => {
-        this.imageInput.click();
+      // Toggle attach menu instead of instantly opening file picker
+      const attachMenu = DomUtils.$("#chat-attach-menu");
+      const attachUpload = DomUtils.$("#chat-attach-upload");
+      const attachCamera = DomUtils.$("#chat-attach-camera");
+
+      const closeAttachMenu = () => {
+        if (!attachMenu) return;
+        attachMenu.setAttribute("aria-hidden", "true");
+        this.attachBtn.setAttribute("aria-expanded", "false");
+        attachMenu.classList.remove("active");
+      };
+
+      const openAttachMenu = () => {
+        if (!attachMenu) return;
+        attachMenu.setAttribute("aria-hidden", "false");
+        this.attachBtn.setAttribute("aria-expanded", "true");
+        attachMenu.classList.add("active");
+      };
+
+      this.attachBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (attachMenu && attachMenu.classList.contains("active")) {
+          closeAttachMenu();
+        } else {
+          openAttachMenu();
+        }
       });
+
+      // Close menu when clicking outside
+      document.addEventListener("click", (ev) => {
+        const target = ev.target;
+        if (!attachMenu) return;
+        if (!attachMenu.contains(target) && target !== this.attachBtn) {
+          closeAttachMenu();
+        }
+      });
+
+      if (attachUpload) {
+        attachUpload.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          closeAttachMenu();
+          this.imageInput.click();
+        });
+      }
+
+      if (attachCamera) {
+        attachCamera.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          closeAttachMenu();
+          this.openCameraModal();
+        });
+      }
 
       this.imageInput.addEventListener("change", () => {
         const file = this.imageInput.files?.[0] || null;
@@ -420,8 +801,124 @@ class ChatInterface {
 
         this.selectedImageFile = file;
         this.renderAttachmentPreview();
+        this.updateSendButtonState();
       });
     }
+  }
+
+  // Camera modal helpers
+  openCameraModal() {
+    // ask user to confirm that the photo should contain a person
+    if (
+      !confirm(
+        "Please make sure the photo contains a person before continuing.",
+      )
+    ) {
+      return;
+    }
+    const modal = DomUtils.$("#chat-camera-modal");
+    const video = DomUtils.$("#chat-camera-video");
+    if (!modal || !video) return;
+    modal.classList.add("active");
+    modal.setAttribute("aria-hidden", "false");
+    this._startCameraStream();
+
+    const captureBtn = DomUtils.$("#chat-camera-capture");
+    const closeBtn = DomUtils.$("#chat-camera-close");
+
+    if (captureBtn) {
+      captureBtn.onclick = async () => {
+        await this._captureCameraPhoto();
+      };
+    }
+
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        this.closeCameraModal();
+      };
+    }
+  }
+
+  closeCameraModal() {
+    const modal = DomUtils.$("#chat-camera-modal");
+    if (!modal) return;
+    modal.classList.remove("active");
+    modal.setAttribute("aria-hidden", "true");
+    this._stopCameraStream();
+  }
+
+  async _startCameraStream() {
+    try {
+      const video = DomUtils.$("#chat-camera-video");
+      if (!video) return;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      video.srcObject = stream;
+      video.play();
+      this._cameraStream = stream;
+    } catch (err) {
+      console.error("Camera access denied or unavailable:", err);
+      const reason = err && err.message ? ` (${err.message})` : "";
+      NotificationManager.error(
+        "Unable to access camera — check your browser permissions, ensure a camera is connected, and that the page is served over HTTPS." +
+          reason,
+      );
+      this.closeCameraModal();
+    }
+  }
+
+  _stopCameraStream() {
+    const stream = this._cameraStream;
+    if (!stream) return;
+    try {
+      stream.getTracks().forEach((t) => t.stop());
+    } catch (e) {
+      // ignore
+    }
+    this._cameraStream = null;
+    const video = DomUtils.$("#chat-camera-video");
+    if (video) video.srcObject = null;
+  }
+
+  async _captureCameraPhoto() {
+    const video = DomUtils.$("#chat-camera-video");
+    const canvas = DomUtils.$("#chat-camera-canvas");
+    if (!video || !canvas) return;
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          NotificationManager.error("Capture failed");
+          resolve(null);
+          return;
+        }
+
+        const file = new File([blob], `capture_${Date.now()}.png`, {
+          type: blob.type,
+        });
+
+        // Ask the user to confirm the photo contains a person before accepting
+        const confirmMsg =
+          "Does this photo contain a person? Click OK to use it, Cancel to retake.";
+        const ok = window.confirm(confirmMsg);
+        if (ok) {
+          this.selectedImageFile = file;
+          this.renderAttachmentPreview();
+          this.closeCameraModal();
+          resolve(file);
+        } else {
+          // Keep the camera modal open to allow retake
+          NotificationManager.info("Please retake the photo");
+          resolve(null);
+        }
+      }, "image/png");
+    });
   }
 
   renderAttachmentPreview() {
@@ -465,6 +962,7 @@ class ChatInterface {
       this.filePreview.innerHTML = "";
       this.filePreview.style.display = "none";
     }
+    this.updateSendButtonState();
   }
 
   addMessage(text, sender, messageTimestamp = null) {
@@ -499,7 +997,7 @@ class ChatInterface {
 
     const indicator = DomUtils.create("div", "message-group assistant");
     indicator.innerHTML = `
-      <div class="message-bubble">
+      <div class="message-bubble typing-bubble">
         <div class="typing-indicator">
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
@@ -508,9 +1006,13 @@ class ChatInterface {
       </div>
     `;
     indicator.id = "typing-indicator";
+    indicator.classList.add("typing-indicator-enter");
 
     this.messagesArea.appendChild(indicator);
     this.typingIndicatorEl = indicator;
+    requestAnimationFrame(() => {
+      indicator.classList.add("typing-indicator-enter-active");
+    });
     this.scrollToBottom();
   }
 
@@ -518,7 +1020,11 @@ class ChatInterface {
     const indicatorEl =
       this.typingIndicatorEl || DomUtils.$("#typing-indicator");
     if (indicatorEl) {
-      indicatorEl.remove();
+      indicatorEl.classList.remove("typing-indicator-enter-active");
+      indicatorEl.classList.add("typing-indicator-exit");
+      setTimeout(() => {
+        indicatorEl.remove();
+      }, 220);
     }
     this.typingIndicatorEl = null;
   }
@@ -530,19 +1036,34 @@ class ChatInterface {
   }
 
   setupAutoScroll() {
-    this.inputField.addEventListener("input", () => {
-      this.inputField.style.height = "auto";
-      this.inputField.style.height =
-        Math.min(this.inputField.scrollHeight, 120) + "px";
-    });
+    window.addEventListener("resize", this.handleWindowResize);
+    this.updateMessageViewportInset();
   }
 
-  async loadMessages() {
+  async loadMessages(conversationId = null) {
     try {
+      const activeConversationId = conversationId || this.currentConversationId;
+      if (!activeConversationId) {
+        this.messagesArea.innerHTML = "";
+        return;
+      }
+
+      // Hide skeleton loaders
+      const skeletons = this.messagesArea.querySelectorAll(".skeleton-message");
+      skeletons.forEach((s) => (s.style.display = "none"));
+
+      // Hide the loading message
+      const loadingMsg = this.messagesArea.querySelector(
+        ".message-group.assistant",
+      );
+      if (loadingMsg) {
+        loadingMsg.style.display = "none";
+      }
+
       let response;
       try {
         response = await API.get(
-          `/api/user/chatbots/${this.chatbotId}/messages`,
+          `/api/user/chatbots/${this.chatbotId}/conversations/${activeConversationId}/messages`,
         );
       } catch (error) {
         if (!this.isNotJoinedError(error)) {
@@ -555,10 +1076,12 @@ class ChatInterface {
         }
 
         response = await API.get(
-          `/api/user/chatbots/${this.chatbotId}/messages`,
+          `/api/user/chatbots/${this.chatbotId}/conversations/${activeConversationId}/messages`,
         );
       }
 
+      this.messages = [];
+      this.messagesArea.innerHTML = "";
       const messages = Array.isArray(response?.data) ? response.data : [];
       messages.forEach((msg) => {
         if (!msg?.content) return;
@@ -717,48 +1240,22 @@ class ChatInterface {
     this.scrollToBottom();
   }
 
-  async playWelcomeIntro(chatbot) {
-    const chatbotName = chatbot?.name || "ConvergeAI Assistant";
-    const eventName = chatbot?.event_name || "your event";
-    const description = (
-      chatbot?.description ||
-      "Ask anything related to this event and get instant help."
-    ).trim();
-    const introText = `Welcome to ${eventName}. You are now chatting with ${chatbotName}. ${description}`;
-
-    const introCard = DomUtils.create("div", "chat-welcome-card");
-    introCard.innerHTML = `
-      <div class="chat-welcome-title">Welcome</div>
-      <div class="chat-welcome-typing">
-        <span class="chat-welcome-text"></span><span class="chat-welcome-cursor">|</span>
-      </div>
-    `;
-
-    const textEl = introCard.querySelector(".chat-welcome-text");
-    this.messagesArea.appendChild(introCard);
-    this.scrollToBottom();
-
-    for (const character of introText) {
-      textEl.textContent += character;
-      await new Promise((resolve) => setTimeout(resolve, 18));
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
   setInputVisible(visible) {
     if (!this.inputArea) return;
 
     if (!visible) {
       this.inputArea.classList.add("chat-input-hidden");
       this.inputArea.classList.remove("chat-input-reveal");
+      this.updateMessageViewportInset();
       return;
     }
 
     this.inputArea.classList.remove("chat-input-hidden");
     this.inputArea.classList.add("chat-input-reveal");
+    this.updateMessageViewportInset();
     setTimeout(() => {
       this.inputArea.classList.remove("chat-input-reveal");
+      this.updateMessageViewportInset();
       this.inputField.focus();
     }, 450);
   }
