@@ -51,7 +51,7 @@ def _build_recent_context(chatbot_id, user_id, limit=8):
     return '\n'.join(lines)
 
 
-def _call_gemini(chatbot, user, user_text, image_payload=None):
+def _call_gemini(chatbot, user, user_text, image_payloads=None):
     api_key = (chatbot.gemini_api_key or '').strip()
     if not api_key:
         api_key = (
@@ -87,13 +87,19 @@ def _call_gemini(chatbot, user, user_text, image_payload=None):
         'text': '\n\n'.join(prompt_chunks)
     }]
 
-    if image_payload:
-        parts.append({
-            'inline_data': {
-                'mime_type': image_payload['mime_type'],
-                'data': image_payload['data_b64']
-            }
-        })
+    # Handle multiple images (user image, guest image, background image)
+    if image_payloads:
+        if not isinstance(image_payloads, list):
+            image_payloads = [image_payloads]
+        
+        for image_payload in image_payloads:
+            if image_payload:
+                parts.append({
+                    'inline_data': {
+                        'mime_type': image_payload['mime_type'],
+                        'data': image_payload['data_b64']
+                    }
+                })
 
     endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
     response = requests.post(
@@ -562,6 +568,32 @@ def send_message(user, chatbot_id):
             'data_b64': base64.b64encode(image_bytes).decode('utf-8')
         }
 
+    # Extract guest image if provided
+    guest_image_payload = None
+    guest_image_file = request.files.get('guest_image') if request.files else None
+    if guest_image_file and guest_image_file.filename:
+        mime_type = (guest_image_file.mimetype or '').lower().strip()
+        if mime_type in ALLOWED_IMAGE_MIME_TYPES:
+            guest_image_bytes = guest_image_file.read()
+            if guest_image_bytes and len(guest_image_bytes) <= MAX_CHAT_IMAGE_SIZE_BYTES:
+                guest_image_payload = {
+                    'mime_type': mime_type,
+                    'data_b64': base64.b64encode(guest_image_bytes).decode('utf-8')
+                }
+
+    # Extract background image if provided
+    background_image_payload = None
+    background_image_file = request.files.get('background_image') if request.files else None
+    if background_image_file and background_image_file.filename:
+        mime_type = (background_image_file.mimetype or '').lower().strip()
+        if mime_type in ALLOWED_IMAGE_MIME_TYPES:
+            background_image_bytes = background_image_file.read()
+            if background_image_bytes and len(background_image_bytes) <= MAX_CHAT_IMAGE_SIZE_BYTES:
+                background_image_payload = {
+                    'mime_type': mime_type,
+                    'data_b64': base64.b64encode(background_image_bytes).decode('utf-8')
+                }
+
     if not content and not image_payload:
         return jsonify({'success': False, 'message': 'Message text or image is required'}), 400
 
@@ -589,7 +621,16 @@ def send_message(user, chatbot_id):
     db.session.commit()
     
     try:
-        bot_reply_text = _call_gemini(chatbot, user, content, image_payload=image_payload)
+        # Collect all images for Gemini
+        all_image_payloads = []
+        if image_payload:
+            all_image_payloads.append(image_payload)
+        if guest_image_payload:
+            all_image_payloads.append(guest_image_payload)
+        if background_image_payload:
+            all_image_payloads.append(background_image_payload)
+        
+        bot_reply_text = _call_gemini(chatbot, user, content, image_payloads=all_image_payloads if all_image_payloads else None)
     except Exception as error:
         return jsonify({
             'success': False,

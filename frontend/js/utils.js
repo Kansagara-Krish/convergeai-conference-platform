@@ -9,23 +9,26 @@ function resolveApiBaseUrl() {
   }
 
   if (typeof window === "undefined") {
-    return "http://localhost:5000";
+    return "http://localhost:5050";
   }
 
   const { protocol, hostname, port } = window.location;
 
   // If running on the same host but different ports, use the same hostname
-  if ((hostname === "localhost" || hostname === "127.0.0.1") && port === "5000") {
+  if (
+    (hostname === "localhost" || hostname === "127.0.0.1") &&
+    port === "5050"
+  ) {
     return "";
   }
 
   if (protocol === "file:") {
-    return "http://localhost:5000";
+    return "http://localhost:5050";
   }
 
-  // For remote development/Docker: use same hostname as frontend but port 5000
+  // For remote development/Docker: use same hostname as frontend but port 5050
   // This prevents CORS issues when frontend and backend are on same network
-  return `${protocol}//${hostname}:5000`;
+  return `${protocol}//${hostname}:5050`;
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
