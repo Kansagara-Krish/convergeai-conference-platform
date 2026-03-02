@@ -139,8 +139,18 @@ class ChatInterface {
     this.newChatBtn = DomUtils.$("#new-chat-btn");
     this.inputArea = DomUtils.$(".input-area");
     this.attachBtn = DomUtils.$("#chat-attach-btn");
+    this.attachMenu = DomUtils.$("#chat-attach-menu");
     this.imageInput = DomUtils.$("#chat-image-input");
     this.filePreview = DomUtils.$("#chat-file-preview");
+    this.previewRow = DomUtils.$("#composer-preview-row");
+    this.modeBtn = DomUtils.$("#chat-mode-btn");
+    this.modeMenu = DomUtils.$("#chat-mode-menu");
+    this.modeOptions = DomUtils.$$(".chat-mode-option");
+    this.guestModeIcon = DomUtils.$(
+      '.chat-mode-option[data-mode="guest"] .chat-mode-icon-img',
+    );
+    this.guestSelectorPanel = DomUtils.$("#chat-guest-selector-panel");
+    this.guestSelectorList = DomUtils.$("#chat-guest-selector-list");
     this.overlay = DomUtils.$("#chat-overlay");
     this.overlayContent = DomUtils.$("#chat-overlay-content");
     this.overlayImage = DomUtils.$("#chat-overlay-image");
@@ -162,6 +172,9 @@ class ChatInterface {
     this.selectedGuestImage = null;
     this.backgroundImageUrl = null;
     this.guests = [];
+    this.selectedGuestIds = [];
+    this.chatMode = "single";
+    this.isMultiplePersonMode = false;
     // set id then start
     this.chatbotId = this.getChatbotId();
     this.init();
@@ -489,6 +502,8 @@ class ChatInterface {
     });
 
     this.setupAttachmentHandlers();
+    this.setupGuestModeControls();
+    this.setupGuestModeIcon();
 
     try {
       await this.loadConversations();
@@ -531,6 +546,7 @@ class ChatInterface {
       chatbotMeta?.background_image,
     );
     this.renderGuestWall(chatbotMeta?.guests || []);
+    await this.initializeGuestSelectorData(chatbotMeta?.guests || []);
 
     // Handle unavailable chatbot
     if (this.chatUnavailable) {
@@ -549,6 +565,387 @@ class ChatInterface {
     this.autoResizeInput();
     this.setupAutoScroll();
     this.updateMessageViewportInset();
+  }
+
+  setupGuestModeControls() {
+    const closeModeMenu = () => {
+      if (!this.modeMenu || !this.modeBtn) return;
+      this.modeMenu.classList.remove("active");
+      this.modeMenu.setAttribute("aria-hidden", "true");
+      this.modeBtn.setAttribute("aria-expanded", "false");
+    };
+
+    const openModeMenu = () => {
+      if (!this.modeMenu || !this.modeBtn) return;
+      this.modeMenu.classList.add("active");
+      this.modeMenu.setAttribute("aria-hidden", "false");
+      this.modeBtn.setAttribute("aria-expanded", "true");
+    };
+
+    if (this.modeBtn) {
+      this.modeBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const isOpen = this.modeMenu?.classList.contains("active");
+        if (isOpen) {
+          closeModeMenu();
+        } else {
+          openModeMenu();
+        }
+      });
+    }
+
+    if (this.modeOptions && this.modeOptions.length > 0) {
+      this.modeOptions.forEach((option) => {
+        const guestImageEl = option.querySelector(".chat-mode-icon-img");
+        if (guestImageEl) {
+          guestImageEl.addEventListener("error", () => {
+            option.classList.add("guest-icon-fallback");
+          });
+          guestImageEl.addEventListener("load", () => {
+            option.classList.remove("guest-icon-fallback");
+          });
+        }
+
+        option.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const nextMode = option.dataset.mode || "guest";
+          this.applyModeSelection(nextMode, true);
+          closeModeMenu();
+        });
+      });
+    }
+
+    document.addEventListener("click", (event) => {
+      if (!this.modeMenu || !this.modeBtn) return;
+      const target = event.target;
+      const clickedInsideMenu = this.modeMenu.contains(target);
+      const clickedModeBtn = this.modeBtn.contains(target);
+      if (!clickedInsideMenu && !clickedModeBtn) {
+        closeModeMenu();
+      }
+    });
+
+    if (this.modeMenu) {
+      this.modeMenu.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+    }
+
+    this.applyModeSelection("single", true);
+  }
+
+  setupGuestModeIcon() {
+    if (!this.guestModeIcon) return;
+
+    const base = String(API_BASE_URL || "").replace(/\/+$/, "");
+    const iconUrl = base ? `${base}/uploads/guest_icon.jpg` : "/uploads/guest_icon.jpg";
+    const fallbackUrl = "../assets/images/guest-mode-icon.svg";
+
+    this.guestModeIcon.onerror = () => {
+      this.guestModeIcon.onerror = null;
+      this.guestModeIcon.src = fallbackUrl;
+    };
+
+    this.guestModeIcon.src = iconUrl;
+  }
+
+  applyModeSelection(modeValue, shouldSyncSelector = false) {
+    const normalizedMode = ["guest", "single", "multiple"].includes(modeValue)
+      ? modeValue
+      : "guest";
+
+    this.chatMode = normalizedMode;
+    if (normalizedMode === "single") {
+      this.isMultiplePersonMode = false;
+    } else if (normalizedMode === "multiple") {
+      this.isMultiplePersonMode = true;
+    }
+
+    if (shouldSyncSelector) {
+      this.syncModeOptionSelection();
+    }
+
+    this.updateGuestSelectorVisibility();
+    this.enforceGuestSelectionMode();
+  }
+
+  syncModeOptionSelection() {
+    if (!this.modeOptions || this.modeOptions.length === 0) return;
+
+    this.modeOptions.forEach((option) => {
+      const optionMode = option.dataset.mode || "";
+      const isActive = optionMode === this.chatMode;
+      option.classList.toggle("active", isActive);
+      option.setAttribute("aria-pressed", String(isActive));
+    });
+
+    this.updateModeButtonVisual();
+  }
+
+  updateModeButtonVisual() {
+    if (!this.modeBtn) return;
+
+    const iconEl = this.modeBtn.querySelector(".material-symbols-outlined");
+    if (iconEl) {
+      iconEl.textContent = "tune";
+    }
+
+    this.modeBtn.setAttribute("title", "Modes");
+    this.modeBtn.setAttribute("aria-label", "Modes");
+  }
+
+  isGuestMode() {
+    return this.chatMode === "guest";
+  }
+
+  getRequestModeValue() {
+    if (this.isGuestMode()) {
+      return "guest";
+    }
+    return this.isMultiplePersonMode ? "multiple_person" : "single_person";
+  }
+
+  updateGuestSelectorVisibility() {
+    if (!this.guestSelectorPanel) return;
+
+    const isVisible = this.isGuestMode();
+    this.guestSelectorPanel.classList.toggle("active", isVisible);
+    this.guestSelectorPanel.setAttribute("aria-hidden", String(!isVisible));
+    if (this.inputArea) {
+      this.inputArea.classList.toggle("guest-panel-open", isVisible);
+    }
+    this.updateMessageViewportInset();
+  }
+
+  openGuestSelectorPanel() {
+    if (!this.guestSelectorPanel) return;
+    this.guestSelectorPanel.classList.add("active");
+    this.guestSelectorPanel.setAttribute("aria-hidden", "false");
+    if (this.inputArea) {
+      this.inputArea.classList.add("guest-panel-open");
+    }
+    this.updateMessageViewportInset();
+  }
+
+  openAttachMenu() {
+    if (!this.attachMenu || !this.attachBtn) return;
+    this.attachMenu.setAttribute("aria-hidden", "false");
+    this.attachBtn.setAttribute("aria-expanded", "true");
+    this.attachMenu.classList.add("active");
+  }
+
+  closeAttachMenu() {
+    if (!this.attachMenu || !this.attachBtn) return;
+    this.attachMenu.setAttribute("aria-hidden", "true");
+    this.attachBtn.setAttribute("aria-expanded", "false");
+    this.attachMenu.classList.remove("active");
+  }
+
+  validateSendRequirements() {
+    const hasSelectedGuest =
+      Array.isArray(this.selectedGuestIds) && this.selectedGuestIds.length > 0;
+    const hasOwnImage = Boolean(this.selectedImageFile);
+
+    if (!hasSelectedGuest && !hasOwnImage) {
+      NotificationManager.warning(
+        "Select a guest and upload your photo before sending.",
+      );
+      this.applyModeSelection("guest", true);
+      this.openGuestSelectorPanel();
+      this.openAttachMenu();
+      return false;
+    }
+
+    if (!hasSelectedGuest) {
+      NotificationManager.warning(
+        "Please select a guest image first before sending.",
+      );
+      this.applyModeSelection("guest", true);
+      this.openGuestSelectorPanel();
+      return false;
+    }
+
+    if (!hasOwnImage) {
+      NotificationManager.warning(
+        "Please upload or capture your own photo before sending.",
+      );
+      this.openAttachMenu();
+      return false;
+    }
+
+    return true;
+  }
+
+  async initializeGuestSelectorData(fallbackGuests = []) {
+    const guestRecords = await this.loadGuestsFromApi();
+
+    if (guestRecords.length > 0) {
+      this.guests = guestRecords;
+    } else if (Array.isArray(fallbackGuests)) {
+      this.guests = fallbackGuests;
+    }
+
+    this.renderGuestSelectorList();
+    this.enforceGuestSelectionMode();
+  }
+
+  async loadGuestsFromApi() {
+    if (!this.chatbotId) return [];
+
+    const endpoints = [
+      `/api/guests?chatbot_id=${this.chatbotId}`,
+      `/api/user/guests?chatbot_id=${this.chatbotId}`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await API.get(endpoint);
+        const records = Array.isArray(response?.data) ? response.data : [];
+        const normalized = this.normalizeGuestRecords(records);
+        if (normalized.length > 0) {
+          return normalized;
+        }
+      } catch (error) {
+        continue;
+      }
+    }
+
+    return [];
+  }
+
+  normalizeGuestRecords(guestRecords) {
+    if (!Array.isArray(guestRecords)) return [];
+
+    return guestRecords
+      .map((guest) => {
+        const guestId = Number(guest?.id);
+        if (!Number.isFinite(guestId)) return null;
+
+        const chatbotId = Number(guest?.chatbot_id);
+        if (
+          Number.isFinite(chatbotId) &&
+          chatbotId !== Number(this.chatbotId)
+        ) {
+          return null;
+        }
+
+        return {
+          ...guest,
+          id: guestId,
+          name: String(guest?.name || "").trim(),
+          photo: guest?.photo || "",
+        };
+      })
+      .filter((guest) => Boolean(guest?.name));
+  }
+
+  renderGuestSelectorList() {
+    if (!this.guestSelectorList) return;
+
+    this.guestSelectorList.innerHTML = "";
+
+    if (!Array.isArray(this.guests) || this.guests.length === 0) {
+      this.guestSelectorList.innerHTML =
+        '<div class="chat-guest-selector-empty">No guests available</div>';
+      return;
+    }
+
+    this.guests.forEach((guest) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "chat-guest-card";
+      card.dataset.guestId = String(guest.id);
+      card.setAttribute("aria-pressed", "false");
+
+      const imageUrl = this.resolveMediaUrl(guest.photo);
+      const safeName = this.escapeHtml(guest.name || "Guest");
+      const fallbackLetter = safeName.charAt(0).toUpperCase() || "G";
+      const imageMarkup = imageUrl
+        ? `<img class="chat-guest-card-image" src="${imageUrl}" alt="${safeName}">`
+        : `<div class="chat-guest-card-image">${fallbackLetter}</div>`;
+
+      card.innerHTML = `
+        ${imageMarkup}
+        <div class="chat-guest-card-name">${safeName}</div>
+      `;
+
+      card.addEventListener("click", () => {
+        this.toggleGuestSelection(guest.id);
+      });
+
+      this.guestSelectorList.appendChild(card);
+    });
+
+    this.syncGuestCardSelection();
+  }
+
+  toggleGuestSelection(guestId) {
+    const normalizedId = Number(guestId);
+    if (!Number.isFinite(normalizedId)) return;
+
+    const hasSelected = this.selectedGuestIds.includes(normalizedId);
+
+    if (this.isMultiplePersonMode) {
+      this.selectedGuestIds = hasSelected
+        ? this.selectedGuestIds.filter((id) => id !== normalizedId)
+        : [...this.selectedGuestIds, normalizedId];
+    } else {
+      this.selectedGuestIds = hasSelected ? [] : [normalizedId];
+    }
+
+    this.syncGuestCardSelection();
+    this.syncPrimarySelectedGuest();
+
+    if (this.selectedGuestIds.length > 0 && this.guestSelectorPanel) {
+      this.guestSelectorPanel.classList.remove("active");
+      this.guestSelectorPanel.setAttribute("aria-hidden", "true");
+      if (this.inputArea) {
+        this.inputArea.classList.remove("guest-panel-open");
+      }
+      this.updateMessageViewportInset();
+    }
+  }
+
+  syncGuestCardSelection() {
+    if (!this.guestSelectorList) return;
+
+    this.guestSelectorList
+      .querySelectorAll(".chat-guest-card")
+      .forEach((card) => {
+        const guestId = Number(card.dataset.guestId);
+        const isSelected = this.selectedGuestIds.includes(guestId);
+        card.classList.toggle("selected", isSelected);
+        card.setAttribute("aria-pressed", String(isSelected));
+      });
+  }
+
+  enforceGuestSelectionMode() {
+    if (!this.isMultiplePersonMode && this.selectedGuestIds.length > 1) {
+      this.selectedGuestIds = [this.selectedGuestIds[0]];
+    }
+
+    this.syncGuestCardSelection();
+    this.syncPrimarySelectedGuest();
+  }
+
+  syncPrimarySelectedGuest() {
+    const primaryGuestId = this.selectedGuestIds[0];
+    const primaryGuest = this.guests.find(
+      (guest) => guest.id === primaryGuestId,
+    );
+
+    if (!primaryGuest) {
+      this.selectedGuest = null;
+      this.selectedGuestImage = null;
+      this.renderAttachmentPreview();
+      return;
+    }
+
+    this.selectedGuest = primaryGuest;
+    this.selectedGuestImage = primaryGuest.photo
+      ? this.resolveMediaUrl(primaryGuest.photo)
+      : null;
+    this.renderAttachmentPreview();
   }
 
   updateSendButtonState() {
@@ -612,11 +1009,7 @@ class ChatInterface {
     const text = this.inputField.value.trim();
     const selectedImage = this.selectedImageFile;
 
-    // VALIDATION: User must upload an image
-    if (!selectedImage) {
-      NotificationManager.warning(
-        "Please upload an image before sending a message. Click the + button to add an image.",
-      );
+    if (!this.validateSendRequirements()) {
       return;
     }
 
@@ -741,10 +1134,21 @@ class ChatInterface {
     guestImage,
     backgroundImage,
   ) {
+    const requestMode = this.getRequestModeValue();
+
     if (selectedImage) {
       const formData = new FormData();
       formData.append("content", text);
       formData.append("image", selectedImage);
+      formData.append("mode", requestMode);
+      formData.append(
+        "multiple_person_mode",
+        String(Boolean(this.isMultiplePersonMode)),
+      );
+
+      if (this.isGuestMode()) {
+        formData.append("guest_ids", JSON.stringify(this.selectedGuestIds));
+      }
 
       // Include guest image if selected
       if (guestImage) {
@@ -774,6 +1178,9 @@ class ChatInterface {
     return API.post(`/api/user/chatbots/${this.chatbotId}/messages`, {
       content: text,
       conversation_id: conversationId,
+      mode: requestMode,
+      multiple_person_mode: Boolean(this.isMultiplePersonMode),
+      guest_ids: this.isGuestMode() ? this.selectedGuestIds : [],
     });
   }
 
@@ -800,30 +1207,16 @@ class ChatInterface {
   setupAttachmentHandlers() {
     if (this.attachBtn && this.imageInput) {
       // Toggle attach menu instead of instantly opening file picker
-      const attachMenu = DomUtils.$("#chat-attach-menu");
+      const attachMenu = this.attachMenu;
       const attachUpload = DomUtils.$("#chat-attach-upload");
       const attachCamera = DomUtils.$("#chat-attach-camera");
-
-      const closeAttachMenu = () => {
-        if (!attachMenu) return;
-        attachMenu.setAttribute("aria-hidden", "true");
-        this.attachBtn.setAttribute("aria-expanded", "false");
-        attachMenu.classList.remove("active");
-      };
-
-      const openAttachMenu = () => {
-        if (!attachMenu) return;
-        attachMenu.setAttribute("aria-hidden", "false");
-        this.attachBtn.setAttribute("aria-expanded", "true");
-        attachMenu.classList.add("active");
-      };
 
       this.attachBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         if (attachMenu && attachMenu.classList.contains("active")) {
-          closeAttachMenu();
+          this.closeAttachMenu();
         } else {
-          openAttachMenu();
+          this.openAttachMenu();
         }
       });
 
@@ -832,14 +1225,14 @@ class ChatInterface {
         const target = ev.target;
         if (!attachMenu) return;
         if (!attachMenu.contains(target) && target !== this.attachBtn) {
-          closeAttachMenu();
+          this.closeAttachMenu();
         }
       });
 
       if (attachUpload) {
         attachUpload.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          closeAttachMenu();
+          this.closeAttachMenu();
           this.imageInput.click();
         });
       }
@@ -847,7 +1240,7 @@ class ChatInterface {
       if (attachCamera) {
         attachCamera.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          closeAttachMenu();
+          this.closeAttachMenu();
           this.openCameraModal();
         });
       }
@@ -1006,9 +1399,16 @@ class ChatInterface {
   renderAttachmentPreview() {
     if (!this.filePreview) return;
 
-    if (!this.selectedImageFile) {
+    const hasImage = Boolean(this.selectedImageFile);
+    const hasGuests =
+      Array.isArray(this.selectedGuestIds) && this.selectedGuestIds.length > 0;
+
+    if (!hasImage && !hasGuests) {
       this.filePreview.innerHTML = "";
       this.filePreview.style.display = "none";
+      if (this.previewRow) {
+        this.previewRow.style.display = "none";
+      }
       if (this.selectedImagePreviewUrl) {
         URL.revokeObjectURL(this.selectedImagePreviewUrl);
         this.selectedImagePreviewUrl = null;
@@ -1016,23 +1416,77 @@ class ChatInterface {
       return;
     }
 
-    if (this.selectedImagePreviewUrl) {
+    if (hasImage) {
+      if (this.selectedImagePreviewUrl) {
+        URL.revokeObjectURL(this.selectedImagePreviewUrl);
+      }
+      this.selectedImagePreviewUrl = URL.createObjectURL(
+        this.selectedImageFile,
+      );
+    } else if (this.selectedImagePreviewUrl) {
       URL.revokeObjectURL(this.selectedImagePreviewUrl);
+      this.selectedImagePreviewUrl = null;
     }
-    this.selectedImagePreviewUrl = URL.createObjectURL(this.selectedImageFile);
 
-    this.filePreview.innerHTML = `
-      <div class="file-preview-item">
-        <img class="file-preview-thumb" src="${this.selectedImagePreviewUrl}" alt="Selected image preview" />
-        <button type="button" class="file-preview-remove" id="chat-file-remove" aria-label="Remove image">×</button>
+    const imagePreviewMarkup = hasImage
+      ? `
+      <div class="file-preview-item guest-preview-item image-preview-item">
+        <img class="file-preview-thumb guest-preview-thumb" src="${this.selectedImagePreviewUrl}" alt="Selected image preview" />
+        <div class="guest-preview-name">Your photo</div>
+        <button type="button" class="file-preview-remove file-preview-remove-image" aria-label="Remove image">×</button>
       </div>
-    `;
-    this.filePreview.style.display = "flex";
+    `
+      : "";
 
-    const removeBtn = document.getElementById("chat-file-remove");
-    if (removeBtn) {
-      removeBtn.addEventListener("click", () => this.clearSelectedImage());
+    const guestPreviewMarkup = (hasGuests ? this.selectedGuestIds : [])
+      .map((guestId) => {
+        const guest = this.guests.find((item) => item.id === Number(guestId));
+        if (!guest) return "";
+        const guestName = this.escapeHtml(guest.name || "Guest");
+        const guestPhotoUrl = guest.photo
+          ? this.resolveMediaUrl(guest.photo)
+          : "";
+        const guestInitial = (guestName || "G").charAt(0).toUpperCase();
+        const thumbMarkup = guestPhotoUrl
+          ? `<img class="file-preview-thumb guest-preview-thumb" src="${guestPhotoUrl}" alt="${guestName}">`
+          : `<div class="file-preview-thumb guest-preview-fallback">${guestInitial}</div>`;
+
+        return `
+        <div class="file-preview-item guest-preview-item">
+          ${thumbMarkup}
+          <div class="guest-preview-name">${guestName}</div>
+          <button type="button" class="file-preview-remove file-preview-remove-guest" data-guest-id="${guest.id}" aria-label="Remove ${guestName}">×</button>
+        </div>
+      `;
+      })
+      .join("");
+
+    this.filePreview.innerHTML = `${imagePreviewMarkup}${guestPreviewMarkup}`;
+    this.filePreview.style.display = "flex";
+    if (this.previewRow) {
+      this.previewRow.style.display = "flex";
     }
+
+    const imageRemoveBtn = this.filePreview.querySelector(
+      ".file-preview-remove-image",
+    );
+    if (imageRemoveBtn) {
+      imageRemoveBtn.addEventListener("click", () => this.clearSelectedImage());
+    }
+
+    this.filePreview
+      .querySelectorAll(".file-preview-remove-guest")
+      .forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const guestId = Number(btn.dataset.guestId);
+          if (!Number.isFinite(guestId)) return;
+          this.selectedGuestIds = this.selectedGuestIds.filter(
+            (id) => id !== guestId,
+          );
+          this.syncGuestCardSelection();
+          this.syncPrimarySelectedGuest();
+        });
+      });
   }
 
   clearSelectedImage() {
@@ -1040,10 +1494,7 @@ class ChatInterface {
     if (this.imageInput) {
       this.imageInput.value = "";
     }
-    if (this.filePreview) {
-      this.filePreview.innerHTML = "";
-      this.filePreview.style.display = "none";
-    }
+    this.renderAttachmentPreview();
     this.updateSendButtonState();
   }
 
@@ -1296,6 +1747,14 @@ class ChatInterface {
    * Select a guest and store their image URL
    */
   selectGuest(guest) {
+    const guestId = Number(guest?.id);
+    if (Number.isFinite(guestId)) {
+      this.selectedGuestIds = this.isMultiplePersonMode
+        ? Array.from(new Set([...this.selectedGuestIds, guestId]))
+        : [guestId];
+      this.syncGuestCardSelection();
+    }
+
     this.selectedGuest = guest;
     this.selectedGuestImage = guest.photo
       ? this.resolveMediaUrl(guest.photo)
@@ -1307,7 +1766,9 @@ class ChatInterface {
       photo: this.selectedGuestImage,
     });
 
-    NotificationManager.success(`Selected: ${guest.name}`);
+    if (!this.isMultiplePersonMode) {
+      NotificationManager.success(`Selected: ${guest.name}`);
+    }
   }
 
   /**

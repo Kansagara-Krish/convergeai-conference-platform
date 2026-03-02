@@ -23,6 +23,20 @@ class ForgotPasswordHandler {
   }
 
   init() {
+    this.form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.submitActiveStep();
+    });
+
+    this.form?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      const target = event.target;
+      if (!target || target.tagName === "TEXTAREA") return;
+
+      event.preventDefault();
+      this.submitActiveStep();
+    });
+
     this.sendOtpBtn?.addEventListener("click", () => this.requestOtp(false));
     this.resendOtpBtn?.addEventListener("click", () => this.requestOtp(true));
     this.resetPasswordBtn?.addEventListener("click", () =>
@@ -38,6 +52,16 @@ class ForgotPasswordHandler {
     }
 
     this.setupPasswordToggleIcons();
+  }
+
+  submitActiveStep() {
+    const isResetStepActive = this.stepReset?.classList.contains("active");
+    if (isResetStepActive) {
+      this.resetPassword();
+      return;
+    }
+
+    this.requestOtp(false);
   }
 
   setupPasswordToggleIcons() {
