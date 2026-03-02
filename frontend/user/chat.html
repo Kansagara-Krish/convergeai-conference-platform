@@ -6,9 +6,9 @@
     <title>Chat - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/user.css?v=3">
-    <link rel="stylesheet" href="../css/chat.css?v=13">
+    <link rel="stylesheet" href="../css/chat.css?v=16">
     <script src="../js/utils.js?v=3"></script>
-    <script src="../js/main.js?v=13"></script>
+    <script src="../js/main.js?v=16"></script>
 </head>
 <body>
     <div class="user-container">
@@ -81,7 +81,12 @@
                 <!-- Input Area -->
                 <div class="input-area">
                     <div class="chat-composer">
-                        <div class="attach-wrap">
+                        <div class="composer-preview-row" id="composer-preview-row">
+                            <div class="file-preview" id="chat-file-preview"></div>
+                        </div>
+                        <div class="composer-input-row">
+                                                <div class="composer-left-controls">
+                                                <div class="attach-wrap">
                           <button class="input-action-btn input-plus-btn" id="chat-attach-btn" aria-haspopup="true" aria-expanded="false" title="Attachments">
                               <span class="material-symbols-outlined">add</span>
                           </button>
@@ -97,9 +102,28 @@
                               </button>
                           </div>
                         </div>
+                        <div class="chat-mode-wrap">
+                            <button class="input-action-btn chat-mode-btn" id="chat-mode-btn" aria-haspopup="true" aria-expanded="false" title="Modes">
+                                <span class="material-symbols-outlined">tune</span>
+                            </button>
+                            <div class="chat-mode-menu" id="chat-mode-menu" aria-hidden="true">
+                                <button type="button" class="chat-mode-option" data-mode="guest" title="Guest mode" aria-label="Guest mode">
+                                    <img class="chat-mode-icon-img" src="/uploads/guest_icon.jpg" alt="Guest icon" onerror="this.onerror=null;this.src='../assets/images/guest-mode-icon.svg';">
+                                    <span class="chat-mode-text">Guest</span>
+                                </button>
+                                <button type="button" class="chat-mode-option" data-mode="single" title="Single person mode" aria-label="Single person mode">
+                                    <span class="material-symbols-outlined">account_circle</span>
+                                    <span class="chat-mode-text">Single Person</span>
+                                </button>
+                                <button type="button" class="chat-mode-option" data-mode="multiple" title="Multiple person mode" aria-label="Multiple person mode">
+                                    <span class="material-symbols-outlined">groups</span>
+                                    <span class="chat-mode-text">Multiple Person</span>
+                                </button>
+                            </div>
+                        </div>
+                        </div>
 
                         <div class="input-wrapper">
-                            <div class="file-preview" id="chat-file-preview"></div>
                             <textarea class="input-field" placeholder="Message ConvergeAI..." rows="1"></textarea>
                         </div>
 
@@ -109,8 +133,12 @@
                                 <span class="material-symbols-outlined">arrow_upward</span>
                             </button>
                         </div>
+                        </div>
 
                         <input type="file" id="chat-image-input" class="chat-hidden-file-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" aria-label="Upload image">
+                    </div>
+                    <div class="chat-guest-selector-panel" id="chat-guest-selector-panel" aria-hidden="true">
+                        <div class="chat-guest-selector-list" id="chat-guest-selector-list"></div>
                     </div>
                     <p class="chat-input-info">Image responses may take a few seconds to generate.</p>
                 </div>
