@@ -6,15 +6,19 @@
     <title>Chat - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/user.css?v=3">
-    <link rel="stylesheet" href="../css/chat.css?v=16">
+    <link rel="stylesheet" href="../css/chat.css?v=23">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js?v=3"></script>
-    <script src="../js/main.js?v=16"></script>
+    <script src="../js/main.js?v=20"></script>
 </head>
 <body>
     <div class="user-container">
         <!-- Header -->
         <header class="user-header">
             <div class="user-header-content">
+                <button type="button" id="chat-history-toggle" class="chat-history-toggle-btn" aria-label="Toggle conversation history" aria-expanded="false">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
                 <div class="user-logo">
                     <div class="chat-top-logo"><span class="material-symbols-outlined">smart_toy</span></div>
                     <span id="chatbot-top-title">ConvergeAI Chat</span>
@@ -38,7 +42,10 @@
         <div class="chat-main">
             <aside class="chat-conversations" id="chat-conversations" aria-label="Conversations">
                 <div class="chat-conversations-header">
-                    <span class="chat-conversations-title">Conversations</span>
+                    <span class="chat-conversations-title"></span>
+                    <button type="button" id="chat-history-close" class="chat-history-close-btn" aria-label="Close history panel">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
                     <button type="button" id="new-chat-btn" title="New Chat" class="new-chat-btn" aria-label="Create new conversation">
                         <span class="material-symbols-outlined">add</span>
                     </button>
@@ -53,7 +60,22 @@
                     
                     <div class="chat-conversations-empty">No conversations yet. Start a new chat!</div>
                 </div>
+                <div class="chat-usage-panel" id="chat-usage-panel" aria-live="polite">
+                    <div class="chat-usage-title">Workspace usage</div>
+                    <div class="chat-usage-group">
+                        <div class="chat-usage-row">
+                            <span>Image generations</span>
+                            <span id="chat-usage-steps-label">0 / 3</span>
+                        </div>
+                        <div class="chat-usage-bar">
+                            <span id="chat-usage-steps-bar"></span>
+                        </div>
+                    </div>
+                    <div class="chat-usage-note" id="chat-usage-note">Resets based on your plan.</div>
+                </div>
             </aside>
+
+            <div class="chat-history-backdrop" id="chat-history-backdrop" aria-hidden="true"></div>
 
             <div class="chat-wrapper">
 
@@ -132,10 +154,14 @@
                             <button class="send-btn" title="Send message">
                                 <span class="material-symbols-outlined">arrow_upward</span>
                             </button>
+                            <button type="button" id="chat-contact-toggle" class="chat-contact-toggle" aria-label="Share your contact details">
+                                <span class="material-symbols-outlined">send</span>
+                                <span>Send Details</span>
+                            </button>
                         </div>
                         </div>
 
-                        <input type="file" id="chat-image-input" class="chat-hidden-file-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" aria-label="Upload image">
+                        <input type="file" id="chat-image-input" class="chat-hidden-file-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" multiple aria-label="Upload image">
                     </div>
                     <div class="chat-guest-selector-panel" id="chat-guest-selector-panel" aria-hidden="true">
                         <div class="chat-guest-selector-list" id="chat-guest-selector-list"></div>
@@ -151,7 +177,7 @@
         <div class="camera-modal-content">
             <div class="camera-modal-instructions">Please make sure you're photographing a person before capturing.</div>
             <video id="chat-camera-video" autoplay playsinline></video>
-            <canvas id="chat-camera-canvas" style="display:none;"></canvas>
+            <canvas id="chat-camera-canvas"></canvas>
             <div class="camera-actions">
                 <button type="button" id="chat-camera-capture" class="btn btn-primary btn-sm">Capture</button>
                 <button type="button" id="chat-camera-close" class="btn btn-secondary btn-sm">Cancel</button>
@@ -159,38 +185,24 @@
         </div>
     </div>
 
-    <style>
-        .user-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
+    <div class="chat-contact-modal" id="chat-contact-modal" aria-hidden="true">
+        <div class="chat-contact-modal-card">
+            <h3>Send Your Details</h3>
+            <p>Please share your details. A volunteer will contact you.</p>
+            <form id="chat-contact-form" class="chat-contact-form" novalidate>
+                <label for="chat-contact-name">Name</label>
+                <input type="text" id="chat-contact-name" name="name" placeholder="Enter your name" required>
 
-        .chat-main {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 260px 1fr;
-            gap: 0;
-            min-height: 0;
-            margin-top: 56px;
-        }
+                <label for="chat-contact-whatsapp">WhatsApp Number</label>
+                <input type="tel" id="chat-contact-whatsapp" name="whatsapp" placeholder="e.g. +91 9876543210" required>
 
-        .chat-wrapper {
-            display: grid;
-            grid-template-rows: 1fr auto;
-            gap: 0;
-            min-height: 0;
-        }
+                <div class="chat-contact-actions">
+                    <button type="button" id="chat-contact-cancel" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        .input-area {
-            flex-shrink: 0;
-        }
-
-        .user-main {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr;
-        }
-    </style>
 </body>
 </html>

@@ -22,7 +22,7 @@ class User(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), default='user', nullable=False)  # admin, user, speaker
+    role = db.Column(db.String(50), default='user', nullable=False)  # admin, user, speaker, volunteer
     active = db.Column(db.Boolean, default=True)
     
     # Timestamps
@@ -243,8 +243,9 @@ class Message(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     conversation_id = db.Column(db.Integer, db.ForeignKey('conversations.id'), nullable=True, index=True)
     
-    content = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text, nullable=True)
     is_user_message = db.Column(db.Boolean, default=True)
+    message_type = db.Column(db.String(32), nullable=False, default='text')
     image_url = db.Column(db.String(512), nullable=True)  # For bot-generated or attached images
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
@@ -255,6 +256,7 @@ class Message(db.Model):
             'id': self.id,
             'content': self.content,
             'sender': 'user' if self.is_user_message else 'bot',
+            'message_type': self.message_type or 'text',
             'timestamp': self.created_at.isoformat(),
             'conversation_id': self.conversation_id,
             'user': self.user.to_dict() if self.user else None,

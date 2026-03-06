@@ -21,7 +21,5 @@ next open camera or upload the image
 while send button click one form for the Name and WhatsApp number
 
 # run the app.py and this command 
-python.exe -m http.server 8000 
+python app.py
 
-#Fmtp password just for testing purpose not for production use
-tulo nhlx ynji pyeh

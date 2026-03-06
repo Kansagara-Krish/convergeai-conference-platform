@@ -33,6 +33,31 @@ class UserPanel {
       userBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        const isOpening = !userDropdown.classList.contains("active");
+        if (isOpening) {
+          const attachMenu = DomUtils.$("#chat-attach-menu");
+          const attachBtn = DomUtils.$("#chat-attach-btn");
+          const modeMenu = DomUtils.$("#chat-mode-menu");
+          const modeBtn = DomUtils.$("#chat-mode-btn");
+
+          if (attachMenu) {
+            attachMenu.classList.remove("active");
+            attachMenu.setAttribute("aria-hidden", "true");
+          }
+          if (attachBtn) {
+            attachBtn.setAttribute("aria-expanded", "false");
+          }
+
+          if (modeMenu) {
+            modeMenu.classList.remove("active");
+            modeMenu.setAttribute("aria-hidden", "true");
+          }
+          if (modeBtn) {
+            modeBtn.setAttribute("aria-expanded", "false");
+          }
+        }
+
         DomUtils.toggleClass(userDropdown, "active");
         DomUtils.toggleClass(userBtn, "active");
       });
@@ -132,11 +157,21 @@ class UserPanel {
 
 class ChatInterface {
   constructor() {
+    this.currentUser = Storage.getUser() || {};
     this.messagesArea = DomUtils.$(".messages-area");
     this.inputField = DomUtils.$(".input-field");
     this.sendBtn = DomUtils.$(".send-btn");
     this.convListEl = DomUtils.$("#chat-conversations-list");
     this.newChatBtn = DomUtils.$("#new-chat-btn");
+    this.historyPanel = DomUtils.$("#chat-conversations");
+    this.historyToggleBtn = DomUtils.$("#chat-history-toggle");
+    this.historyCloseBtn = DomUtils.$("#chat-history-close");
+    this.historyBackdrop = DomUtils.$("#chat-history-backdrop");
+    this.usagePanel = DomUtils.$("#chat-usage-panel");
+    this.usageStepsLabel = DomUtils.$("#chat-usage-steps-label");
+    this.usageStepsBar = DomUtils.$("#chat-usage-steps-bar");
+    this.usageNote = DomUtils.$("#chat-usage-note");
+    this.chatInputInfo = DomUtils.$(".chat-input-info");
     this.inputArea = DomUtils.$(".input-area");
     this.attachBtn = DomUtils.$("#chat-attach-btn");
     this.attachMenu = DomUtils.$("#chat-attach-menu");
@@ -146,6 +181,12 @@ class ChatInterface {
     this.modeBtn = DomUtils.$("#chat-mode-btn");
     this.modeMenu = DomUtils.$("#chat-mode-menu");
     this.modeOptions = DomUtils.$$(".chat-mode-option");
+    this.contactToggleBtn = DomUtils.$("#chat-contact-toggle");
+    this.contactModal = DomUtils.$("#chat-contact-modal");
+    this.contactForm = DomUtils.$("#chat-contact-form");
+    this.contactCancelBtn = DomUtils.$("#chat-contact-cancel");
+    this.contactNameInput = DomUtils.$("#chat-contact-name");
+    this.contactWhatsappInput = DomUtils.$("#chat-contact-whatsapp");
     this.guestModeIcon = DomUtils.$(
       '.chat-mode-option[data-mode="guest"] .chat-mode-icon-img',
     );
@@ -159,7 +200,10 @@ class ChatInterface {
     this.selectedImageFile = null;
     this.selectedImagePreviewUrl = null;
     this.typingIndicatorEl = null;
-    this.handleWindowResize = () => this.updateMessageViewportInset();
+    this.handleWindowResize = () => {
+      this.updateMessageViewportInset();
+      this.syncHistoryDrawerState();
+    };
     this.chatUnavailable = false;
     this.chatUnavailableMessage = "";
     // chatbotId will be initialized via helper below
@@ -175,9 +219,25 @@ class ChatInterface {
     this.selectedGuestIds = [];
     this.chatMode = "single";
     this.isMultiplePersonMode = false;
+    this.isGenerationLocked = false;
+    this.defaultInputInfoText = this.chatInputInfo
+      ? this.chatInputInfo.textContent
+      : "Image responses may take a few seconds to generate.";
     // set id then start
     this.chatbotId = this.getChatbotId();
     this.init();
+  }
+
+  isVolunteerUser() {
+    const role = String(this.currentUser?.role || "")
+      .trim()
+      .toLowerCase();
+    return role === "volunteer";
+  }
+
+  updateUsagePanelVisibility() {
+    if (!this.usagePanel) return;
+    this.usagePanel.style.display = this.isVolunteerUser() ? "none" : "";
   }
 
   // --- Conversation API helpers ---
@@ -416,6 +476,86 @@ class ChatInterface {
     this.renderConversations();
     this.messagesArea.innerHTML = "";
     await this.loadMessages(id);
+    this.closeHistoryDrawer();
+  }
+
+  isHistoryDrawerMode() {
+    return window.innerWidth <= 1024;
+  }
+
+  setHistoryToggleState(isOpen) {
+    if (!this.historyToggleBtn) return;
+
+    this.historyToggleBtn.setAttribute(
+      "aria-expanded",
+      isOpen ? "true" : "false",
+    );
+    this.historyToggleBtn.classList.toggle("active", Boolean(isOpen));
+
+    const iconEl = this.historyToggleBtn.querySelector(
+      ".material-symbols-outlined",
+    );
+    if (iconEl) {
+      iconEl.textContent = isOpen ? "close" : "menu";
+    }
+  }
+
+  openHistoryDrawer() {
+    if (!this.historyPanel || !this.isHistoryDrawerMode()) return;
+    this.historyPanel.classList.add("drawer-open");
+    document.body.classList.add("chat-history-open");
+    this.setHistoryToggleState(true);
+  }
+
+  closeHistoryDrawer() {
+    if (!this.historyPanel) return;
+    this.historyPanel.classList.remove("drawer-open");
+    document.body.classList.remove("chat-history-open");
+    this.setHistoryToggleState(false);
+  }
+
+  toggleHistoryDrawer() {
+    if (!this.historyPanel || !this.isHistoryDrawerMode()) return;
+    const isOpen = this.historyPanel.classList.contains("drawer-open");
+    if (isOpen) {
+      this.closeHistoryDrawer();
+    } else {
+      this.openHistoryDrawer();
+    }
+  }
+
+  syncHistoryDrawerState() {
+    if (this.isHistoryDrawerMode()) return;
+    this.closeHistoryDrawer();
+    this.setHistoryToggleState(false);
+  }
+
+  setupHistoryDrawer() {
+    if (!this.historyPanel) return;
+
+    this.historyToggleBtn?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleHistoryDrawer();
+    });
+
+    this.historyCloseBtn?.addEventListener("click", (event) => {
+      event.preventDefault();
+      this.closeHistoryDrawer();
+    });
+
+    this.historyBackdrop?.addEventListener("click", () => {
+      this.closeHistoryDrawer();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        this.closeHistoryDrawer();
+      }
+    });
+
+    this.setHistoryToggleState(false);
+    this.syncHistoryDrawerState();
   }
 
   getChatbotId() {
@@ -439,6 +579,17 @@ class ChatInterface {
     }
 
     let normalized = raw.replace(/\\/g, "/").replace(/^\/+/, "");
+
+    const imageNameOnlyPattern = /^[^/]+\.(png|jpe?g|webp|gif)$/i;
+    const isImageNameOnly = imageNameOnlyPattern.test(normalized);
+
+    if (isImageNameOnly) {
+      if (/^(test_)?guest[_-]/i.test(normalized)) {
+        normalized = `uploads/guests/${normalized}`;
+      } else {
+        normalized = `static/generated/${normalized}`;
+      }
+    }
 
     if (
       normalized.startsWith("backgrounds/") ||
@@ -464,6 +615,124 @@ class ChatInterface {
     }
   }
 
+  async loadUsageSummary() {
+    if (!this.usagePanel) return;
+
+    this.updateUsagePanelVisibility();
+    if (this.isVolunteerUser()) {
+      this.applyGenerationLimitState(false, { limited: false });
+      return;
+    }
+
+    try {
+      const response = await API.get("/api/user/usage");
+      const usage = response?.data || {};
+      this.renderUsageSummary(usage);
+    } catch (error) {
+      console.error("Failed to load usage summary:", error);
+    }
+  }
+
+  renderUsageSummary(usage) {
+    if (!this.usagePanel) return;
+
+    const used = Number.isFinite(Number(usage?.used)) ? Number(usage.used) : 0;
+    const limited = Boolean(usage?.limited);
+    const limit = Number.isFinite(Number(usage?.limit))
+      ? Number(usage.limit)
+      : 0;
+
+    const stepsLabel = limited ? `${used} / ${limit}` : `${used} / Unlimited`;
+    if (this.usageStepsLabel) {
+      this.usageStepsLabel.textContent = stepsLabel;
+    }
+
+    const stepsPercent =
+      limited && limit > 0 ? Math.min((used / limit) * 100, 100) : 100;
+    if (this.usageStepsBar) {
+      this.usageStepsBar.style.width = `${Math.max(0, stepsPercent)}%`;
+    }
+
+    if (this.usageNote) {
+      this.usageNote.textContent = limited
+        ? `Remaining image generations: ${Math.max(limit - used, 0)}`
+        : "Volunteer access: unlimited image generations.";
+    }
+
+    const isLimitReached = Boolean(limited && limit > 0 && used >= limit);
+    this.applyGenerationLimitState(isLimitReached, usage);
+  }
+
+  applyGenerationLimitState(isLocked, usage = {}) {
+    this.isGenerationLocked = Boolean(isLocked);
+
+    if (this.newChatBtn) {
+      this.newChatBtn.disabled = this.isGenerationLocked;
+      this.newChatBtn.style.opacity = this.isGenerationLocked ? "0.45" : "";
+      this.newChatBtn.style.pointerEvents = this.isGenerationLocked
+        ? "none"
+        : "";
+    }
+
+    if (this.attachBtn) {
+      this.attachBtn.disabled = this.isGenerationLocked;
+      this.attachBtn.style.opacity = this.isGenerationLocked ? "0.45" : "";
+      this.attachBtn.style.pointerEvents = this.isGenerationLocked
+        ? "none"
+        : "";
+      this.attachBtn.title = this.isGenerationLocked
+        ? "Image generation limit reached"
+        : "Attachments";
+    }
+
+    if (this.modeBtn) {
+      this.modeBtn.disabled = this.isGenerationLocked;
+      this.modeBtn.style.opacity = this.isGenerationLocked ? "0.45" : "";
+      this.modeBtn.style.pointerEvents = this.isGenerationLocked ? "none" : "";
+      this.modeBtn.title = this.isGenerationLocked
+        ? "Image generation limit reached"
+        : "Modes";
+    }
+
+    if (this.imageInput) {
+      this.imageInput.disabled = this.isGenerationLocked;
+    }
+
+    if (this.inputField) {
+      this.inputField.readOnly = this.isGenerationLocked;
+      this.inputField.placeholder = this.isGenerationLocked
+        ? "Image generation limit reached"
+        : "Message ConvergeAI...";
+    }
+
+    if (this.isGenerationLocked) {
+      this.closeAttachMenu();
+      if (this.modeMenu && this.modeBtn) {
+        this.modeMenu.classList.remove("active");
+        this.modeMenu.setAttribute("aria-hidden", "true");
+        this.modeBtn.setAttribute("aria-expanded", "false");
+      }
+      this.closeGuestSelectorPanel();
+      this.clearSelectedImage();
+      this.sendBtn.disabled = true;
+      this.sendBtn.style.opacity = "0.45";
+      this.sendBtn.classList.add("send-disabled");
+      if (this.chatInputInfo) {
+        const limit = Number.isFinite(Number(usage?.limit))
+          ? Number(usage.limit)
+          : 3;
+        this.chatInputInfo.textContent = `Limit reached: you already generated ${limit} images. Contact admin to get volunteer access.`;
+      }
+      return;
+    }
+
+    if (this.chatInputInfo) {
+      this.chatInputInfo.textContent = this.defaultInputInfoText;
+    }
+
+    this.updateSendButtonState();
+  }
+
   async init() {
     console.log("ChatInterface.init() called", { chatbotId: this.chatbotId });
     if (!this.messagesArea || !this.inputField || !this.sendBtn) {
@@ -481,6 +750,8 @@ class ChatInterface {
     if (!this.chatbotId) {
       await this.resolveDefaultChatbotId();
     }
+
+    await this.loadUsageSummary();
 
     if (!this.chatbotId) {
       this.renderNoChatbotState();
@@ -504,6 +775,8 @@ class ChatInterface {
     this.setupAttachmentHandlers();
     this.setupGuestModeControls();
     this.setupGuestModeIcon();
+    this.setupContactDetailsHandlers();
+    this.setupHistoryDrawer();
 
     try {
       await this.loadConversations();
@@ -577,6 +850,8 @@ class ChatInterface {
 
     const openModeMenu = () => {
       if (!this.modeMenu || !this.modeBtn) return;
+      this.closeHeaderDropdown();
+      this.closeAttachMenu();
       this.modeMenu.classList.add("active");
       this.modeMenu.setAttribute("aria-hidden", "false");
       this.modeBtn.setAttribute("aria-expanded", "true");
@@ -585,6 +860,18 @@ class ChatInterface {
     if (this.modeBtn) {
       this.modeBtn.addEventListener("click", (event) => {
         event.stopPropagation();
+        this.closeHeaderDropdown();
+        this.closeAttachMenu();
+
+        if (
+          this.isGuestMode() &&
+          this.guestSelectorPanel &&
+          !this.guestSelectorPanel.classList.contains("active")
+        ) {
+          this.openGuestSelectorPanel();
+          return;
+        }
+
         const isOpen = this.modeMenu?.classList.contains("active");
         if (isOpen) {
           closeModeMenu();
@@ -616,12 +903,25 @@ class ChatInterface {
     }
 
     document.addEventListener("click", (event) => {
-      if (!this.modeMenu || !this.modeBtn) return;
       const target = event.target;
-      const clickedInsideMenu = this.modeMenu.contains(target);
-      const clickedModeBtn = this.modeBtn.contains(target);
+
+      const clickedInsideMenu = this.modeMenu && this.modeMenu.contains(target);
+      const clickedModeBtn = this.modeBtn && this.modeBtn.contains(target);
+
       if (!clickedInsideMenu && !clickedModeBtn) {
         closeModeMenu();
+      }
+
+      const isGuestPanelOpen =
+        this.guestSelectorPanel &&
+        this.guestSelectorPanel.classList.contains("active");
+      if (!isGuestPanelOpen) return;
+
+      const clickedInsideGuestPanel =
+        this.guestSelectorPanel && this.guestSelectorPanel.contains(target);
+
+      if (!clickedInsideGuestPanel && !clickedInsideMenu && !clickedModeBtn) {
+        this.closeGuestSelectorPanel();
       }
     });
 
@@ -638,7 +938,9 @@ class ChatInterface {
     if (!this.guestModeIcon) return;
 
     const base = String(API_BASE_URL || "").replace(/\/+$/, "");
-    const iconUrl = base ? `${base}/uploads/guest_icon.jpg` : "/uploads/guest_icon.jpg";
+    const iconUrl = base
+      ? `${base}/uploads/guest_icon.jpg`
+      : "/uploads/guest_icon.jpg";
     const fallbackUrl = "../assets/images/guest-mode-icon.svg";
 
     this.guestModeIcon.onerror = () => {
@@ -718,7 +1020,7 @@ class ChatInterface {
   }
 
   openGuestSelectorPanel() {
-    if (!this.guestSelectorPanel) return;
+    if (!this.guestSelectorPanel || !this.isGuestMode()) return;
     this.guestSelectorPanel.classList.add("active");
     this.guestSelectorPanel.setAttribute("aria-hidden", "false");
     if (this.inputArea) {
@@ -727,8 +1029,39 @@ class ChatInterface {
     this.updateMessageViewportInset();
   }
 
+  closeGuestSelectorPanel() {
+    if (!this.guestSelectorPanel) return;
+    this.guestSelectorPanel.classList.remove("active");
+    this.guestSelectorPanel.setAttribute("aria-hidden", "true");
+    if (this.inputArea) {
+      this.inputArea.classList.remove("guest-panel-open");
+    }
+    this.updateMessageViewportInset();
+  }
+
+  closeHeaderDropdown() {
+    const userDropdown = DomUtils.$(".chat-header-dropdown");
+    const userBtn = DomUtils.$(".header-user-btn");
+
+    if (userDropdown) {
+      userDropdown.classList.remove("active");
+    }
+    if (userBtn) {
+      userBtn.classList.remove("active");
+    }
+  }
+
   openAttachMenu() {
     if (!this.attachMenu || !this.attachBtn) return;
+
+    this.closeHeaderDropdown();
+
+    if (this.modeMenu && this.modeBtn) {
+      this.modeMenu.classList.remove("active");
+      this.modeMenu.setAttribute("aria-hidden", "true");
+      this.modeBtn.setAttribute("aria-expanded", "false");
+    }
+
     this.attachMenu.setAttribute("aria-hidden", "false");
     this.attachBtn.setAttribute("aria-expanded", "true");
     this.attachMenu.classList.add("active");
@@ -742,38 +1075,116 @@ class ChatInterface {
   }
 
   validateSendRequirements() {
-    const hasSelectedGuest =
-      Array.isArray(this.selectedGuestIds) && this.selectedGuestIds.length > 0;
-    const hasOwnImage = Boolean(this.selectedImageFile);
-
-    if (!hasSelectedGuest && !hasOwnImage) {
-      NotificationManager.warning(
-        "Select a guest and upload your photo before sending.",
-      );
-      this.applyModeSelection("guest", true);
-      this.openGuestSelectorPanel();
-      this.openAttachMenu();
-      return false;
-    }
-
-    if (!hasSelectedGuest) {
-      NotificationManager.warning(
-        "Please select a guest image first before sending.",
-      );
-      this.applyModeSelection("guest", true);
-      this.openGuestSelectorPanel();
-      return false;
-    }
-
-    if (!hasOwnImage) {
-      NotificationManager.warning(
-        "Please upload or capture your own photo before sending.",
-      );
-      this.openAttachMenu();
-      return false;
-    }
-
     return true;
+  }
+
+  setContactCtaVisible(visible) {
+    if (!this.contactToggleBtn) return;
+    this.contactToggleBtn.style.display = visible ? "inline-flex" : "none";
+  }
+
+  setupContactDetailsHandlers() {
+    if (!this.contactToggleBtn || !this.contactModal || !this.contactForm) {
+      return;
+    }
+
+    this.contactToggleBtn.addEventListener("click", () => {
+      this.contactModal.classList.add("active");
+      this.contactModal.setAttribute("aria-hidden", "false");
+      document.body.classList.add("chat-contact-open");
+      setTimeout(() => {
+        this.contactNameInput?.focus();
+      }, 80);
+    });
+
+    const closeModal = () => {
+      this.contactModal.classList.remove("active");
+      this.contactModal.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("chat-contact-open");
+    };
+
+    this.contactCancelBtn?.addEventListener("click", closeModal);
+
+    this.contactModal.addEventListener("click", (event) => {
+      if (event.target === this.contactModal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (
+        event.key === "Escape" &&
+        this.contactModal.classList.contains("active")
+      ) {
+        closeModal();
+      }
+    });
+
+    this.contactForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const name = String(this.contactNameInput?.value || "").trim();
+      const whatsapp = String(this.contactWhatsappInput?.value || "").trim();
+
+      if (name.length < 2) {
+        NotificationManager.error("Please enter a valid name");
+        return;
+      }
+
+      const normalizedNumber = whatsapp.replace(/[\s-]/g, "");
+      if (!/^\+?[0-9]{8,15}$/.test(normalizedNumber)) {
+        NotificationManager.error("Please enter a valid WhatsApp number");
+        return;
+      }
+
+      this.addMessage(
+        `Details submitted: Name - ${name}, WhatsApp - ${whatsapp}. Volunteer team will contact you soon.`,
+        "user",
+      );
+      NotificationManager.success("Details submitted successfully");
+      this.contactForm.reset();
+      closeModal();
+    });
+  }
+
+  getImageGenerationHelpMessage(rawMessage = "") {
+    const msg = String(rawMessage || "").toLowerCase();
+
+    if (
+      msg.includes("api key") ||
+      msg.includes("invalid_argument") ||
+      msg.includes("permission") ||
+      msg.includes("unauthorized") ||
+      msg.includes("forbidden")
+    ) {
+      return "Image generation is temporarily unavailable due to API configuration. Please contact admin or volunteer support.";
+    }
+
+    if (
+      msg.includes("quota") ||
+      msg.includes("limit") ||
+      msg.includes("resource_exhausted") ||
+      msg.includes("rate") ||
+      msg.includes("429")
+    ) {
+      return "Image generation limit has been reached for now. Please contact admin or volunteer support.";
+    }
+
+    return "Unable to generate image right now. Please try again or contact admin/volunteer support.";
+  }
+
+  isLikelyImageRequest(text, selectedImage) {
+    if (selectedImage) return true;
+
+    const requestedMode = this.getRequestModeValue();
+    if (["guest", "single_person", "multiple_person"].includes(requestedMode)) {
+      return true;
+    }
+
+    const content = String(text || "").toLowerCase();
+    return /(generate|create|make|render)\s+.*(image|photo|portrait|picture)/.test(
+      content,
+    );
   }
 
   async initializeGuestSelectorData(fallbackGuests = []) {
@@ -792,10 +1203,7 @@ class ChatInterface {
   async loadGuestsFromApi() {
     if (!this.chatbotId) return [];
 
-    const endpoints = [
-      `/api/guests?chatbot_id=${this.chatbotId}`,
-      `/api/user/guests?chatbot_id=${this.chatbotId}`,
-    ];
+    const endpoints = [`/api/user/guests?chatbot_id=${this.chatbotId}`];
 
     for (const endpoint of endpoints) {
       try {
@@ -896,13 +1304,8 @@ class ChatInterface {
     this.syncGuestCardSelection();
     this.syncPrimarySelectedGuest();
 
-    if (this.selectedGuestIds.length > 0 && this.guestSelectorPanel) {
-      this.guestSelectorPanel.classList.remove("active");
-      this.guestSelectorPanel.setAttribute("aria-hidden", "true");
-      if (this.inputArea) {
-        this.inputArea.classList.remove("guest-panel-open");
-      }
-      this.updateMessageViewportInset();
+    if (this.selectedGuestIds.length > 0) {
+      this.closeGuestSelectorPanel();
     }
   }
 
@@ -949,6 +1352,15 @@ class ChatInterface {
   }
 
   updateSendButtonState() {
+    if (this.isGenerationLocked) {
+      if (this.sendBtn) {
+        this.sendBtn.disabled = true;
+        this.sendBtn.style.opacity = "0.45";
+        this.sendBtn.classList.add("send-disabled");
+      }
+      return;
+    }
+
     const hasText = Boolean(this.inputField && this.inputField.value.trim());
     const hasImage = Boolean(this.selectedImageFile);
     if (!this.sendBtn) return;
@@ -976,6 +1388,19 @@ class ChatInterface {
   updateMessageViewportInset() {
     if (!this.messagesArea) return;
 
+    const previewIsVisible =
+      this.previewRow && this.previewRow.style.display !== "none";
+    const previewHeight = previewIsVisible
+      ? this.previewRow.offsetHeight || 0
+      : 0;
+
+    if (this.inputArea) {
+      this.inputArea.style.setProperty(
+        "--composer-preview-height",
+        `${previewHeight}px`,
+      );
+    }
+
     const isInputVisible =
       this.inputArea && !this.inputArea.classList.contains("chat-input-hidden");
     const bottomInset = isInputVisible
@@ -998,6 +1423,13 @@ class ChatInterface {
   }
 
   async sendMessage() {
+    if (this.isGenerationLocked) {
+      NotificationManager.warning(
+        "Image generation limit reached. Contact admin to get volunteer access.",
+      );
+      return;
+    }
+
     if (this.chatUnavailable) {
       NotificationManager.warning(
         this.chatUnavailableMessage ||
@@ -1019,13 +1451,54 @@ class ChatInterface {
       await this.createConversation("New chat");
     }
 
-    const userMessagePreview = text || "[Image uploaded]";
+    const userMessagePreview = text || "";
 
-    this.addMessage(userMessagePreview, "user", null, selectedImage);
+    const selectedGuestPreviewUrls = (
+      Array.isArray(this.selectedGuestIds) ? this.selectedGuestIds : []
+    )
+      .map((guestId) =>
+        this.guests.find((guest) => Number(guest?.id) === Number(guestId)),
+      )
+      .filter((guest) => Boolean(guest?.photo))
+      .map((guest) => this.resolveMediaUrl(guest.photo))
+      .filter((url) => Boolean(String(url || "").trim()));
+
+    const userMessageImages = [];
+    if (selectedImage) {
+      userMessageImages.push(selectedImage);
+    }
+    selectedGuestPreviewUrls.forEach((url) => userMessageImages.push(url));
+    if (this.backgroundImageUrl) {
+      userMessageImages.push(this.backgroundImageUrl);
+    }
+
+    this.addMessage(
+      userMessagePreview,
+      "user",
+      null,
+      userMessageImages.length > 0 ? userMessageImages : null,
+    );
+
+    const selectedGuestImageForRequest = this.selectedGuestImage;
+
+    const selectedGuestIdsForRequest = Array.from(
+      new Set(
+        (Array.isArray(this.selectedGuestIds) ? this.selectedGuestIds : [])
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id)),
+      ),
+    );
+    if (
+      selectedGuestIdsForRequest.length === 0 &&
+      Number.isFinite(Number(this.selectedGuest?.id))
+    ) {
+      selectedGuestIdsForRequest.push(Number(this.selectedGuest.id));
+    }
 
     this.inputField.value = "";
     this.autoResizeInput();
     this.clearSelectedImage();
+    this.clearSelectedGuests();
     this.sendBtn.disabled = true;
 
     try {
@@ -1033,12 +1506,28 @@ class ChatInterface {
 
       // Fetch guest image if a guest is selected
       let guestImageBlob = null;
-      if (this.selectedGuestImage) {
-        console.log("📸 Fetching guest image...", this.selectedGuestImage);
+      if (selectedGuestImageForRequest) {
+        console.log("📸 Fetching guest image...", selectedGuestImageForRequest);
         guestImageBlob = await this.urlToBlob(
-          this.selectedGuestImage,
+          selectedGuestImageForRequest,
           "guest_image.jpg",
         );
+      }
+
+      const guestImageBlobs = [];
+      for (const guestId of selectedGuestIdsForRequest) {
+        const guest = this.guests.find((item) => Number(item?.id) === guestId);
+        const guestPhotoUrl = guest?.photo
+          ? this.resolveMediaUrl(guest.photo)
+          : "";
+        if (!guestPhotoUrl) continue;
+        const blob = await this.urlToBlob(
+          guestPhotoUrl,
+          `guest_${guestId}.jpg`,
+        );
+        if (blob) {
+          guestImageBlobs.push({ id: guestId, blob });
+        }
       }
 
       // Fetch background image if available
@@ -1057,7 +1546,9 @@ class ChatInterface {
           text,
           selectedImage,
           this.currentConversationId,
-          guestImageBlob, // Pass fetched guest image blob
+          guestImageBlob,
+          guestImageBlobs,
+          selectedGuestIdsForRequest,
           backgroundImageBlob, // Pass fetched background image blob
         );
       } catch (error) {
@@ -1071,6 +1562,8 @@ class ChatInterface {
             selectedImage,
             this.currentConversationId,
             guestImageBlob,
+            guestImageBlobs,
+            selectedGuestIdsForRequest,
             backgroundImageBlob,
           );
         } else {
@@ -1093,33 +1586,45 @@ class ChatInterface {
         this.renderConversations();
       }
 
-      if (botResponse?.content) {
-        let botImageFile = null;
+      const botText = String(botResponse?.content || "");
+      const botMessageType = String(
+        botResponse?.message_type || "text",
+      ).toLowerCase();
+      const responseImageUrls = [];
 
-        // Check if bot response contains an image URL or image data
-        if (botResponse?.image_url) {
-          console.log("🤖 Bot response includes image:", botResponse.image_url);
-          try {
-            // Fetch and convert bot image URL to blob for display
-            botImageFile = await this.urlToBlob(
-              botResponse.image_url,
-              "bot_image.jpg",
-            );
-          } catch (error) {
-            console.error("Failed to fetch bot image:", error);
-          }
-        }
+      if (botResponse?.image_url) {
+        responseImageUrls.push(botResponse.image_url);
+      }
 
+      if (Array.isArray(botResponse?.image_urls)) {
+        botResponse.image_urls
+          .filter((url) => Boolean(String(url || "").trim()))
+          .forEach((url) => responseImageUrls.push(url));
+      }
+
+      if (botMessageType === "image" && responseImageUrls.length > 0) {
+        this.addMessage("", "bot", botResponse?.timestamp, responseImageUrls);
+        this.setContactCtaVisible(true);
+      } else if (botText || responseImageUrls.length > 0) {
         this.addMessage(
-          botResponse.content,
+          botText || "[Image generated]",
           "bot",
-          botResponse.timestamp,
-          botImageFile,
+          botResponse?.timestamp,
+          responseImageUrls,
         );
       }
+
+      await this.loadUsageSummary();
     } catch (error) {
       console.error("Error sending message:", error);
-      NotificationManager.error(error.message || "Failed to send message");
+      if (this.isLikelyImageRequest(text, selectedImage)) {
+        const helpMessage = this.getImageGenerationHelpMessage(error?.message);
+        this.addMessage(helpMessage, "bot");
+        NotificationManager.warning(helpMessage);
+      } else {
+        NotificationManager.error(error.message || "Failed to send message");
+      }
+      await this.loadUsageSummary();
     } finally {
       this.stopTypingIndicator();
       this.sendBtn.disabled = false;
@@ -1132,9 +1637,24 @@ class ChatInterface {
     selectedImage,
     conversationId,
     guestImage,
+    guestImages,
+    selectedGuestIds,
     backgroundImage,
   ) {
     const requestMode = this.getRequestModeValue();
+    const normalizedGuestIds = Array.from(
+      new Set(
+        (Array.isArray(selectedGuestIds) ? selectedGuestIds : [])
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id)),
+      ),
+    );
+    if (
+      normalizedGuestIds.length === 0 &&
+      Number.isFinite(Number(this.selectedGuest?.id))
+    ) {
+      normalizedGuestIds.push(Number(this.selectedGuest.id));
+    }
 
     if (selectedImage) {
       const formData = new FormData();
@@ -1146,13 +1666,24 @@ class ChatInterface {
         String(Boolean(this.isMultiplePersonMode)),
       );
 
-      if (this.isGuestMode()) {
-        formData.append("guest_ids", JSON.stringify(this.selectedGuestIds));
+      if (normalizedGuestIds.length > 0) {
+        formData.append("guest_ids", JSON.stringify(normalizedGuestIds));
       }
 
       // Include guest image if selected
       if (guestImage) {
         formData.append("guest_image", guestImage);
+      }
+
+      if (Array.isArray(guestImages) && guestImages.length > 0) {
+        guestImages.forEach((entry) => {
+          if (!entry?.blob) return;
+          formData.append(
+            "guest_images",
+            entry.blob,
+            `guest_${entry.id || "image"}.jpg`,
+          );
+        });
       }
 
       // Include background image if available
@@ -1180,7 +1711,7 @@ class ChatInterface {
       conversation_id: conversationId,
       mode: requestMode,
       multiple_person_mode: Boolean(this.isMultiplePersonMode),
-      guest_ids: this.isGuestMode() ? this.selectedGuestIds : [],
+      guest_ids: normalizedGuestIds,
     });
   }
 
@@ -1377,21 +1908,10 @@ class ChatInterface {
         const file = new File([blob], `capture_${Date.now()}.png`, {
           type: blob.type,
         });
-
-        // Ask the user to confirm the photo contains a person before accepting
-        const confirmMsg =
-          "Does this photo contain a person? Click OK to use it, Cancel to retake.";
-        const ok = window.confirm(confirmMsg);
-        if (ok) {
-          this.selectedImageFile = file;
-          this.renderAttachmentPreview();
-          this.closeCameraModal();
-          resolve(file);
-        } else {
-          // Keep the camera modal open to allow retake
-          NotificationManager.info("Please retake the photo");
-          resolve(null);
-        }
+        this.selectedImageFile = file;
+        this.renderAttachmentPreview();
+        this.closeCameraModal();
+        resolve(file);
       }, "image/png");
     });
   }
@@ -1413,6 +1933,8 @@ class ChatInterface {
         URL.revokeObjectURL(this.selectedImagePreviewUrl);
         this.selectedImagePreviewUrl = null;
       }
+      this.updateMessageViewportInset();
+      requestAnimationFrame(() => this.updateMessageViewportInset());
       return;
     }
 
@@ -1487,6 +2009,9 @@ class ChatInterface {
           this.syncPrimarySelectedGuest();
         });
       });
+
+    this.updateMessageViewportInset();
+    requestAnimationFrame(() => this.updateMessageViewportInset());
   }
 
   clearSelectedImage() {
@@ -1498,12 +2023,53 @@ class ChatInterface {
     this.updateSendButtonState();
   }
 
-  addMessage(text, sender, messageTimestamp = null, imageFile = null) {
+  clearSelectedGuests() {
+    this.selectedGuestIds = [];
+    this.selectedGuest = null;
+    this.selectedGuestImage = null;
+    this.syncGuestCardSelection();
+    this.renderAttachmentPreview();
+    this.updateSendButtonState();
+  }
+
+  extractImageUrlsFromText(text) {
+    const sourceText = String(text || "");
+    const imageUrls = [];
+    const seen = new Set();
+    const markdownImageRegex =
+      /!\[[^\]]*\]\((https?:\/\/[^\s)]+|\/uploads\/[^\s)]+)\)/gi;
+
+    let cleanedText = sourceText.replace(markdownImageRegex, (match, url) => {
+      const normalizedUrl = String(url || "").trim();
+      if (normalizedUrl && !seen.has(normalizedUrl)) {
+        seen.add(normalizedUrl);
+        imageUrls.push(normalizedUrl);
+      }
+      return "";
+    });
+
+    cleanedText = cleanedText.replace(/\n{3,}/g, "\n\n").trim();
+
+    return {
+      cleanText: cleanedText,
+      imageUrls,
+    };
+  }
+
+  addMessage(text, sender, messageTimestamp = null, imageInput = null) {
     const timestamp = DateUtils.formatTime(messageTimestamp || new Date());
     const normalizedSender = sender === "user" ? "user" : "assistant";
+    const placeholderValues = new Set(["[image uploaded]", "[image message]"]);
+    const rawText = String(text || "").trim();
+    const textForDisplay = placeholderValues.has(rawText.toLowerCase())
+      ? ""
+      : text;
+    const { cleanText, imageUrls: inlineImageUrls } =
+      this.extractImageUrlsFromText(textForDisplay);
+
     const message = {
       id: Date.now(),
-      text: text,
+      text: cleanText,
       sender: normalizedSender,
       timestamp: timestamp,
     };
@@ -1515,18 +2081,58 @@ class ChatInterface {
       `message-group ${normalizedSender}`,
     );
 
-    let imageHtml = "";
-    let imageSrc = "";
+    const imageSources = [];
+    const pushImageSource = (value) => {
+      if (!value) return;
+      if (typeof value === "string") {
+        const normalized = String(value).trim();
+        if (!normalized) return;
+        const resolved = this.resolveMediaUrl(normalized) || normalized;
+        if (!imageSources.includes(resolved)) {
+          imageSources.push(resolved);
+        }
+        return;
+      }
+      const objectUrl = URL.createObjectURL(value);
+      if (!imageSources.includes(objectUrl)) {
+        imageSources.push(objectUrl);
+      }
+    };
 
-    // Create image URL if imageFile is provided
-    if (imageFile) {
-      imageSrc = URL.createObjectURL(imageFile);
-      imageHtml = `<img class="message-image" src="${imageSrc}" alt="Message image" />`;
+    if (Array.isArray(imageInput)) {
+      imageInput.forEach((entry) => pushImageSource(entry));
+    } else {
+      pushImageSource(imageInput);
     }
+
+    inlineImageUrls.forEach((entry) => pushImageSource(entry));
+
+    const withImageFallback = (source) => {
+      const safeSource = this.escapeHtml(source);
+      return `<img class="message-image" src="${safeSource}" alt="Message image" loading="lazy" data-fallback-step="0" onerror="(function(img){var step=Number(img.dataset.fallbackStep||'0'); if(step===0){img.dataset.fallbackStep='1'; img.src=img.src.replace('/static/generated/','/uploads/messages/'); return;} if(step===1){img.dataset.fallbackStep='2'; img.src=img.src.replace('/uploads/messages/','/uploads/guests/'); return;} img.onerror=null;})(this)" />`;
+    };
+
+    let imageHtml = "";
+    if (imageSources.length === 1) {
+      imageHtml = withImageFallback(imageSources[0]);
+    } else if (imageSources.length > 1) {
+      const galleryItems = imageSources
+        .map((source) => withImageFallback(source))
+        .join("");
+      imageHtml = `<div class="message-image-group count-${Math.min(imageSources.length, 6)}">${galleryItems}</div>`;
+    }
+
+    const renderedText = this.renderMessageContent(cleanText);
+    const hideAssistantTextWhenImage =
+      normalizedSender === "assistant" && imageSources.length > 0;
+    const textHtml =
+      !hideAssistantTextWhenImage && renderedText
+        ? `<div class="message-text">${renderedText}</div>`
+        : "";
 
     messageEl.innerHTML = `
       <div class="message-bubble">
-        <div class="message-text">${this.renderMessageContent(text)}</div>
+        ${textHtml}
         ${imageHtml}
         <div class="message-time">${timestamp}</div>
       </div>
@@ -1628,8 +2234,37 @@ class ChatInterface {
       this.messagesArea.innerHTML = "";
       const messages = Array.isArray(response?.data) ? response.data : [];
       messages.forEach((msg) => {
-        if (!msg?.content) return;
-        this.addMessage(msg.content, msg.sender || "bot", msg.timestamp);
+        const content = String(msg?.content || "");
+        const messageType = String(msg?.message_type || "text").toLowerCase();
+        const messageImageUrls = [];
+
+        if (msg?.image_url) {
+          messageImageUrls.push(msg.image_url);
+        }
+        if (Array.isArray(msg?.image_urls)) {
+          msg.image_urls
+            .filter((url) => Boolean(String(url || "").trim()))
+            .forEach((url) => messageImageUrls.push(url));
+        }
+
+        if (messageType === "image") {
+          if (messageImageUrls.length === 0) return;
+          this.addMessage(
+            content || "",
+            msg.sender || "bot",
+            msg.timestamp,
+            messageImageUrls,
+          );
+          return;
+        }
+
+        if (!content && messageImageUrls.length === 0) return;
+        this.addMessage(
+          content || "[Image message]",
+          msg.sender || "bot",
+          msg.timestamp,
+          messageImageUrls,
+        );
       });
     } catch (error) {
       console.error("Error loading messages:", error);
@@ -2192,7 +2827,7 @@ class LoginHandler {
           if (userRole !== "admin") {
             redirectUrl = "user/chat.html";
             try {
-              const chatbotResponse = await API.get("/api/user/chatbots");
+              const chatbotResponse = await API.get("/api/user/my-chatbots");
               const chatbots = Array.isArray(chatbotResponse?.data)
                 ? chatbotResponse.data
                 : [];

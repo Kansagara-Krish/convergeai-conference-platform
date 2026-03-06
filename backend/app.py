@@ -215,6 +215,34 @@ Requirements:
                 ))
                 db.session.commit()
 
+    def ensure_messages_schema():
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        if 'messages' not in table_names:
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('messages')}
+
+        if 'message_type' not in columns:
+            db.session.execute(text(
+                """
+                ALTER TABLE messages
+                ADD COLUMN message_type VARCHAR(32) NOT NULL DEFAULT 'text'
+                """
+            ))
+            db.session.commit()
+
+        try:
+            db.session.execute(text(
+                """
+                ALTER TABLE messages
+                ALTER COLUMN content DROP NOT NULL
+                """
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     should_bootstrap_db = not (
         len(sys.argv) > 1 and sys.argv[1] == 'db'
     )
@@ -225,6 +253,7 @@ Requirements:
             db.create_all()
             ensure_chatbot_prompt_columns()
             ensure_conversation_schema()
+            ensure_messages_schema()
             remove_unused_model_columns()
     
     return app
