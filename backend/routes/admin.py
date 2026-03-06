@@ -27,6 +27,7 @@ admin_bp = Blueprint('admin', __name__)
 EMAIL_REGEX = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$')
 NOTIFICATION_RETENTION_DAYS = 7
 GUEST_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+VALID_USER_ROLES = {'admin', 'user', 'speaker', 'volunteer'}
 
 
 def _to_bool(value, default=False):
@@ -60,7 +61,6 @@ def _sanitize_image_stem(value):
     if '.' in stem:
         stem = stem.rsplit('.', 1)[0]
     return stem[:120]
-
 
 def _build_unique_filename(upload_root, stem, extension):
     safe_stem = _sanitize_image_stem(stem) or uuid.uuid4().hex
@@ -189,6 +189,28 @@ def create_admin_notification(title, message, entity_type='system', entity_id=No
 
 def is_valid_email(email):
     return bool(email and EMAIL_REGEX.match(email))
+
+
+def _make_unique_email(email):
+    normalized_email = str(email or '').strip().lower()
+    if not normalized_email:
+        return normalized_email, False
+
+    if User.query.filter_by(email=normalized_email).first() is None:
+        return normalized_email, False
+
+    local_part, separator, domain_part = normalized_email.partition('@')
+    if not separator or not domain_part:
+        return normalized_email, False
+
+    safe_local = re.sub(r'[^a-z0-9._+-]', '', local_part) or 'user'
+    suffix = 1
+
+    while True:
+        candidate = f"{safe_local}+{suffix}@{domain_part}"
+        if User.query.filter_by(email=candidate).first() is None:
+            return candidate, True
+        suffix += 1
 
 
 def send_user_credentials_email(recipient_email, name, role, username, password, allowed_events=None):
@@ -431,15 +453,14 @@ def create_user(user):
     if not is_valid_email(email):
         return jsonify({'success': False, 'message': 'Invalid email format'}), 400
 
-    if role not in ['admin', 'user', 'speaker']:
+    if role not in VALID_USER_ROLES:
         return jsonify({'success': False, 'message': 'Invalid role'}), 400
 
     # Prevent regular admin users from creating other admin accounts
     if role == 'admin' and getattr(user, 'role', None) == 'admin':
         return jsonify({'success': False, 'message': 'You are not allowed to create admin users'}), 403
 
-    if User.query.filter_by(email=email).first():
-        return jsonify({'success': False, 'message': 'Email already exists'}), 409
+    effective_email, email_auto_adjusted = _make_unique_email(email)
 
     if User.query.filter_by(username=username).first():
         return jsonify({'success': False, 'message': 'Username already exists'}), 409
@@ -448,7 +469,7 @@ def create_user(user):
 
     new_user = User(
         name=name,
-        email=email,
+        email=effective_email,
         username=username,
         role=role,
         active=active
@@ -487,7 +508,7 @@ def create_user(user):
     app = current_app._get_current_object()
     thread = threading.Thread(
         target=send_email_background,
-        args=(app, email, name, role, username, password, assigned_event_names)
+        args=(app, effective_email, name, role, username, password, assigned_event_names)
     )
     thread.daemon = True
     thread.start()
@@ -501,13 +522,22 @@ def create_user(user):
     )
     db.session.commit()
 
-    message = f'User created successfully and assigned to {assigned_count} event(s)! Credentials email is being sent.' if assigned_count > 0 else 'User created successfully! Credentials email is being sent.'
+    if assigned_count > 0:
+        message = f'User created successfully and assigned to {assigned_count} event(s)! Credentials email is being sent.'
+    else:
+        message = 'User created successfully! Credentials email is being sent.'
+
+    if email_auto_adjusted:
+        message += f' Email already existed, so saved as {effective_email}.'
 
     return jsonify({
         'success': True,
         'message': message,
         'data': new_user.to_dict(),
-        'chatbots_assigned': assigned_count
+        'chatbots_assigned': assigned_count,
+        'email_auto_adjusted': email_auto_adjusted,
+        'requested_email': email,
+        'saved_email': effective_email
     }), 201
 
 @admin_bp.route('/users/<int:user_id>', methods=['GET'])
@@ -546,7 +576,7 @@ def update_user(user, user_id):
     # Allow updating specific fields
     if 'active' in data:
         target_user.active = data['active']
-    if 'role' in data and data['role'] in ['admin', 'user', 'speaker']:
+    if 'role' in data and data['role'] in VALID_USER_ROLES:
         # Prevent regular admin users from promoting others to admin
         if data['role'] == 'admin' and getattr(user, 'role', None) == 'admin':
             return jsonify({'success': False, 'message': 'You are not allowed to assign admin role'}), 403
@@ -943,8 +973,9 @@ def preview_users_from_excel(user):
 
             name = get_value(row, ['name', 'full_name', 'fullname'])
             email = get_value(row, ['email', 'mail']).lower()
+            username = get_value(row, ['username', 'user_name'])
 
-            if not name or not email:
+            if not email or not username:
                 skipped_rows += 1
                 continue
 
@@ -953,10 +984,9 @@ def preview_users_from_excel(user):
                 skipped_rows += 1
                 continue
 
-            if User.query.filter_by(email=email).first() is not None:
+            _, email_auto_adjusted = _make_unique_email(email)
+            if email_auto_adjusted:
                 duplicate_email_rows += 1
-                skipped_rows += 1
-                continue
 
             valid_rows += 1
 
@@ -989,9 +1019,13 @@ def import_users_from_excel(user):
     
     file = request.files['file']
     event_id = request.form.get('event_id')  # Get selected event/chatbot ID
+    default_role = str(request.form.get('default_role', 'user') or 'user').strip().lower()
     
     if not file.filename.endswith('.xlsx'):
         return jsonify({'success': False, 'message': 'Only .xlsx files are allowed'}), 400
+
+    if default_role not in VALID_USER_ROLES:
+        default_role = 'user'
     
     # Validate event_id if provided
     chatbot = None
@@ -1050,33 +1084,36 @@ def import_users_from_excel(user):
 
             name = get_value(row, ['name', 'full_name', 'fullname'])
             email = get_value(row, ['email', 'mail']).lower()
-            role = get_value(row, ['role', 'user_role'], 'user').lower()
+            role = get_value(row, ['role', 'user_role'], default_role).lower()
             raw_username = get_value(row, ['username', 'user_name'])
             password = get_value(row, ['password', 'pass'])
             active_value = get_value(row, ['active', 'is_active'], '')
 
-            if not name or not email:
+            if not email or not raw_username:
                 skipped += 1
                 continue
 
-            if role not in ['admin', 'user', 'speaker']:
-                role = 'user'
+            if not is_valid_email(email):
+                skipped += 1
+                continue
+
+            if role not in VALID_USER_ROLES:
+                role = default_role
 
             # Prevent regular admin users from importing/creating admin accounts
             if role == 'admin' and getattr(user, 'role', None) == 'admin':
                 role = 'user'
 
-            if User.query.filter_by(email=email).first() is not None:
-                skipped += 1
-                continue
+            effective_email, _ = _make_unique_email(email)
 
-            username = normalize_username(raw_username, email)
+            username = normalize_username(raw_username, effective_email)
+            display_name = (name or username).strip()
             if not password:
                 password = '123'
 
             new_user = User(
-                name=name,
-                email=email,
+                name=display_name,
+                email=effective_email,
                 username=username,
                 role=role,
                 active=parse_bool(active_value, True)
@@ -1101,17 +1138,17 @@ def import_users_from_excel(user):
 
 
             credentials.append({
-                'name': name,
+                'name': display_name,
                 'role': role,
                 'username': username,
                 'password': password,
-                'email': email,
+                'email': effective_email,
                 'allowed_events': [chatbot.event_name] if chatbot and chatbot.event_name else []
             })
 
         if not credentials:
             db.session.rollback()
-            return jsonify({'success': False, 'message': 'No valid users imported (check required columns and duplicates)'}), 400
+            return jsonify({'success': False, 'message': 'No valid users imported (required columns: Email, Username)'}), 400
 
         db.session.commit()
 

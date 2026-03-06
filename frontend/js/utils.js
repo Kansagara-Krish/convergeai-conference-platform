@@ -254,9 +254,21 @@ class FormValidator {
 // ============================================
 
 class DateUtils {
+  static parse(date) {
+    if (date instanceof Date) return date;
+
+    if (typeof date === "string") {
+      const raw = date.trim();
+      const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+      const normalized = hasTimezone ? raw : `${raw}Z`;
+      return new Date(normalized);
+    }
+
+    return new Date(date);
+  }
+
   static format(date, format = "YYYY-MM-DD") {
-    if (typeof date === "string") date = new Date(date);
-    const d = new Date(date);
+    const d = this.parse(date);
     const map = {
       YYYY: d.getFullYear(),
       MM: String(d.getMonth() + 1).padStart(2, "0"),
@@ -269,7 +281,7 @@ class DateUtils {
   }
 
   static formatTime(date) {
-    const d = new Date(date);
+    const d = this.parse(date);
     return d.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
@@ -277,7 +289,7 @@ class DateUtils {
   }
 
   static formatDate(date) {
-    const d = new Date(date);
+    const d = this.parse(date);
     return d.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -289,14 +301,14 @@ class DateUtils {
     if (!start && !end) return "N/A";
     if (start && !end) return `${this.formatDate(start)} - Ongoing`;
     if (!start && end) return this.formatDate(end);
-    const s = new Date(start);
-    const e = new Date(end);
+    const s = this.parse(start);
+    const e = this.parse(end);
     return `${this.formatDate(s)} - ${this.formatDate(e)}`;
   }
 
   static isToday(date) {
     const today = new Date();
-    const d = new Date(date);
+    const d = this.parse(date);
     return (
       d.getDate() === today.getDate() &&
       d.getMonth() === today.getMonth() &&
@@ -306,7 +318,7 @@ class DateUtils {
 
   static daysUntil(date) {
     const today = new Date();
-    const d = new Date(date);
+    const d = this.parse(date);
     const diff = d - today;
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   }

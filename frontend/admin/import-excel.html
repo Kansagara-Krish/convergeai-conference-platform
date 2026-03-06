@@ -10,7 +10,7 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js?v=11"></script>
-    <script src="../js/admin.js?v=11"></script>
+    <script src="../js/admin.js?v=12"></script>
 </head>
 
 <body>
@@ -127,9 +127,10 @@
                         <div class="card-body">
                             <h3><i class="fas fa-clipboard-list"></i> Import Instructions</h3>
                             <ul style="margin-left: var(--spacing-lg); color: var(--text-secondary);">
-                                <li>Upload an Excel file (.xlsx) with user emails and names</li>
-                                <li>Required columns: Name, Email</li>
-                                <li>System will auto-generate usernames and temporary passwords</li>
+                                <li>Upload an Excel file (.xlsx) with only email and username columns</li>
+                                <li>Use this exact header row to avoid mismatch: <code>email,username</code></li>
+                                <li>Do not add Password, Role, Active, or Name columns for this import format</li>
+                                <li>System will create accounts and assign default password <code>123</code></li>
                                 <li>Credentials will be sent to users' email addresses</li>
                                 <li>You can download and print the credentials list</li>
                             </ul>
@@ -170,6 +171,7 @@
                                     <label for="role-select">Default User Role</label>
                                     <select id="role-select" name="default_role">
                                         <option value="user">User</option>
+                                        <option value="volunteer">Volunteer</option>
                                     </select>
                                 </div>
                             </div>

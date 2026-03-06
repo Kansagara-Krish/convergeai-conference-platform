@@ -1637,6 +1637,8 @@
 
 .file-upload.background-upload {
   padding: var(--spacing-lg);
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 .background-upload .file-upload-icon {
@@ -2730,12 +2732,28 @@ select#event-select,
 select#role-select,
 select#user-role-filter,
 select#user-status-filter,
+select#guest-status-filter,
+select#guest-event-filter,
 select#chatbot-status-filter,
 .users-filter-select {
-  background-color: rgba(31, 42, 72, 0.9);
-  color: var(--text-primary);
+  background-color: rgba(15, 23, 42, 0.9);
+  color: var(--text-primary) !important;
   border: 1px solid var(--border-color);
   color-scheme: dark;
+}
+
+.form-group select:focus,
+select#event-select:focus,
+select#role-select:focus,
+select#user-role-filter:focus,
+select#user-status-filter:focus,
+select#guest-status-filter:focus,
+select#guest-event-filter:focus,
+select#chatbot-status-filter:focus,
+.users-filter-select:focus {
+  border-color: rgba(99, 102, 241, 0.55);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  outline: none;
 }
 
 .form-group select option,
@@ -2743,10 +2761,43 @@ select#event-select option,
 select#role-select option,
 select#user-role-filter option,
 select#user-status-filter option,
+select#guest-status-filter option,
+select#guest-event-filter option,
 select#chatbot-status-filter option,
 .users-filter-select option {
-  background-color: #171d3a;
-  color: var(--text-primary);
+  background-color: #111b33 !important;
+  color: var(--text-primary) !important;
+}
+
+.form-group select option:hover,
+.form-group select option:focus,
+.form-group select option:active,
+select#event-select option:hover,
+select#event-select option:focus,
+select#event-select option:active,
+select#role-select option:hover,
+select#role-select option:focus,
+select#role-select option:active,
+select#user-role-filter option:hover,
+select#user-role-filter option:focus,
+select#user-role-filter option:active,
+select#user-status-filter option:hover,
+select#user-status-filter option:focus,
+select#user-status-filter option:active,
+select#guest-status-filter option:hover,
+select#guest-status-filter option:focus,
+select#guest-status-filter option:active,
+select#guest-event-filter option:hover,
+select#guest-event-filter option:focus,
+select#guest-event-filter option:active,
+select#chatbot-status-filter option:hover,
+select#chatbot-status-filter option:focus,
+select#chatbot-status-filter option:active,
+.users-filter-select option:hover,
+.users-filter-select option:focus,
+.users-filter-select option:active {
+  background-color: rgba(79, 70, 229, 0.42) !important;
+  color: #ffffff !important;
 }
 
 .form-group select option:checked,
@@ -2754,16 +2805,39 @@ select#event-select option:checked,
 select#role-select option:checked,
 select#user-role-filter option:checked,
 select#user-status-filter option:checked,
+select#guest-status-filter option:checked,
+select#guest-event-filter option:checked,
 select#chatbot-status-filter option:checked,
 .users-filter-select option:checked {
-  background-color: #2a6acb;
-  color: #ffffff;
+  background-color: var(--accent-blue) !important;
+  color: #ffffff !important;
 }
 
 .single-user-role-select {
   padding-right: 3rem;
   background-position: right 1rem center;
   min-height: 52px;
+  background-color: rgba(31, 42, 72, 0.96) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  color-scheme: dark;
+}
+
+.single-user-role-select option {
+  background-color: #171d3a !important;
+  color: var(--text-primary) !important;
+}
+
+.single-user-role-select option:hover,
+.single-user-role-select option:focus,
+.single-user-role-select option:active {
+  background-color: #22325e !important;
+  color: #ffffff !important;
+}
+
+.single-user-role-select option:checked {
+  background-color: #2a6acb !important;
+  color: #ffffff !important;
 }
 
 .single-user-role-row .single-user-active-wrap {

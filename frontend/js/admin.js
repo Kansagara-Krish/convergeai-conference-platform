@@ -153,6 +153,11 @@ class AdminPanel {
       event.preventDefault();
       event.stopPropagation();
 
+      const userDropdown = DomUtils.$(".dropdown-menu");
+      if (userDropdown) {
+        DomUtils.removeClass(userDropdown, "active");
+      }
+
       this.isBellPanelOpen = !this.isBellPanelOpen;
       bellPanel.classList.toggle("active", this.isBellPanelOpen);
       bellPanel.setAttribute("aria-hidden", String(!this.isBellPanelOpen));
@@ -636,6 +641,15 @@ class AdminPanel {
     if (userBtn && dropdown) {
       userBtn.addEventListener("click", (e) => {
         e.stopPropagation();
+
+        const bellPanel = DomUtils.$("#dashboard-bell-panel");
+        if (bellPanel) {
+          this.isBellPanelOpen = false;
+          bellPanel.classList.remove("active");
+          bellPanel.setAttribute("aria-hidden", "true");
+          this.updateMobileBellFocusState(false);
+        }
+
         DomUtils.toggleClass(dropdown, "active");
       });
 
@@ -1657,6 +1671,10 @@ class ChatbotFormHandler {
 class ImportExcelHandler {
   constructor() {
     this.form = DomUtils.$('form[data-form="import-excel"]');
+    this.submitBtn = this.form?.querySelector('button[type="submit"]') || null;
+    this.defaultSubmitHtml =
+      this.submitBtn?.innerHTML || "Import & Generate Credentials";
+    this.isSubmitting = false;
     this.eventSelect = DomUtils.$("#event-select");
     this.roleSelect = DomUtils.$("#role-select");
     this.recentImportsBody = DomUtils.$("#recent-imports-body");
@@ -1804,6 +1822,10 @@ class ImportExcelHandler {
   async handleSubmit(e) {
     e.preventDefault();
 
+    if (this.isSubmitting) {
+      return;
+    }
+
     const file = this.form.querySelector('input[type="file"]').files[0];
     if (!file) {
       NotificationManager.error("Please select a file");
@@ -1817,6 +1839,7 @@ class ImportExcelHandler {
     const selectedEvent = this.eventSelect?.value || "";
     if (selectedRole) formData.append("default_role", selectedRole);
     if (selectedEvent) formData.append("event_id", selectedEvent);
+    this.setSubmitLoading(true);
 
     try {
       const data = await API.post("/api/admin/import/excel", formData);
@@ -1839,7 +1862,27 @@ class ImportExcelHandler {
     } catch (error) {
       console.error("Import error:", error);
       NotificationManager.error(error.message || "Failed to import file");
+    } finally {
+      this.setSubmitLoading(false);
     }
+  }
+
+  setSubmitLoading(isLoading) {
+    this.isSubmitting = isLoading;
+
+    if (!this.submitBtn) return;
+
+    this.submitBtn.disabled = isLoading;
+    this.submitBtn.setAttribute("aria-busy", isLoading ? "true" : "false");
+    this.submitBtn.style.opacity = isLoading ? "0.85" : "1";
+
+    if (isLoading) {
+      this.submitBtn.innerHTML =
+        '<i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i> Importing...';
+      return;
+    }
+
+    this.submitBtn.innerHTML = this.defaultSubmitHtml;
   }
 
   appendRecentImportRow({ fileName, count, eventName }) {
@@ -1915,11 +1958,13 @@ class ImportExcelHandler {
     const html = `
       <h3>Import Successful!</h3>
       <p>${credentials.length} users created with credentials:</p>
+      <p style="color: var(--text-secondary); margin-top: 0.35rem;">Default password is <strong>123</strong> when Password is empty in Excel.</p>
       ${skipped > 0 ? `<p style="color: var(--accent-orange);">${skipped} rows were skipped (duplicates or invalid data).</p>` : ""}
       <div class="table-container" style="max-height: 400px; overflow-y: auto;">
         <table class="table">
           <thead>
             <tr>
+              <th>Role</th>
               <th>Username</th>
               <th>Password</th>
               <th>Email</th>
@@ -1930,6 +1975,7 @@ class ImportExcelHandler {
               .map(
                 (cred) => `
               <tr>
+                <td>${cred.role || "user"}</td>
                 <td>${cred.username}</td>
                 <td style="font-family: var(--font-mono); font-size: 0.85rem;">${cred.password}</td>
                 <td>${cred.email}</td>
@@ -2104,7 +2150,7 @@ class UserManagementHandler {
         <!-- Event Assignment Section -->
         <div style="padding-bottom: 16px;">
           <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
-            <i class="fas fa-calendar-check"></i> Assign to Active Events
+            <i class="fas fa-calendar-check"></i> Assign to Active Events <span class="required">*</span>
           </h4>
           <select id="single-user-chatbots" name="chatbots" multiple class="single-user-events-select" style="width: 100%; height: 160px; padding: 10px; border-radius: 8px; border: 2px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 14px; cursor: pointer; font-family: inherit;">
             <option value="" disabled>Loading active events...</option>
@@ -2137,8 +2183,11 @@ class UserManagementHandler {
     const activeToggle = modal.querySelector("#single-user-active");
     const activeToggleText = modal.querySelector(".toggle-text");
 
-    const getCreateLabelByRole = (role) =>
-      role === "admin" ? "Create Admin" : "Create User";
+    const getCreateLabelByRole = (role) => {
+      if (role === "admin") return "Create Admin";
+      if (role === "volunteer") return "Create Volunteer";
+      return "Create User";
+    };
 
     const updateSubmitLabelByRole = () => {
       if (!submitBtn || !roleSelect) return;
@@ -2148,8 +2197,10 @@ class UserManagementHandler {
 
     updateSubmitLabelByRole();
     if (roleSelect) {
-      // restrict role selection to 'user' only; admins cannot create admins here
-      roleSelect.innerHTML = '<option value="user">User</option>';
+      roleSelect.innerHTML = [
+        '<option value="user">User</option>',
+        '<option value="volunteer">Volunteer</option>',
+      ].join("");
       roleSelect.value = "user";
       roleSelect.addEventListener("change", updateSubmitLabelByRole);
     }
@@ -2236,6 +2287,13 @@ class UserManagementHandler {
       return;
     }
 
+    if (payload.chatbot_ids.length === 0) {
+      NotificationManager.error(
+        "Please select at least one event/chatbot to assign to the user",
+      );
+      return;
+    }
+
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!emailPattern.test(payload.email)) {
       NotificationManager.error("Please enter a valid email address");
@@ -2244,9 +2302,17 @@ class UserManagementHandler {
 
     const submitBtn = form.querySelector("#single-user-submit");
     const submitLabel =
-      payload.role === "admin" ? "Creating Admin..." : "Creating User...";
+      payload.role === "admin"
+        ? "Creating Admin..."
+        : payload.role === "volunteer"
+          ? "Creating Volunteer..."
+          : "Creating User...";
     const resetLabel =
-      payload.role === "admin" ? "Create Admin" : "Create User";
+      payload.role === "admin"
+        ? "Create Admin"
+        : payload.role === "volunteer"
+          ? "Create Volunteer"
+          : "Create User";
 
     if (submitBtn) {
       submitBtn.disabled = true;
