@@ -1,64 +1,75 @@
 # ConvergeAI Conference Chatbot System
 
-ConvergeAI is a full-stack conference chatbot platform with:
-- Admin tools for chatbot/event management, guest management, and bulk user import.
-- User tools for joining events and chatting with Gemini-powered assistants.
-- Conversation history, role-based access control, notifications, and file uploads.
-- Animated loading states (skeletons, button loaders, generation loaders) and a modern conference-themed UI.
+## Project Overview
+ConvergeAI is a full-stack conference chatbot platform for managing event assistants and attendee interactions.
 
-Tech stack:
+It includes:
+- An admin experience for chatbot setup, guest management, user management, and Excel-based onboarding
+- A user experience for joining event chatbots, chatting, and managing profile data
+- Role-based access control, conversation history, OTP-based password reset, notifications, and uploads
+- Animated loading states and a polished conference-style dark UI
+
+## Tech Stack
 - Backend: Flask, SQLAlchemy, PostgreSQL, OpenPyXL
 - Frontend: HTML, CSS, Vanilla JavaScript
 - AI: Google Gemini API
-- Deploy: Gunicorn + Docker Compose
+- Deployment: Gunicorn + Docker Compose
+
+## Screenshots
+Add project screenshots here for GitHub presentation.
+
+Suggested screenshots:
+- Login page
+- Admin dashboard
+- Chatbot management page
+- User chat interface
+
+Example Markdown:
+
+```md
+![Admin Dashboard](docs/screenshots/admin-dashboard.png)
+![User Chat](docs/screenshots/user-chat.png)
+```
 
 ## Features
-
-### Admin
+### Admin Features
 - Dashboard stats (`/api/admin/dashboard/stats`)
 - User management (create, update, delete, role/active controls)
 - Excel user import with preview and credential generation (`.xlsx`)
-- Chatbot management (create/update/delete, prompts, API keys, event dates)
+- Chatbot management (create, update, delete, prompts, API keys, event dates)
 - Guest management with image upload
 - Admin notifications feed
 
-### User
+### User Features
 - Browse active/public chatbots
 - Join chatbots and track joined events
 - Multi-conversation chat per chatbot
-- Text + image message support
-- Gemini image generation usage endpoint (`/api/user/usage`)
-- Profile view/update
+- Text and image message support
+- Gemini image generation usage tracking (`/api/user/usage`)
+- Profile view and update
 
-### Platform
-- Token auth with role checks (`token_required`, `admin_required`)
+### Platform and UX Features
+- Token-based auth with role checks (`token_required`, `admin_required`)
 - Health endpoint (`/api/health`)
 - Upload serving (`/uploads/<path>`)
 - Frontend served by Flask in normal app startup
+- Animated page skeleton loaders (admin bootstrapping)
+- Conversation/message skeleton loaders in chat views
+- Image generation loader during Gemini generation flows
+- Button-level loaders for login, import, forgot-password, and reset actions
 
-### UI/UX (Current Work)
-- Animated page skeleton loaders on admin pages while data is bootstrapping
-- Conversation and message skeleton loaders in chat screens
-- Image generation loader shown during Gemini image creation
-- Button-level loaders for login, import, forgot-password, and reset flows
-- Conference-style dark visual theme with gradients, glass effects, and responsive layouts
-
-## User Types (4) and Feature Access
-
-Current roles supported in the system:
+## User Roles and Access
+Current supported roles (3):
 - `admin`
 - `user`
-- `speaker`
 - `volunteer`
 
-Feature summary by role:
-- `admin`: Full admin panel access (dashboard, users, chatbot config, guest management, import tools, notifications)
-- `user`: Standard user portal access (join events, chat, conversations, profile, image usage limits)
-- `volunteer`: User portal access with elevated image-generation allowance (unlimited generation behavior in UI)
-- `speaker`: Stored as a valid role in the system; currently follows standard user-level chat/profile flow unless custom policy is added
+Role summary:
+- `admin`: Full admin panel access (users, chatbots, guests, import, notifications, dashboard)
+- `user`: Standard user portal access (join events, chat, conversations, profile, usage limits)
+- `volunteer`: User portal access with elevated image-generation allowance (unlimited behavior in UI)
 
 ## Repository Structure
-
 ```text
 convergeai_conference_chatbot_system/
 |-- backend/
@@ -67,36 +78,47 @@ convergeai_conference_chatbot_system/
 |   |-- models.py
 |   |-- requirements.txt
 |   |-- routes/
-|   |   |-- auth.py
+|   |   |-- __init__.py
 |   |   |-- admin.py
-|   |   |-- user.py
-|   |   `-- chatbot.py
-|   `-- uploads/
+|   |   |-- auth.py
+|   |   |-- chatbot.py
+|   |   `-- user.py
+|   `-- static/
+|       `-- generated/
+|-- database/
+|   `-- init_db.py
+|-- dev-scripts/
+|   |-- check_guests_schema.py
+|   |-- diagnose.py
+|   `-- list_admins.py
 |-- frontend/
 |   |-- index.html
+|   |-- forgot-password.html
+|   |-- test-delete.html
 |   |-- admin/
 |   |-- user/
 |   |-- css/
 |   `-- js/
-|-- database/
-|   `-- init_db.py
-|-- dev-scripts/
+|-- uploads/
+|   |-- backgrounds/
+|   |-- guest_lists/
+|   |-- guests/
+|   `-- messages/
 |-- Dockerfile
 |-- docker-compose.yml
+|-- requirements-dev.txt
 |-- wsgi.py
 `-- README.md
 ```
 
 ## Requirements
-
-- Python 3.11 recommended
+- Python 3.11 (recommended)
 - PostgreSQL 13+
-- pip
+- `pip`
 - Optional: Docker + Docker Compose
 
 ## Environment Variables
-
-Create `.env` in the project root.
+Create a `.env` file in the project root.
 
 ```env
 FLASK_ENV=development
@@ -127,18 +149,19 @@ GEMINI_IMAGE_MODEL=gemini-2.0-flash-exp
 
 Notes:
 - In production mode, `DATABASE_URL`, `SECRET_KEY`, and `JWT_SECRET_KEY` are validated.
-- Chatbots can also store their own per-chatbot `gemini_api_key`.
+- Chatbots can store per-chatbot `gemini_api_key` values.
+- Never commit `.env`, API keys, or real secrets.
 
-## Local Setup (Windows PowerShell)
-
-1. Clone and enter project.
+## Installation
+### Local Setup (Windows PowerShell)
+1. Clone the repository and enter the project folder.
 
 ```powershell
 git clone <your-repo-url>
 cd convergeai_conference_chatbot_system
 ```
 
-2. Create and activate venv.
+2. Create and activate a virtual environment.
 
 ```powershell
 python -m venv venv
@@ -152,50 +175,43 @@ pip install -r backend/requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-4. Configure `.env` (see above).
+4. Add a `.env` file (see the Environment Variables section).
 
-5. Initialize database.
+5. Initialize the database.
 
 ```powershell
 python database/init_db.py
 ```
 
-Credential note:
-- Do not use shared/default credentials in public or production deployments.
-- Create unique accounts and strong passwords for each environment.
-- Keep credentials out of GitHub commits and documentation.
-
-6. Run app.
+6. Run the application.
 
 ```powershell
 python backend/app.py
 ```
 
-Local backend URL:
-- `http://localhost:5050`
+Local URLs:
+- App (Flask + frontend): `http://localhost:5050/`
+- Health check: `http://localhost:5050/api/health`
 
-Because Flask serves the frontend directory, you can open:
-- `http://localhost:5050/`
-
-## Docker Setup
+### Docker Setup
+Build and start services:
 
 ```powershell
 docker-compose up -d --build
 ```
 
-Default compose ports:
+Default ports:
 - Frontend container: `http://localhost:8000`
-- Backend API/container: `http://localhost:5000`
-- Postgres: `localhost:5432`
+- Backend API container: `http://localhost:5000`
+- PostgreSQL: `localhost:5432`
 
-Stop:
+Stop services:
 
 ```powershell
 docker-compose down
 ```
 
 ## API Summary
-
 Base prefixes:
 - `/api/auth`
 - `/api/admin`
@@ -213,48 +229,43 @@ Base prefixes:
 - `POST /users/<user_id>/reset-password` (admin)
 
 ### Admin (`/api/admin`)
-- Dashboard and notifications:
-  - `GET /dashboard/stats`
-  - `GET /notifications`
-  - `PUT /notifications/read`
-- Users:
-  - `GET /users`
-  - `POST /users`
-  - `GET /users/<user_id>`
-  - `PUT /users/<user_id>`
-  - `DELETE /users/<user_id>`
-- Chatbots and guests:
-  - `GET /chatbots`
-  - `GET /chatbots/<chatbot_id>`
-  - `DELETE /chatbots/<chatbot_id>`
-  - `GET /chatbots/<chatbot_id>/guests`
-  - `POST /chatbots/<chatbot_id>/guests`
-  - `GET /guests`
-  - `POST /guests`
-  - `GET /guests/<guest_id>`
-  - `PUT /guests/<guest_id>`
-  - `DELETE /guests/<guest_id>`
-- Import:
-  - `POST /import/excel/preview`
-  - `POST /import/excel`
+- `GET /dashboard/stats`
+- `GET /notifications`
+- `PUT /notifications/read`
+- `GET /users`
+- `POST /users`
+- `GET /users/<user_id>`
+- `PUT /users/<user_id>`
+- `DELETE /users/<user_id>`
+- `GET /chatbots`
+- `GET /chatbots/<chatbot_id>`
+- `DELETE /chatbots/<chatbot_id>`
+- `GET /chatbots/<chatbot_id>/guests`
+- `POST /chatbots/<chatbot_id>/guests`
+- `GET /guests`
+- `POST /guests`
+- `GET /guests/<guest_id>`
+- `PUT /guests/<guest_id>`
+- `DELETE /guests/<guest_id>`
+- `POST /import/excel/preview`
+- `POST /import/excel`
 
 ### User (`/api/user`)
 - `GET /guests?chatbot_id=<id>`
 - `GET /chatbots`
 - `GET /usage`
+- `POST /chatbots/<chatbot_id>/image-contacts`
 - `POST /chatbots/<chatbot_id>/join`
 - `GET /my-chatbots`
 - `GET /profile`
 - `PUT /profile`
-- Conversations:
-  - `GET /chatbots/<chatbot_id>/conversations`
-  - `POST /chatbots/<chatbot_id>/conversations`
-  - `PUT /chatbots/<chatbot_id>/conversations/<conversation_id>`
-  - `DELETE /chatbots/<chatbot_id>/conversations/<conversation_id>`
-  - `GET /chatbots/<chatbot_id>/conversations/<conversation_id>/messages`
-- Messages:
-  - `GET /chatbots/<chatbot_id>/messages`
-  - `POST /chatbots/<chatbot_id>/messages`
+- `GET /chatbots/<chatbot_id>/conversations`
+- `POST /chatbots/<chatbot_id>/conversations`
+- `PUT /chatbots/<chatbot_id>/conversations/<conversation_id>`
+- `DELETE /chatbots/<chatbot_id>/conversations/<conversation_id>`
+- `GET /chatbots/<chatbot_id>/conversations/<conversation_id>/messages`
+- `GET /chatbots/<chatbot_id>/messages`
+- `POST /chatbots/<chatbot_id>/messages`
 
 ### Chatbots (`/api/chatbots`)
 - `POST /` (admin)
@@ -268,10 +279,9 @@ Base prefixes:
 - `GET /uploads/<path>`
 
 ## Import File Format
+User import endpoint expects `.xlsx` files.
 
-User import endpoint expects `.xlsx`.
-
-Minimum required columns per row:
+Required columns:
 - `email`
 - `username`
 
@@ -281,44 +291,49 @@ Optional columns:
 - `password`
 - `active`
 
-Always provide a `password` column during import to avoid weak/shared temporary credentials.
-
-## Authentication and Credentials
-
-- No default username/password should be relied on for real deployments.
-- Login supports both username or email with password.
-- Password reset supports OTP flow (`request-otp` -> `reset`).
-- Admin can reset user passwords through admin-protected endpoints.
+Recommendation:
+- Always provide a `password` column during import to avoid weak temporary defaults.
 
 ## Utility Scripts
-
 Top-level scripts:
-- `database/init_db.py`: initialize DB schema and seed local development data
+- `database/init_db.py`: Initializes database schema and seeds local development data
 - `wsgi.py`: WSGI entry point for production servers
 
-Diagnostic/dev scripts (under `dev-scripts/`):
+Diagnostic scripts (`dev-scripts/`):
 - `diagnose.py`
 - `check_guests_schema.py`
 - `list_admins.py`
 
-Note:
-- Some legacy helper scripts reference older model fields. Use `database/init_db.py` and active API routes as the source of truth.
-
 ## Testing
-
-Add project tests under a dedicated `tests/` folder (recommended) and run them with your preferred test runner.
+Add project tests under a dedicated `tests/` folder and run them with your preferred test runner.
 
 ```powershell
 python test_delete_conversation.py
 ```
 
 ## Security Notes
+- Use strong `SECRET_KEY` and `JWT_SECRET_KEY` values.
+- Restrict CORS and protect SMTP credentials in production.
+- Avoid publishing shared/default credentials in public docs.
+- Rotate compromised tokens and keys immediately.
 
-- Do not publish shared/default credentials in repository docs.
-- Use strong `SECRET_KEY` and `JWT_SECRET_KEY`.
-- Restrict CORS and secure SMTP credentials in production.
-- Do not commit `.env`, API keys, or real secrets.
+## Contribution
+Contributions are welcome.
+
+Suggested workflow:
+1. Fork the repository.
+2. Create a feature branch.
+3. Make focused changes with clear commit messages.
+4. Run tests and basic manual checks.
+5. Open a Pull Request with a clear description.
+
+## Future Improvements
+- Add automated test coverage for key API and frontend flows
+- Add API documentation with request/response examples
+- Add CI/CD checks (lint, tests, security scanning)
+- Add production deployment documentation and hardening checklist
 
 ## License
+No license file is currently included.
 
-Add your preferred license file and update this section.
+Before public open-source distribution, add a `LICENSE` file (for example, MIT/Apache-2.0) and update this section accordingly.
