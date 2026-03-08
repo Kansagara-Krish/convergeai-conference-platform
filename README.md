@@ -4,6 +4,7 @@ ConvergeAI is a full-stack conference chatbot platform with:
 - Admin tools for chatbot/event management, guest management, and bulk user import.
 - User tools for joining events and chatting with Gemini-powered assistants.
 - Conversation history, role-based access control, notifications, and file uploads.
+- Animated loading states (skeletons, button loaders, generation loaders) and a modern conference-themed UI.
 
 Tech stack:
 - Backend: Flask, SQLAlchemy, PostgreSQL, OpenPyXL
@@ -34,6 +35,27 @@ Tech stack:
 - Health endpoint (`/api/health`)
 - Upload serving (`/uploads/<path>`)
 - Frontend served by Flask in normal app startup
+
+### UI/UX (Current Work)
+- Animated page skeleton loaders on admin pages while data is bootstrapping
+- Conversation and message skeleton loaders in chat screens
+- Image generation loader shown during Gemini image creation
+- Button-level loaders for login, import, forgot-password, and reset flows
+- Conference-style dark visual theme with gradients, glass effects, and responsive layouts
+
+## User Types (4) and Feature Access
+
+Current roles supported in the system:
+- `admin`
+- `user`
+- `speaker`
+- `volunteer`
+
+Feature summary by role:
+- `admin`: Full admin panel access (dashboard, users, chatbot config, guest management, import tools, notifications)
+- `user`: Standard user portal access (join events, chat, conversations, profile, image usage limits)
+- `volunteer`: User portal access with elevated image-generation allowance (unlimited generation behavior in UI)
+- `speaker`: Stored as a valid role in the system; currently follows standard user-level chat/profile flow unless custom policy is added
 
 ## Repository Structure
 
@@ -132,15 +154,16 @@ pip install -r requirements-dev.txt
 
 4. Configure `.env` (see above).
 
-5. Initialize database with demo users.
+5. Initialize database.
 
 ```powershell
 python database/init_db.py
 ```
 
-This creates:
-- Admin: `admin` / `password`
-- User: `user` / `password`
+Credential note:
+- Do not use shared/default credentials in public or production deployments.
+- Create unique accounts and strong passwords for each environment.
+- Keep credentials out of GitHub commits and documentation.
 
 6. Run app.
 
@@ -258,12 +281,19 @@ Optional columns:
 - `password`
 - `active`
 
-If password is empty during import, default password is `123`.
+Always provide a `password` column during import to avoid weak/shared temporary credentials.
+
+## Authentication and Credentials
+
+- No default username/password should be relied on for real deployments.
+- Login supports both username or email with password.
+- Password reset supports OTP flow (`request-otp` -> `reset`).
+- Admin can reset user passwords through admin-protected endpoints.
 
 ## Utility Scripts
 
 Top-level scripts:
-- `database/init_db.py`: initialize DB and create demo admin/user
+- `database/init_db.py`: initialize DB schema and seed local development data
 - `wsgi.py`: WSGI entry point for production servers
 
 Diagnostic/dev scripts (under `dev-scripts/`):
@@ -284,7 +314,7 @@ python test_delete_conversation.py
 
 ## Security Notes
 
-- Change all default credentials before production use.
+- Do not publish shared/default credentials in repository docs.
 - Use strong `SECRET_KEY` and `JWT_SECRET_KEY`.
 - Restrict CORS and secure SMTP credentials in production.
 - Do not commit `.env`, API keys, or real secrets.
