@@ -848,9 +848,7 @@ textarea {
    ============================================ */
 
 .toast {
-  position: fixed;
-  bottom: var(--spacing-xl);
-  right: var(--spacing-xl);
+  position: relative;
   padding: var(--spacing-lg);
   border-radius: var(--radius-md);
   border-left: 4px solid;
@@ -1762,4 +1760,20 @@ select option:checked {
     padding: 6px;
     font-size: 1rem;
   }
+}
+
+.toast-container {
+  position: fixed;
+  right: var(--spacing-xl);
+  bottom: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1200;
+  max-width: min(92vw, 420px);
+  pointer-events: none;
+}
+
+.toast-container .toast {
+  pointer-events: auto;
 }

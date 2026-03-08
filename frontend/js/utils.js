@@ -14,10 +14,10 @@ function resolveApiBaseUrl() {
 
   const { protocol, hostname, port } = window.location;
 
-  // If running on the same host but different ports, use the same hostname
+  // If frontend is served by backend on localhost ports, use same-origin URLs.
   if (
     (hostname === "localhost" || hostname === "127.0.0.1") &&
-    port === "5050"
+    ["5000", "5050", "7000"].includes(port)
   ) {
     return "";
   }
@@ -44,6 +44,17 @@ const API_BASE_URL = resolveApiBaseUrl();
 // ============================================
 
 class NotificationManager {
+  static getContainer() {
+    let container = document.getElementById("toast-container");
+    if (container) return container;
+
+    container = document.createElement("div");
+    container.id = "toast-container";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+    return container;
+  }
+
   static show(message, type = "info", duration = 3000) {
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
@@ -51,7 +62,7 @@ class NotificationManager {
       <span class="toast-icon">${this.getIcon(type)}</span>
       <span class="toast-message">${message}</span>
     `;
-    document.body.appendChild(toast);
+    this.getContainer().appendChild(toast);
 
     setTimeout(() => {
       toast.style.animation = "slideOut 0.3s ease-out forwards";

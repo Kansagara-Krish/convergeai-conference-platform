@@ -6,10 +6,10 @@
     <title>Chat - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/user.css?v=3">
-    <link rel="stylesheet" href="../css/chat.css?v=23">
+    <link rel="stylesheet" href="../css/chat.css?v=29">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js?v=3"></script>
-    <script src="../js/main.js?v=20"></script>
+        <script src="../js/main.js?v=28"></script>
 </head>
 <body>
     <div class="user-container">
@@ -154,10 +154,6 @@
                             <button class="send-btn" title="Send message">
                                 <span class="material-symbols-outlined">arrow_upward</span>
                             </button>
-                            <button type="button" id="chat-contact-toggle" class="chat-contact-toggle" aria-label="Share your contact details">
-                                <span class="material-symbols-outlined">send</span>
-                                <span>Send Details</span>
-                            </button>
                         </div>
                         </div>
 
@@ -188,7 +184,7 @@
     <div class="chat-contact-modal" id="chat-contact-modal" aria-hidden="true">
         <div class="chat-contact-modal-card">
             <h3>Send Your Details</h3>
-            <p>Please share your details. A volunteer will contact you.</p>
+            <p>Please share your details.</p>
             <form id="chat-contact-form" class="chat-contact-form" novalidate>
                 <label for="chat-contact-name">Name</label>
                 <input type="text" id="chat-contact-name" name="name" placeholder="Enter your name" required>
@@ -196,11 +192,26 @@
                 <label for="chat-contact-whatsapp">WhatsApp Number</label>
                 <input type="tel" id="chat-contact-whatsapp" name="whatsapp" placeholder="e.g. +91 9876543210" required>
 
+                <div class="chat-contact-meta" id="chat-contact-meta"></div>
+
                 <div class="chat-contact-actions">
                     <button type="button" id="chat-contact-cancel" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Send</button>
+                    <button type="submit" id="chat-contact-submit" class="btn btn-primary">Send</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div class="chat-image-lightbox" id="chat-image-lightbox" aria-hidden="true">
+        <div class="chat-image-lightbox-card">
+            <button type="button" id="chat-image-lightbox-close" class="chat-image-lightbox-close" aria-label="Close full screen image">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <img id="chat-image-lightbox-preview" class="chat-image-lightbox-preview" src="" alt="Full screen preview">
+            <button type="button" id="chat-image-lightbox-send" class="chat-image-lightbox-send" aria-label="Send details from image preview">
+                <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                <span>Send</span>
+            </button>
         </div>
     </div>
 

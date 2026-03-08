@@ -164,5 +164,11 @@ env.bak/
 dist/
 build/
 
+# Local testing artifacts
+testing_data/
+
+# Generated AI image outputs (runtime artifacts)
+backend/static/generated/
+
 # IDE Project files
 *.kpf

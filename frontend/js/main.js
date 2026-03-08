@@ -185,8 +185,14 @@ class ChatInterface {
     this.contactModal = DomUtils.$("#chat-contact-modal");
     this.contactForm = DomUtils.$("#chat-contact-form");
     this.contactCancelBtn = DomUtils.$("#chat-contact-cancel");
+    this.contactSubmitBtn = DomUtils.$("#chat-contact-submit");
+    this.contactMeta = DomUtils.$("#chat-contact-meta");
     this.contactNameInput = DomUtils.$("#chat-contact-name");
     this.contactWhatsappInput = DomUtils.$("#chat-contact-whatsapp");
+    this.imageLightbox = DomUtils.$("#chat-image-lightbox");
+    this.imageLightboxPreview = DomUtils.$("#chat-image-lightbox-preview");
+    this.imageLightboxClose = DomUtils.$("#chat-image-lightbox-close");
+    this.imageLightboxSend = DomUtils.$("#chat-image-lightbox-send");
     this.guestModeIcon = DomUtils.$(
       '.chat-mode-option[data-mode="guest"] .chat-mode-icon-img',
     );
@@ -200,6 +206,7 @@ class ChatInterface {
     this.selectedImageFile = null;
     this.selectedImagePreviewUrl = null;
     this.typingIndicatorEl = null;
+    this.selectedContactImageUrl = "";
     this.handleWindowResize = () => {
       this.updateMessageViewportInset();
       this.syncHistoryDrawerState();
@@ -218,6 +225,8 @@ class ChatInterface {
     this.guests = [];
     this.selectedGuestIds = [];
     this.chatMode = "single";
+    this.personMode = "single";
+    this.isGuestModeEnabled = false;
     this.isMultiplePersonMode = false;
     this.isGenerationLocked = false;
     this.defaultInputInfoText = this.chatInputInfo
@@ -744,8 +753,9 @@ class ChatInterface {
       return;
     }
 
-    this.setInputVisible(false);
+    this.setInputVisible(true);
     this.updateMessageViewportInset();
+    this.renderInitialChatLoading();
 
     if (!this.chatbotId) {
       await this.resolveDefaultChatbotId();
@@ -754,11 +764,10 @@ class ChatInterface {
     await this.loadUsageSummary();
 
     if (!this.chatbotId) {
+      this.clearInitialChatLoading();
       this.renderNoChatbotState();
       return;
     }
-
-    this.messagesArea.innerHTML = "";
 
     this.sendBtn.addEventListener("click", () => this.sendMessage());
     this.inputField.addEventListener("keypress", (e) => {
@@ -776,6 +785,7 @@ class ChatInterface {
     this.setupGuestModeControls();
     this.setupGuestModeIcon();
     this.setupContactDetailsHandlers();
+    this.setupImageLightboxHandlers();
     this.setupHistoryDrawer();
 
     try {
@@ -810,6 +820,7 @@ class ChatInterface {
     const chatbotMeta = await this.loadChatbotMeta();
 
     if (!chatbotMeta) {
+      this.clearInitialChatLoading();
       this.setInputVisible(false);
       return;
     }
@@ -824,6 +835,7 @@ class ChatInterface {
     // Handle unavailable chatbot
     if (this.chatUnavailable) {
       this.renderChatUnavailableNotice();
+      this.clearInitialChatLoading();
       this.setInputVisible(false);
       return;
     }
@@ -833,11 +845,60 @@ class ChatInterface {
       await this.loadMessages(this.currentConversationId);
     }
 
+    this.clearInitialChatLoading();
+
     // Enable input and show it
     this.setInputVisible(true);
     this.autoResizeInput();
     this.setupAutoScroll();
     this.updateMessageViewportInset();
+  }
+
+  getMessagesSkeletonMarkup() {
+    return `
+      <div class="skeleton-message assistant">
+        <div class="skeleton-message-bubble"></div>
+      </div>
+      <div class="skeleton-message assistant">
+        <div class="skeleton-message-bubble skeleton-message-bubble-image"></div>
+      </div>
+      <div class="skeleton-message user">
+        <div class="skeleton-message-bubble"></div>
+      </div>
+      <div class="skeleton-message assistant">
+        <div class="skeleton-message-bubble"></div>
+      </div>
+    `;
+  }
+
+  renderInitialChatLoading() {
+    if (this.convListEl) {
+      this.convListEl.innerHTML = `
+        <div class="skeleton-conversation"></div>
+        <div class="skeleton-conversation"></div>
+        <div class="skeleton-conversation"></div>
+        <div class="skeleton-conversation"></div>
+        <div class="skeleton-conversation"></div>
+        <div class="chat-conversations-empty">No conversations yet. Start a new chat!</div>
+      `;
+    }
+
+    this.showMessagesLoadingSkeleton();
+
+    if (this.inputArea) {
+      this.inputArea.classList.add("chat-input-loading");
+    }
+  }
+
+  clearInitialChatLoading() {
+    if (this.inputArea) {
+      this.inputArea.classList.remove("chat-input-loading");
+    }
+  }
+
+  showMessagesLoadingSkeleton() {
+    if (!this.messagesArea) return;
+    this.messagesArea.innerHTML = this.getMessagesSkeletonMarkup();
   }
 
   setupGuestModeControls() {
@@ -862,15 +923,6 @@ class ChatInterface {
         event.stopPropagation();
         this.closeHeaderDropdown();
         this.closeAttachMenu();
-
-        if (
-          this.isGuestMode() &&
-          this.guestSelectorPanel &&
-          !this.guestSelectorPanel.classList.contains("active")
-        ) {
-          this.openGuestSelectorPanel();
-          return;
-        }
 
         const isOpen = this.modeMenu?.classList.contains("active");
         if (isOpen) {
@@ -954,14 +1006,17 @@ class ChatInterface {
   applyModeSelection(modeValue, shouldSyncSelector = false) {
     const normalizedMode = ["guest", "single", "multiple"].includes(modeValue)
       ? modeValue
-      : "guest";
+      : "single";
 
-    this.chatMode = normalizedMode;
-    if (normalizedMode === "single") {
-      this.isMultiplePersonMode = false;
-    } else if (normalizedMode === "multiple") {
-      this.isMultiplePersonMode = true;
+    if (normalizedMode === "guest") {
+      this.isGuestModeEnabled = !this.isGuestModeEnabled;
+    } else {
+      this.personMode = normalizedMode;
+      this.isMultiplePersonMode = normalizedMode === "multiple";
     }
+
+    // Keep chatMode as the active person-mode for compatibility with existing flows.
+    this.chatMode = this.personMode;
 
     if (shouldSyncSelector) {
       this.syncModeOptionSelection();
@@ -976,7 +1031,16 @@ class ChatInterface {
 
     this.modeOptions.forEach((option) => {
       const optionMode = option.dataset.mode || "";
-      const isActive = optionMode === this.chatMode;
+      let isActive = false;
+
+      if (optionMode === "guest") {
+        isActive = Boolean(this.isGuestModeEnabled);
+      } else if (optionMode === "single") {
+        isActive = this.personMode === "single";
+      } else if (optionMode === "multiple") {
+        isActive = this.personMode === "multiple";
+      }
+
       option.classList.toggle("active", isActive);
       option.setAttribute("aria-pressed", String(isActive));
     });
@@ -997,7 +1061,7 @@ class ChatInterface {
   }
 
   isGuestMode() {
-    return this.chatMode === "guest";
+    return Boolean(this.isGuestModeEnabled);
   }
 
   getRequestModeValue() {
@@ -1081,42 +1145,143 @@ class ChatInterface {
   setContactCtaVisible(visible) {
     if (!this.contactToggleBtn) return;
     this.contactToggleBtn.style.display = visible ? "inline-flex" : "none";
+    this.updateMessageViewportInset();
   }
 
-  setupContactDetailsHandlers() {
-    if (!this.contactToggleBtn || !this.contactModal || !this.contactForm) {
+  openContactModal(imageUrl = "") {
+    if (!this.contactModal) return;
+    this.selectedContactImageUrl = String(
+      imageUrl || this.selectedContactImageUrl || "",
+    ).trim();
+    if (this.contactMeta) {
+      this.contactMeta.textContent = this.selectedContactImageUrl
+        ? "Selected generated image is ready to send."
+        : "Please select a generated image before sending.";
+      this.contactMeta.classList.remove("is-error", "is-success");
+    }
+    this.contactModal.classList.add("active");
+    this.contactModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("chat-contact-open");
+    setTimeout(() => {
+      this.contactNameInput?.focus();
+    }, 80);
+  }
+
+  closeContactModal() {
+    if (!this.contactModal) return;
+    this.contactModal.classList.remove("active");
+    this.contactModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("chat-contact-open");
+    if (this.contactSubmitBtn) {
+      this.contactSubmitBtn.disabled = false;
+      this.contactSubmitBtn.textContent = "Send";
+    }
+  }
+
+  setupImageLightboxHandlers() {
+    if (
+      !this.messagesArea ||
+      !this.imageLightbox ||
+      !this.imageLightboxPreview
+    ) {
       return;
     }
 
-    this.contactToggleBtn.addEventListener("click", () => {
-      this.contactModal.classList.add("active");
-      this.contactModal.setAttribute("aria-hidden", "false");
-      document.body.classList.add("chat-contact-open");
-      setTimeout(() => {
-        this.contactNameInput?.focus();
-      }, 80);
+    this.messagesArea.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement)) return;
+      if (!target.classList.contains("message-image")) return;
+
+      const src = String(target.getAttribute("src") || "").trim();
+      if (!src) return;
+
+      this.imageLightboxPreview.src = src;
+      this.imageLightboxPreview.alt = String(
+        target.getAttribute("alt") || "Image preview",
+      );
+
+      const canSendFromLightbox =
+        String(target.dataset.contactEligible || "false") === "true";
+      this.selectedContactImageUrl = canSendFromLightbox ? src : "";
+      if (this.imageLightboxSend) {
+        this.imageLightboxSend.style.display = canSendFromLightbox
+          ? "inline-flex"
+          : "none";
+        this.imageLightboxSend.setAttribute(
+          "aria-hidden",
+          String(!canSendFromLightbox),
+        );
+      }
+
+      this.imageLightbox.classList.add("active");
+      this.imageLightbox.setAttribute("aria-hidden", "false");
+      document.body.classList.add("chat-image-lightbox-open");
     });
 
-    const closeModal = () => {
-      this.contactModal.classList.remove("active");
-      this.contactModal.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("chat-contact-open");
+    const closeLightbox = () => {
+      this.imageLightbox.classList.remove("active");
+      this.imageLightbox.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("chat-image-lightbox-open");
+      this.imageLightboxPreview.src = "";
     };
 
-    this.contactCancelBtn?.addEventListener("click", closeModal);
+    this.imageLightboxClose?.addEventListener("click", closeLightbox);
+    this.imageLightbox.addEventListener("click", (event) => {
+      const clickedEl = event.target;
+      if (!(clickedEl instanceof HTMLElement)) return;
 
-    this.contactModal.addEventListener("click", (event) => {
-      if (event.target === this.contactModal) {
-        closeModal();
+      const isDesktop = window.matchMedia("(min-width: 769px)").matches;
+      const clickedPreview = clickedEl.closest(".chat-image-lightbox-preview");
+      const clickedSend = clickedEl.closest(".chat-image-lightbox-send");
+
+      if (isDesktop && !clickedPreview && !clickedSend) {
+        closeLightbox();
+        return;
+      }
+
+      if (clickedEl === this.imageLightbox) {
+        closeLightbox();
       }
     });
 
+    this.imageLightboxSend?.addEventListener("click", () => {
+      const focusedImageUrl = String(
+        this.imageLightboxPreview?.src || "",
+      ).trim();
+      closeLightbox();
+      this.openContactModal(focusedImageUrl);
+    });
+
     document.addEventListener("keydown", (event) => {
-      if (
-        event.key === "Escape" &&
-        this.contactModal.classList.contains("active")
-      ) {
-        closeModal();
+      if (event.key !== "Escape") return;
+
+      if (this.imageLightbox.classList.contains("active")) {
+        closeLightbox();
+        return;
+      }
+
+      if (this.contactModal.classList.contains("active")) {
+        this.closeContactModal();
+      }
+    });
+  }
+
+  setupContactDetailsHandlers() {
+    if (!this.contactModal || !this.contactForm) {
+      return;
+    }
+
+    this.contactToggleBtn?.addEventListener("click", () => {
+      this.openContactModal();
+    });
+
+    this.contactCancelBtn?.addEventListener("click", () =>
+      this.closeContactModal(),
+    );
+
+    this.contactModal.addEventListener("click", (event) => {
+      if (event.target === this.contactModal) {
+        this.closeContactModal();
       }
     });
 
@@ -1137,13 +1302,61 @@ class ChatInterface {
         return;
       }
 
-      this.addMessage(
-        `Details submitted: Name - ${name}, WhatsApp - ${whatsapp}. Volunteer team will contact you soon.`,
-        "user",
-      );
-      NotificationManager.success("Details submitted successfully");
-      this.contactForm.reset();
-      closeModal();
+      const imageUrlToSend = String(this.selectedContactImageUrl || "").trim();
+      if (!imageUrlToSend) {
+        if (this.contactMeta) {
+          this.contactMeta.textContent =
+            "No generated image selected. Please use Send under an image.";
+          this.contactMeta.classList.add("is-error");
+          this.contactMeta.classList.remove("is-success");
+        }
+        NotificationManager.error("Please select a generated image first");
+        return;
+      }
+
+      const sendDetails = async () => {
+        try {
+          if (this.contactSubmitBtn) {
+            this.contactSubmitBtn.disabled = true;
+            this.contactSubmitBtn.textContent = "Sending...";
+          }
+
+          await API.post(
+            `/api/user/chatbots/${this.chatbotId}/image-contacts`,
+            {
+              name,
+              whatsapp,
+              image_url: imageUrlToSend,
+              conversation_id: this.currentConversationId,
+            },
+          );
+
+          if (this.contactMeta) {
+            this.contactMeta.textContent = "Image sent successfully";
+            this.contactMeta.classList.remove("is-error");
+            this.contactMeta.classList.add("is-success");
+          }
+          NotificationManager.success("Image sent successfully");
+          this.contactForm.reset();
+          this.selectedContactImageUrl = "";
+          setTimeout(() => this.closeContactModal(), 450);
+        } catch (error) {
+          const message = error?.message || "Failed to send image details";
+          if (this.contactMeta) {
+            this.contactMeta.textContent = message;
+            this.contactMeta.classList.add("is-error");
+            this.contactMeta.classList.remove("is-success");
+          }
+          NotificationManager.error(message);
+        } finally {
+          if (this.contactSubmitBtn) {
+            this.contactSubmitBtn.disabled = false;
+            this.contactSubmitBtn.textContent = "Send";
+          }
+        }
+      };
+
+      sendDetails();
     });
   }
 
@@ -1185,6 +1398,55 @@ class ChatInterface {
     return /(generate|create|make|render)\s+.*(image|photo|portrait|picture)/.test(
       content,
     );
+  }
+
+  shouldShowImageGenerationLoader(text, selectedImage) {
+    return this.isLikelyImageRequest(text, selectedImage);
+  }
+
+  showImageGenerationLoader() {
+    if (!this.messagesArea) return null;
+
+    const timestamp = DateUtils.formatTime(new Date());
+    const loaderEl = DomUtils.create("div", "message-group assistant");
+    loaderEl.classList.add("image-generation-loader");
+    loaderEl.innerHTML = `
+      <div class="message-bubble">
+        <div class="message-image-loader-card" aria-hidden="true">
+          <div class="message-image-loader-glow"></div>
+          <div class="message-image-loader-sheen"></div>
+        </div>
+        <div class="message-image-loader-label">Generating image...</div>
+        <div class="message-time">${timestamp}</div>
+      </div>
+    `;
+
+    this.messagesArea.appendChild(loaderEl);
+    this.scrollToBottom();
+
+    return {
+      element: loaderEl,
+      startedAt: Date.now(),
+      minDurationMs: 3400,
+    };
+  }
+
+  async clearImageGenerationLoader(loaderState) {
+    if (!loaderState || !loaderState.element) return;
+
+    const elapsed = Date.now() - Number(loaderState.startedAt || Date.now());
+    const remaining = Math.max(
+      Number(loaderState.minDurationMs || 0) - elapsed,
+      0,
+    );
+
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
+
+    if (loaderState.element.isConnected) {
+      loaderState.element.remove();
+    }
   }
 
   async initializeGuestSelectorData(fallbackGuests = []) {
@@ -1501,8 +1763,18 @@ class ChatInterface {
     this.clearSelectedGuests();
     this.sendBtn.disabled = true;
 
+    const useImageLoader = this.shouldShowImageGenerationLoader(
+      text,
+      selectedImage,
+    );
+    let imageLoaderState = null;
+
     try {
-      this.startTypingIndicator();
+      if (useImageLoader) {
+        imageLoaderState = this.showImageGenerationLoader();
+      } else {
+        this.startTypingIndicator();
+      }
 
       // Fetch guest image if a guest is selected
       let guestImageBlob = null;
@@ -1603,20 +1875,38 @@ class ChatInterface {
       }
 
       if (botMessageType === "image" && responseImageUrls.length > 0) {
-        this.addMessage("", "bot", botResponse?.timestamp, responseImageUrls);
+        await this.clearImageGenerationLoader(imageLoaderState);
+        this.addMessage("", "bot", botResponse?.timestamp, responseImageUrls, {
+          showImageContactCta: true,
+          fadeInMessage: true,
+        });
         this.setContactCtaVisible(true);
       } else if (botText || responseImageUrls.length > 0) {
+        const shouldEnableContactCta =
+          responseImageUrls.length > 0 &&
+          this.isLikelyImageRequest(text, selectedImage);
+
+        await this.clearImageGenerationLoader(imageLoaderState);
         this.addMessage(
           botText || "[Image generated]",
           "bot",
           botResponse?.timestamp,
           responseImageUrls,
+          {
+            showImageContactCta: shouldEnableContactCta,
+            fadeInMessage: shouldEnableContactCta,
+          },
         );
+
+        if (shouldEnableContactCta) {
+          this.setContactCtaVisible(true);
+        }
       }
 
       await this.loadUsageSummary();
     } catch (error) {
       console.error("Error sending message:", error);
+      await this.clearImageGenerationLoader(imageLoaderState);
       if (this.isLikelyImageRequest(text, selectedImage)) {
         const helpMessage = this.getImageGenerationHelpMessage(error?.message);
         this.addMessage(helpMessage, "bot");
@@ -2056,7 +2346,15 @@ class ChatInterface {
     };
   }
 
-  addMessage(text, sender, messageTimestamp = null, imageInput = null) {
+  addMessage(
+    text,
+    sender,
+    messageTimestamp = null,
+    imageInput = null,
+    options = {},
+  ) {
+    const showImageContactCta = Boolean(options?.showImageContactCta);
+    const fadeInMessage = Boolean(options?.fadeInMessage);
     const timestamp = DateUtils.formatTime(messageTimestamp || new Date());
     const normalizedSender = sender === "user" ? "user" : "assistant";
     const placeholderValues = new Set(["[image uploaded]", "[image message]"]);
@@ -2109,7 +2407,7 @@ class ChatInterface {
 
     const withImageFallback = (source) => {
       const safeSource = this.escapeHtml(source);
-      return `<img class="message-image" src="${safeSource}" alt="Message image" loading="lazy" data-fallback-step="0" onerror="(function(img){var step=Number(img.dataset.fallbackStep||'0'); if(step===0){img.dataset.fallbackStep='1'; img.src=img.src.replace('/static/generated/','/uploads/messages/'); return;} if(step===1){img.dataset.fallbackStep='2'; img.src=img.src.replace('/uploads/messages/','/uploads/guests/'); return;} img.onerror=null;})(this)" />`;
+      return `<div class="message-image-frame loading"><span class="message-image-frame-skeleton" aria-hidden="true"></span><img class="message-image" src="${safeSource}" alt="Message image" loading="lazy" data-contact-eligible="${showImageContactCta ? "true" : "false"}" data-fallback-step="0" onload="(function(img){var frame=img.parentElement; if(frame){frame.classList.remove('loading');}})(this)" onerror="(function(img){var step=Number(img.dataset.fallbackStep||'0'); if(step===0){img.dataset.fallbackStep='1'; img.src=img.src.replace('/static/generated/','/uploads/messages/'); return;} if(step===1){img.dataset.fallbackStep='2'; img.src=img.src.replace('/uploads/messages/','/uploads/guests/'); return;} img.onerror=null; var frame=img.parentElement; if(frame){frame.classList.remove('loading'); frame.classList.add('failed');}})(this)" /></div>`;
     };
 
     let imageHtml = "";
@@ -2129,16 +2427,48 @@ class ChatInterface {
       !hideAssistantTextWhenImage && renderedText
         ? `<div class="message-text">${renderedText}</div>`
         : "";
+    const imageContactCtaHtml =
+      showImageContactCta &&
+      normalizedSender === "assistant" &&
+      imageSources.length > 0
+        ? `
+          <button type="button" class="message-image-contact-btn" data-image-url="${this.escapeHtml(imageSources[0])}" aria-label="Send details for this generated image">
+            <i class="fab fa-whatsapp" aria-hidden="true"></i>
+            <span>Send</span>
+          </button>
+        `
+        : "";
 
     messageEl.innerHTML = `
       <div class="message-bubble">
         ${textHtml}
         ${imageHtml}
+        ${imageContactCtaHtml}
         <div class="message-time">${timestamp}</div>
       </div>
     `;
 
+    const messageContactBtn = messageEl.querySelector(
+      ".message-image-contact-btn",
+    );
+    if (messageContactBtn) {
+      messageContactBtn.addEventListener("click", () => {
+        const selectedImage = String(
+          messageContactBtn.dataset.imageUrl || "",
+        ).trim();
+        this.openContactModal(selectedImage);
+      });
+    }
+
     this.messagesArea.appendChild(messageEl);
+
+    if (fadeInMessage) {
+      messageEl.classList.add("message-fade-in");
+      requestAnimationFrame(() => {
+        messageEl.classList.add("message-fade-in-active");
+      });
+    }
+
     this.scrollToBottom();
   }
 
@@ -2198,17 +2528,14 @@ class ChatInterface {
         return;
       }
 
-      // Hide skeleton loaders
-      const skeletons = this.messagesArea.querySelectorAll(".skeleton-message");
-      skeletons.forEach((s) => (s.style.display = "none"));
-
-      // Hide the loading message
-      const loadingMsg = this.messagesArea.querySelector(
-        ".message-group.assistant",
+      const holdSkeletonDuringInitialLoad = Boolean(
+        this.inputArea?.classList.contains("chat-input-loading"),
       );
-      if (loadingMsg) {
-        loadingMsg.style.display = "none";
-      }
+      const minSkeletonDelay = holdSkeletonDuringInitialLoad
+        ? new Promise((resolve) => setTimeout(resolve, 3000))
+        : Promise.resolve();
+
+      this.showMessagesLoadingSkeleton();
 
       let response;
       try {
@@ -2230,12 +2557,17 @@ class ChatInterface {
         );
       }
 
+      await minSkeletonDelay;
+
       this.messages = [];
       this.messagesArea.innerHTML = "";
       const messages = Array.isArray(response?.data) ? response.data : [];
+      let hasContactEligibleHistoryImage = false;
+
       messages.forEach((msg) => {
         const content = String(msg?.content || "");
         const messageType = String(msg?.message_type || "text").toLowerCase();
+        const normalizedSender = msg?.sender === "user" ? "user" : "bot";
         const messageImageUrls = [];
 
         if (msg?.image_url) {
@@ -2247,13 +2579,20 @@ class ChatInterface {
             .forEach((url) => messageImageUrls.push(url));
         }
 
+        const isAssistantImageMessage =
+          normalizedSender !== "user" && messageImageUrls.length > 0;
+        if (isAssistantImageMessage) {
+          hasContactEligibleHistoryImage = true;
+        }
+
         if (messageType === "image") {
           if (messageImageUrls.length === 0) return;
           this.addMessage(
             content || "",
-            msg.sender || "bot",
+            normalizedSender,
             msg.timestamp,
             messageImageUrls,
+            { showImageContactCta: isAssistantImageMessage },
           );
           return;
         }
@@ -2261,13 +2600,26 @@ class ChatInterface {
         if (!content && messageImageUrls.length === 0) return;
         this.addMessage(
           content || "[Image message]",
-          msg.sender || "bot",
+          normalizedSender,
           msg.timestamp,
           messageImageUrls,
+          { showImageContactCta: isAssistantImageMessage },
         );
       });
+
+      this.setContactCtaVisible(hasContactEligibleHistoryImage);
     } catch (error) {
       console.error("Error loading messages:", error);
+      if (this.messagesArea) {
+        this.messagesArea.innerHTML = `
+          <div class="message-group assistant">
+            <div class="message-bubble">
+              <div class="message-text">Unable to load messages right now. Please refresh and try again.</div>
+              <div class="message-time">--:--</div>
+            </div>
+          </div>
+        `;
+      }
       NotificationManager.error(error.message || "Failed to load messages");
     }
   }
@@ -2925,6 +3277,7 @@ class ProfilePage {
       const profile = response?.data || this.currentUser;
 
       Storage.setUser({ ...this.currentUser, ...profile });
+      this.currentUser = { ...this.currentUser, ...profile };
 
       if (nameEl) nameEl.textContent = profile.name || "-";
       if (emailEl) emailEl.textContent = profile.email || "-";
@@ -2952,9 +3305,25 @@ class ProfilePage {
       if (messagesSentEl) {
         messagesSentEl.textContent = `${profile.messages_sent || 0} messages`;
       }
+
+      this.syncHeaderProfile(profile);
     } catch (error) {
       console.error("Error loading profile:", error);
     }
+  }
+
+  syncHeaderProfile(profile) {
+    if (!profile) return;
+
+    const initials = (profile.name || "U").substring(0, 1).toUpperCase();
+    const headerAvatarEls = [
+      ...DomUtils.$$("[data-user-avatar]"),
+      ...DomUtils.$$("[data-user-name]"),
+    ];
+
+    headerAvatarEls.forEach((el) => {
+      el.textContent = initials;
+    });
   }
 
   setupPasswordChange() {
@@ -2963,22 +3332,49 @@ class ProfilePage {
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
+        const submitBtn = form.querySelector('button[type="submit"]');
+
         const currentPassword = form.querySelector(
           'input[name="current-password"]',
-        ).value;
+        )?.value;
         const newPassword = form.querySelector(
           'input[name="new-password"]',
-        ).value;
+        )?.value;
         const confirmPassword = form.querySelector(
           'input[name="confirm-password"]',
-        ).value;
+        )?.value;
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          NotificationManager.error("Please fill in all password fields");
+          return;
+        }
 
         if (newPassword !== confirmPassword) {
           NotificationManager.error("Passwords do not match");
           return;
         }
 
+        if (newPassword.length < 6) {
+          NotificationManager.error(
+            "New password must be at least 6 characters long",
+          );
+          return;
+        }
+
+        if (currentPassword === newPassword) {
+          NotificationManager.error(
+            "New password must be different from your current password",
+          );
+          return;
+        }
+
         try {
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML =
+              '<span class="material-symbols-outlined icon-inline">autorenew</span>Updating...';
+          }
+
           await API.put(`/api/auth/change-password`, {
             current_password: currentPassword,
             new_password: newPassword,
@@ -2987,7 +3383,15 @@ class ProfilePage {
           NotificationManager.success("Password changed successfully");
           form.reset();
         } catch (error) {
-          NotificationManager.error("Failed to change password");
+          NotificationManager.error(
+            error?.message || "Failed to change password",
+          );
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML =
+              '<span class="material-symbols-outlined icon-inline">autorenew</span>Change Password';
+          }
         }
       });
     }

@@ -188,6 +188,29 @@ def rename_guest_image_by_name(existing_photo_path, guest_name):
     return str(new_relative).replace('\\', '/')
 
 
+def delete_guest_image_file(photo_path):
+    """Delete guest image file from uploads/guests when guest is removed."""
+    if not photo_path:
+        return
+
+    normalized = str(photo_path).replace('\\', '/').lstrip('/')
+    if '/uploads/' in normalized:
+        normalized = normalized.split('/uploads/', 1)[1]
+    if normalized.startswith('uploads/'):
+        normalized = normalized[len('uploads/'):]
+
+    if not normalized.startswith('guests/'):
+        return
+
+    absolute_path = os.path.join(current_app.root_path, 'uploads', normalized.replace('/', os.sep))
+    try:
+        if os.path.isfile(absolute_path):
+            os.remove(absolute_path)
+    except OSError:
+        # Keep DB operation resilient even if filesystem cleanup fails.
+        pass
+
+
 def normalize_guest_row(row):
     """Normalize guest columns from CSV/XLSX rows."""
     normalized = {}
@@ -213,21 +236,25 @@ def parse_guest_list_file(file_path, extension):
         return guests
 
     workbook = load_workbook(filename=file_path, read_only=True, data_only=True)
-    sheet = workbook.active
-    rows = list(sheet.iter_rows(values_only=True))
-    if not rows:
-        return guests
+    try:
+        sheet = workbook.active
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            return guests
 
-    headers = [str(cell).strip() if cell is not None else '' for cell in rows[0]]
-    for row_values in rows[1:]:
-        row_dict = {
-            headers[index]: row_values[index] if index < len(row_values) else ''
-            for index in range(len(headers))
-            if headers[index]
-        }
-        normalized = normalize_guest_row(row_dict)
-        if normalized.get('name'):
-            guests.append(normalized)
+        headers = [str(cell).strip() if cell is not None else '' for cell in rows[0]]
+        for row_values in rows[1:]:
+            row_dict = {
+                headers[index]: row_values[index] if index < len(row_values) else ''
+                for index in range(len(headers))
+                if headers[index]
+            }
+            normalized = normalize_guest_row(row_dict)
+            if normalized.get('name'):
+                guests.append(normalized)
+    finally:
+        # Explicit close is required on Windows to release file handle before os.remove.
+        workbook.close()
 
     return guests
 
@@ -608,6 +635,7 @@ def update_chatbot(user, chatbot_id):
                 continue
             existing_guest = Guest.query.filter_by(id=guest_id, chatbot_id=chatbot.id).first()
             if existing_guest:
+                delete_guest_image_file(existing_guest.photo)
                 db.session.delete(existing_guest)
 
         for index, manual_guest in enumerate(manual_guests):
