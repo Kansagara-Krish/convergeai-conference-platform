@@ -673,7 +673,7 @@ def get_chatbot(user, chatbot_id):
 @token_required
 @admin_required
 def delete_chatbot(user, chatbot_id):
-    """Delete chatbot"""
+    """Delete chatbot and clean up related background/guest image files."""
     
     chatbot = Chatbot.query.get(chatbot_id)
     
@@ -684,14 +684,23 @@ def delete_chatbot(user, chatbot_id):
     if chatbot.background_image:
         files_to_delete.append(chatbot.background_image)
 
-    guest_photos = [g.photo for g in chatbot.guests if g.photo]
-    files_to_delete.extend(guest_photos)
+    guest_photo_paths = [
+        str(guest.photo).strip()
+        for guest in (chatbot.guests or [])
+        if getattr(guest, 'photo', None)
+    ]
     
     db.session.delete(chatbot)
     db.session.commit()
 
+    # Remove background file and guest image files that are no longer referenced.
     for file_path in set(files_to_delete):
         _delete_uploaded_file(file_path)
+
+    for photo_path in set(guest_photo_paths):
+        still_referenced = Guest.query.filter_by(photo=photo_path).first() is not None
+        if not still_referenced:
+            _delete_uploaded_file(photo_path)
     
     return jsonify({
         'success': True,

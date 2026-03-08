@@ -985,9 +985,9 @@ class ChatbotFormHandler {
     this.form = DomUtils.$('form[data-form="chatbot"]');
     this.deletedGuestIds = [];
     this.defaultSinglePersonPrompt =
-      "Generate a high-quality professional portrait image of the guest.\n\nDetails:\n- Focus on one person only.\n- Center the person in the frame.\n- Use a given background image\n- Maintain realistic facial features.\n- Proper lighting and sharp focus.\n- Business or formal attire.\n- No extra people in the frame.\n- No distortion or overlapping elements.\n- Professional conference vibe.";
+      "Generate a high-quality professional conference photo using the provided images.\n\nThe uploaded images include:\n- A user photo containing one person.\n- One guest image.\n- A background image of a conference stage or professional event environment.\n\nInstructions:\n- Detect the person from the user photo and the person from the guest image.\n- Place both individuals together naturally as if they are attending a conference event.\n- Position them standing side by side in the provided background scene.\n- Ensure both people appear balanced and properly aligned in the frame.\n\nRequirements:\n- Preserve the original facial features of both the user and the guest.\n- Maintain natural body proportions and realistic posture.\n- Ensure no facial distortion or identity changes.\n- Avoid overlapping faces or unnatural spacing between the two people.\n- Blend lighting, shadows, and perspective so both people match the background environment.\n\nImportant rules:\n- Do not create additional people.\n- Do not change facial identity or facial structure.\n- Do not merge or distort faces.\n- Ensure both individuals are clearly visible and properly framed.\n\nStyle:\nProfessional conference photo, realistic lighting, high resolution, sharp focus, cohesive composition.";
     this.defaultMultiplePersonPrompt =
-      "Generate a professional group image of multiple guests.\n\nRequirements:\n- Include all selected guests in one frame.\n- Arrange them naturally in a group.\n- Maintain correct proportions for each person.\n- Ensure no unnatural gaps between group members.\n- If people are close together, blend them naturally without visual separation.\n- Avoid cutting faces or overlapping distortions.\n- Use a conference or stage background.\n- Maintain uniform lighting and perspective.\n- Make the group appear cohesive and professionally composed.";
+      "Generate a high-quality professional conference group photo using the provided images.\n\nThe uploaded images may include:\n- A user photo that may contain one or multiple people.\n- One guest images.\n- A background image is provided\n\nInstructions:\n- Detect all people present in the user photo and keep them in the final image.\n- Include the selected guest(s) together with the people from the user photo.\n- Arrange everyone naturally in a group as if natural smile\n- Place the selected guest(s) in the middle of the group composition when possible while keeping natural spacing and visibility.\n- Place the group inside the provided background scene.\n\nRequirements:\n- Preserve the original facial features of all people from the user image and guest images.\n- Maintain correct body proportions and natural positioning.\n- Ensure no faces are cut or distorted.\n- Avoid overlapping faces or unnatural spacing between people.\n- Blend lighting, shadows, and perspective so all people match the background.\n\nImportant rules:\n- Do not create additional people.\n- Do not change or merge identities.\n- Do not distort faces.\n- Ensure all individuals are clearly visible.\n\nStyle:\nProfessional conference group photo, realistic lighting, high resolution, sharp focus, cohesive composition.";
     if (this.form) {
       this.init();
     }
@@ -3504,6 +3504,17 @@ class GuestManagementHandler {
 
       console.log(`[GuestEdit] Guest data:`, guest);
 
+      // Load all chatbots for the chatbot selection dropdown
+      let chatbots = [];
+      try {
+        const chatbotsResponse = await API.get("/api/admin/chatbots");
+        chatbots = Array.isArray(chatbotsResponse?.data)
+          ? chatbotsResponse.data
+          : [];
+      } catch (err) {
+        console.warn("Failed to load chatbots:", err);
+      }
+
       const resolveUploadUrl = (path) => {
         const raw = String(path || "").trim();
         if (!raw) return "";
@@ -3519,6 +3530,18 @@ class GuestManagementHandler {
       const currentPhotoName = guest.photo
         ? decodeURIComponent(String(guest.photo).split("/").pop() || "")
         : "No image uploaded";
+
+      // Build chatbot options string
+      let chatbotOptionsHTML =
+        '<option value="">-- Select a Chatbot --</option>';
+      if (chatbots.length > 0) {
+        chatbotOptionsHTML = chatbots
+          .map(
+            (bot) =>
+              `<option value="${bot.id}" ${guest.chatbot_id === bot.id ? "selected" : ""}>${bot.name} (${bot.event_name})</option>`,
+          )
+          .join("");
+      }
 
       const formHTML = `
         <div class="form-group">
@@ -3543,6 +3566,13 @@ class GuestManagementHandler {
         <div class="form-group">
           <label for="guest-name-edit">Name <span class="text-danger">*</span></label>
           <input type="text" id="guest-name-edit" class="form-control" value="${guest.name || ""}" required>
+        </div>
+        <div class="form-group">
+          <label for="guest-chatbot-edit">Assign to Chatbot</label>
+          <select id="guest-chatbot-edit" class="form-control">
+            ${chatbotOptionsHTML}
+          </select>
+          <small style="color: var(--text-muted);">Change which event chatbot this guest is assigned to.</small>
         </div>
         <div class="form-group">
           <label for="guest-status-edit">Status</label>
@@ -3571,6 +3601,8 @@ class GuestManagementHandler {
               .value.trim();
             const updatedActive =
               document.getElementById("guest-status-edit").value === "true";
+            const selectedChatbotId =
+              document.getElementById("guest-chatbot-edit").value;
             const selectedPhoto =
               document.getElementById("guest-photo-edit").files?.[0];
 
@@ -3583,6 +3615,9 @@ class GuestManagementHandler {
             updatedData.append("name", updatedName);
             updatedData.append("active", String(updatedActive));
             updatedData.append("photo_name", updatedName);
+            if (selectedChatbotId) {
+              updatedData.append("chatbot_id", selectedChatbotId);
+            }
             if (selectedPhoto) {
               updatedData.append("photo", selectedPhoto);
             }

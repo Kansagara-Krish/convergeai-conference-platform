@@ -15,17 +15,17 @@ import uuid
 from werkzeug.utils import secure_filename
 
 try:
-    from models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest
+    from models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification
     from routes.auth import token_required
 except ImportError:
-    from backend.models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest
+    from backend.models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification
     from backend.routes.auth import token_required
 
 user_bp = Blueprint('user', __name__)
 
 # default to a free flash model
 GEMINI_MODEL = 'gemini-flash-latest'
-GEMINI_IMAGE_MODEL = os.environ.get('GEMINI_IMAGE_MODEL', 'gemini-2.0-flash-exp')
+GEMINI_IMAGE_MODEL = os.environ.get('GEMINI_IMAGE_MODEL', 'gemini-3.1-flash-image-preview')
 ALLOWED_IMAGE_MIME_TYPES = {
     'image/png',
     'image/jpeg',
@@ -451,7 +451,124 @@ def _build_message_preview(message):
     return ''
 
 
+def _generate_image_with_genai(chatbot, user, user_text, image_payloads=None, generation_mode='single'):
+    """Generate image using Gemini REST API and parse image/text response safely."""
+    api_key = (chatbot.gemini_api_key or '').strip()
+    if not api_key:
+        api_key = (
+            str(current_app.config.get('GEMINI_API_KEY') or '').strip()
+            or str(os.environ.get('GEMINI_API_KEY') or '').strip()
+            or str(os.environ.get('GOOGLE_API_KEY') or '').strip()
+        )
+
+    if not api_key:
+        raise ValueError('Gemini API key is not configured. Set chatbot key in admin or server GEMINI_API_KEY')
+
+    base_generation_prompt = (
+        (chatbot.multiple_person_prompt or '').strip()
+        if generation_mode == 'multiple'
+        else (chatbot.single_person_prompt or '').strip()
+    )
+    if not base_generation_prompt:
+        base_generation_prompt = (
+            Chatbot.DEFAULT_MULTIPLE_PERSON_PROMPT
+            if generation_mode == 'multiple'
+            else Chatbot.DEFAULT_SINGLE_PERSON_PROMPT
+        )
+
+    prompt_chunks = [
+        f"Event: {chatbot.event_name}",
+        f"Chatbot Name: {chatbot.name}",
+        'Image Generation Prompt:',
+        base_generation_prompt,
+        'User Input:',
+        str(user_text or '').strip() or 'Generate the image based on provided references.',
+        'Output Rules:',
+        '- Generate image output only.',
+        '- Do not include analysis, plans, or extra text unless generation fails.',
+    ]
+
+    parts = [{
+        'text': '\n\n'.join(prompt_chunks)
+    }]
+
+    if image_payloads:
+        if not isinstance(image_payloads, list):
+            image_payloads = [image_payloads]
+
+        for image_payload in image_payloads:
+            if not image_payload:
+                continue
+            parts.append({
+                'inline_data': {
+                    'mime_type': image_payload['mime_type'],
+                    'data': image_payload['data_b64']
+                }
+            })
+
+    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_IMAGE_MODEL}:generateContent?key={api_key}"
+    response = requests.post(
+        endpoint,
+        json={
+            'contents': [{
+                'role': 'user',
+                'parts': parts
+            }],
+            'generationConfig': {
+                'temperature': 0.2,
+                'topP': 0.9,
+                'maxOutputTokens': 1024,
+                'responseModalities': ['IMAGE', 'TEXT']
+            }
+        },
+        timeout=60
+    )
+
+    if response.status_code >= 400:
+        try:
+            details = response.json()
+        except Exception:
+            details = response.text
+        raise RuntimeError(
+            f'Gemini API error ({response.status_code}) on image model {GEMINI_IMAGE_MODEL}: {details}'
+        )
+
+    payload = response.json() or {}
+    candidates = payload.get('candidates') or []
+    if not candidates:
+        raise RuntimeError('No response candidate returned by Gemini image model')
+
+    response_parts = ((candidates[0].get('content') or {}).get('parts') or [])
+    image_bytes, mime_type = _extract_generated_image_parts(response_parts)
+    if image_bytes:
+        return {
+            'message_type': 'image',
+            'image_bytes': image_bytes,
+            'mime_type': mime_type or 'image/png',
+            'content': None,
+        }
+
+    combined_text = '\n'.join([
+        str(part.get('text') or '').strip()
+        for part in response_parts
+        if str(part.get('text') or '').strip()
+    ]).strip()
+
+    if combined_text:
+        return {
+            'message_type': 'text',
+            'content': combined_text,
+        }
+
+    raise RuntimeError('No image or text content in Gemini response')
+
+
 def _call_gemini(chatbot, user, user_text, image_payloads=None, generation_mode='single', expect_image=False):
+    # Use image generation endpoint path for image requests.
+    if expect_image:
+        return _generate_image_with_genai(chatbot, user, user_text, image_payloads, generation_mode)
+    
+    # Continue with text generation using the existing REST API approach
     api_key = (chatbot.gemini_api_key or '').strip()
     if not api_key:
         api_key = (
@@ -550,47 +667,14 @@ def _call_gemini(chatbot, user, user_text, image_payloads=None, generation_mode=
     model_name = GEMINI_MODEL
     errors = []
 
-    if expect_image:
-        requested_models = [
-            GEMINI_IMAGE_MODEL,
-            GEMINI_MODEL,
-            'gemini-1.5-flash-latest',
-        ]
-        unique_models = []
-        for candidate in requested_models:
-            normalized = str(candidate or '').strip()
-            if normalized and normalized not in unique_models:
-                unique_models.append(normalized)
-
-        for candidate_model in unique_models:
-            for include_modalities in (True, False):
-                response = _post_generate(candidate_model, include_modalities)
-                if response.status_code < 400:
-                    payload = response.json() or {}
-                    model_name = candidate_model
-                    break
-
-                try:
-                    details = response.json()
-                except Exception:
-                    details = response.text
-                errors.append(
-                    f"({response.status_code}) model={candidate_model}, responseModalities={include_modalities}: {details}"
-                )
-            if payload is not None:
-                break
-
-        if payload is None:
-            raise RuntimeError(f"Gemini image generation failed across models: {' | '.join(errors)}")
-    else:
-        response = _post_generate(GEMINI_MODEL, include_response_modalities=False)
-        if response.status_code >= 400:
-            try:
-                details = response.json()
-            except Exception:
-                details = response.text
-            raise RuntimeError(f'Gemini API error ({response.status_code}) on model {GEMINI_MODEL}: {details}')
-        payload = response.json() or {}
+    response = _post_generate(GEMINI_MODEL, include_response_modalities=False)
+    if response.status_code >= 400:
+        try:
+            details = response.json()
+        except Exception:
+            details = response.text
+        raise RuntimeError(f'Gemini API error ({response.status_code}) on model {GEMINI_MODEL}: {details}')
+    payload = response.json() or {}
 
     candidates = payload.get('candidates') or []
     if not candidates:
@@ -598,43 +682,6 @@ def _call_gemini(chatbot, user, user_text, image_payloads=None, generation_mode=
 
     parts = ((candidates[0].get('content') or {}).get('parts') or [])
     combined = '\n'.join([part.get('text', '') for part in parts if part.get('text')]).strip()
-
-    if expect_image:
-        image_bytes, mime_type = _extract_generated_image_parts(parts)
-        if image_bytes:
-            return {
-                'message_type': 'image',
-                'image_bytes': image_bytes,
-                'mime_type': mime_type,
-                'content': None,
-            }
-
-        image_url = _extract_first_http_image_url(combined)
-        if image_url:
-            downloaded_bytes, downloaded_mime_type = _download_image_from_url(image_url)
-            if downloaded_bytes:
-                return {
-                    'message_type': 'image',
-                    'image_bytes': downloaded_bytes,
-                    'mime_type': downloaded_mime_type,
-                    'content': None,
-                }
-            current_app.logger.warning('Image URL returned but download failed; using external URL directly: %s', image_url)
-            return {
-                'message_type': 'image',
-                'image_url': image_url,
-                'content': None,
-            }
-
-        if combined:
-            current_app.logger.warning('Image generation response had no usable image payload/url. Response text: %s', combined[:500])
-        else:
-            current_app.logger.warning('Image generation response had no text and no usable image payload/url (model=%s).', model_name)
-
-        return {
-            'message_type': 'text',
-            'content': 'Image generation failed. Please try again.'
-        }
 
     if not combined:
         raise RuntimeError('Gemini returned an empty response')
@@ -781,6 +828,65 @@ def get_usage_summary(user):
         'success': True,
         'data': usage
     }), 200
+
+
+@user_bp.route('/chatbots/<int:chatbot_id>/image-contacts', methods=['POST'])
+@token_required
+def submit_image_contact(user, chatbot_id):
+    participant = _get_participant(chatbot_id, user.id)
+    if not participant:
+        return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
+
+    chatbot = Chatbot.query.get(chatbot_id)
+    if not chatbot:
+        return jsonify({'success': False, 'message': 'Chatbot not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name', '')).strip()
+    whatsapp = str(data.get('whatsapp', '')).strip()
+    image_url = str(data.get('image_url', '')).strip()
+
+    if len(name) < 2:
+        return jsonify({'success': False, 'message': 'Please enter a valid name'}), 400
+
+    normalized_number = re.sub(r'[\s-]+', '', whatsapp)
+    if not re.fullmatch(r'^\+?[0-9]{8,15}$', normalized_number):
+        return jsonify({'success': False, 'message': 'Please enter a valid WhatsApp number'}), 400
+
+    if not image_url:
+        return jsonify({'success': False, 'message': 'Generated image is required'}), 400
+
+    conversation_id = data.get('conversation_id')
+    try:
+        conversation_id = int(conversation_id) if conversation_id is not None else None
+    except (TypeError, ValueError):
+        conversation_id = None
+
+    notification_message = (
+        f'User: {user.name} ({user.username})\n'
+        f'Chatbot: {chatbot.name}\n'
+        f'Contact Name: {name}\n'
+        f'WhatsApp: {whatsapp}\n'
+        f'Image URL: {image_url}'
+    )
+    if conversation_id:
+        notification_message += f'\nConversation ID: {conversation_id}'
+
+    notification = AdminNotification(
+        title='Generated image details submitted',
+        message=notification_message,
+        entity_type='image_contact',
+        entity_id=chatbot.id,
+        is_read=False,
+    )
+
+    db.session.add(notification)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Image sent successfully'
+    }), 201
 
 # ============================================
 # Join Chatbot

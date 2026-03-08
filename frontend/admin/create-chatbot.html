@@ -10,7 +10,7 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js?v=5"></script>
-    <script src="../js/admin.js?v=5"></script>
+    <script src="../js/admin.js?v=6"></script>
 </head>
 
 <body>
@@ -189,18 +189,34 @@
                                     <textarea id="single-person-prompt" name="single_person_prompt"
                                         placeholder="Enter prompt for single person mode..."
                                         rows="12" style="min-height: 300px; resize: vertical;"
-                                        data-rules="required" required>Generate a high-quality professional portrait image of the guest.
+                                        data-rules="required" required>Generate a high-quality professional conference photo using the provided images.
 
-Details:
-- Focus on one person only.
-- Center the person in the frame.
-- Use a given background image
-- Maintain realistic facial features.
-- Proper lighting and sharp focus.
-- Business or formal attire.
-- No extra people in the frame.
-- No distortion or overlapping elements.
-- Professional conference vibe.</textarea>
+The uploaded images include:
+- A user photo containing one person.
+- One guest image.
+- A background image of a conference stage or professional event environment.
+
+Instructions:
+- Detect the person from the user photo and the person from the guest image.
+- Place both individuals together naturally as if they are attending a conference event.
+- Position them standing side by side in the provided background scene.
+- Ensure both people appear balanced and properly aligned in the frame.
+
+Requirements:
+- Preserve the original facial features of both the user and the guest.
+- Maintain natural body proportions and realistic posture.
+- Ensure no facial distortion or identity changes.
+- Avoid overlapping faces or unnatural spacing between the two people.
+- Blend lighting, shadows, and perspective so both people match the background environment.
+
+Important rules:
+- Do not create additional people.
+- Do not change facial identity or facial structure.
+- Do not merge or distort faces.
+- Ensure both individuals are clearly visible and properly framed.
+
+Style:
+Professional conference photo, realistic lighting, high resolution, sharp focus, cohesive composition.</textarea>
                                 </div>
                             </div>
 
@@ -213,18 +229,35 @@ Details:
                                     <textarea id="multiple-person-prompt" name="multiple_person_prompt"
                                         placeholder="Enter prompt for multiple person mode..."
                                         rows="12" style="min-height: 300px; resize: vertical;"
-                                        data-rules="required" required>Generate a professional group image of multiple guests.
+                                        data-rules="required" required>Generate a high-quality professional conference group photo using the provided images.
+
+The uploaded images may include:
+- A user photo that may contain one or multiple people.
+- One or more guest images.
+- A background image of a conference stage or professional environment.
+
+Instructions:
+- Detect all people present in the user photo and keep them in the final image.
+- Include the selected guest(s) together with the people from the user photo.
+- Arrange everyone naturally in a group as if attending a conference event.
+- Place the selected guest(s) in the middle of the group composition when possible while keeping natural spacing and visibility.
+- Place the group inside the provided background scene.
 
 Requirements:
-- Include all selected guests in one frame.
-- Arrange them naturally in a group.
-- Maintain correct proportions for each person.
-- Ensure no unnatural gaps between group members.
-- If people are close together, blend them naturally without visual separation.
-- Avoid cutting faces or overlapping distortions.
-- Use a conference or stage background.
-- Maintain uniform lighting and perspective.
-- Make the group appear cohesive and professionally composed.</textarea>
+- Preserve the original facial features of all people from the user image and guest images.
+- Maintain correct body proportions and natural positioning.
+- Ensure no faces are cut or distorted.
+- Avoid overlapping faces or unnatural spacing between people.
+- Blend lighting, shadows, and perspective so all people match the background.
+
+Important rules:
+- Do not create additional people.
+- Do not change or merge identities.
+- Do not distort faces.
+- Ensure all individuals are clearly visible.
+
+Style:
+Professional conference group photo, realistic lighting, high resolution, sharp focus, cohesive composition.</textarea>
                                 </div>
                             </div>
 

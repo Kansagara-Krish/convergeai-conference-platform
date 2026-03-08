@@ -98,6 +98,12 @@ def create_app(config_name=None):
     def serve_uploads(filename):
         upload_folder = os.path.join(app.root_path, 'uploads')
         return send_from_directory(upload_folder, filename)
+    
+    # Serve generated images
+    @app.route('/static/generated/<path:filename>')
+    def serve_generated(filename):
+        static_folder = os.path.join(app.root_path, 'static', 'generated')
+        return send_from_directory(static_folder, filename)
 
     # Frontend routes
     @app.route('/')
@@ -266,6 +272,6 @@ if __name__ == '__main__':
     app = create_app()
     app.run(
         host='0.0.0.0',
-        port=5050,
+        port=7000,
         debug=app.config['DEBUG']
     )

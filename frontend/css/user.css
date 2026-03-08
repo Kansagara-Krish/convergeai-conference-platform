@@ -64,6 +64,58 @@
   background-clip: text;
 }
 
+#chatbot-top-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-top-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.chat-top-logo .material-symbols-outlined {
+  font-size: 1rem;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.chat-top-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(71, 85, 105, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.header-user-btn {
+  gap: 6px;
+}
+
+.chat-user-chevron {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.header-user-btn.active .chat-user-chevron {
+  transform: rotate(180deg);
+  color: var(--text-primary);
+}
+
 .user-nav {
   display: flex;
   align-items: center;
@@ -947,7 +999,7 @@
 
 .profile-form {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-lg);
 }
 
@@ -1032,6 +1084,22 @@
     gap: var(--spacing-md);
   }
 
+  .profile-page .user-header-content {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .profile-page .user-logo {
+    max-width: calc(100vw - 120px);
+    gap: var(--spacing-sm);
+  }
+
+  .profile-page #chatbot-top-title {
+    font-size: 0.95rem;
+  }
+
   .user-nav {
     width: auto;
   }
@@ -1046,6 +1114,12 @@
 
   .profile-form {
     grid-template-columns: 1fr;
+  }
+
+  .profile-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
   }
 
   .chatbot-grid {
@@ -1089,6 +1163,20 @@
   .user-header-content {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .profile-page .user-header {
+    padding: var(--spacing-md);
+  }
+
+  .profile-page .user-header-content {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+  }
+
+  .profile-page .user-logo {
+    max-width: calc(100vw - 104px);
   }
 
   .user-nav {

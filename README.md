@@ -264,8 +264,6 @@ If password is empty during import, default password is `123`.
 
 Top-level scripts:
 - `database/init_db.py`: initialize DB and create demo admin/user
-- `reset_admin.py`: reset admin password to `password`
-- `seed_db.py`: seed base/demo data
 - `wsgi.py`: WSGI entry point for production servers
 
 Diagnostic/dev scripts (under `dev-scripts/`):

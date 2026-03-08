@@ -5,27 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - Conference Chatbot System</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/user.css?v=3">
+    <link rel="stylesheet" href="../css/user.css?v=4">
     <script src="../js/utils.js?v=2"></script>
-    <script src="../js/main.js?v=4"></script>
+    <script src="../js/main.js?v=28"></script>
 </head>
-<body>
+<body class="profile-page">
     <div class="user-container">
         <!-- Header -->
         <header class="user-header">
             <div class="user-header-content">
                 <div class="user-logo">
-                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;"><span class="material-symbols-outlined" style="font-size: 1.5rem; color: #fff;">smart_toy</span></div>
-                    <span>ConvergeAI</span>
+                    <div class="chat-top-logo"><span class="material-symbols-outlined">smart_toy</span></div>
+                    <span id="chatbot-top-title">ConvergeAI</span>
                 </div>
 
                 <nav class="user-nav">
-                    <div class="user-profile-menu">
-                        <button class="user-profile-btn">
-                            <div class="user-profile-avatar" data-user-name>U</div>
-                            <span class="material-symbols-outlined">account_circle</span>
+                    <div class="header-user-menu">
+                        <button class="header-user-btn" type="button" aria-label="Open account menu">
+                            <span class="chat-top-user-avatar" data-user-avatar>U</span>
+                            <span class="material-symbols-outlined chat-user-chevron" aria-hidden="true">expand_more</span>
                         </button>
-                        <div class="dropdown-menu">
+                        <div class="dropdown-menu chat-header-dropdown">
                             <a href="profile.html" class="dropdown-item"><span class="material-symbols-outlined icon-inline">person</span>Profile</a>
                             <a href="#" class="dropdown-item" data-action="logout"><span class="material-symbols-outlined icon-inline">logout</span>Logout</a>
                         </div>
@@ -89,11 +89,6 @@
                         <div class="profile-item-label">Active Conversations</div>
                         <div class="profile-item-value" data-profile-messages-sent>0 messages</div>
                     </div>
-
-                    <div class="profile-item">
-                        <div class="profile-item-label">Current Events</div>
-                        <div class="profile-item-value">AI Research Summit</div>
-                    </div>
                 </div>
 
                 <!-- Security & Password -->
@@ -122,52 +117,9 @@
                     </form>
                 </div>
 
-                <!-- Preferences -->
-                <div class="profile-section">
-                    <h3 class="profile-section-title"><span class="material-symbols-outlined icon-inline">tune</span>Preferences</h3>
-
-                    <div class="profile-item">
-                        <div class="profile-item-label">Email Notifications</div>
-                        <label class="checkbox" style="margin: 0;">
-                            <input type="checkbox" checked>
-                            <span>Receive email updates</span>
-                        </label>
-                    </div>
-
-                    <div class="profile-item">
-                        <div class="profile-item-label">Theme</div>
-                        <select class="profile-select">
-                            <option>Dark (Current)</option>
-                            <option>Light</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Danger Zone -->
-                <div class="profile-section profile-section-danger">
-                    <h3 class="profile-section-title profile-section-title-danger"><span class="material-symbols-outlined icon-inline">warning</span>Danger Zone</h3>
-
-                    <div class="profile-item">
-                        <div class="profile-item-label">Delete Account</div>
-                        <button class="btn btn-danger btn-sm">Delete Permanently</button>
-                    </div>
-                </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <style>
-        .user-container {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        .user-main {
-            flex: 1;
-            padding: var(--spacing-xl);
-        }
-    </style>
 </body>
 </html>
