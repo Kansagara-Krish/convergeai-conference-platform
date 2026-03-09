@@ -346,19 +346,31 @@ class API {
 
   static getBaseCandidates() {
     if (typeof window === "undefined") {
-      return ["http://127.0.0.1:5000", "http://localhost:5000"];
+      return [
+        "http://127.0.0.1:5000",
+        "http://localhost:5000",
+        "http://127.0.0.1:5050",
+        "http://localhost:5050",
+        "http://127.0.0.1:7000",
+        "http://localhost:7000",
+      ];
     }
 
     const { protocol, hostname } = window.location;
     const currentHost = hostname || "127.0.0.1";
+    const candidatePorts = ["5000", "5050", "7000"];
+    const hostCandidates = ["127.0.0.1", "localhost", currentHost];
+    const fallbackCandidates = [];
 
-    const candidates = [
-      API_BASE_URL,
-      `${protocol}//127.0.0.1:5000`,
-      `${protocol}//localhost:5000`,
-      `${protocol}//${currentHost}:5000`,
-      "",
-    ].filter((value) => typeof value === "string");
+    for (const host of hostCandidates) {
+      for (const port of candidatePorts) {
+        fallbackCandidates.push(`${protocol}//${host}:${port}`);
+      }
+    }
+
+    const candidates = [API_BASE_URL, ...fallbackCandidates, ""].filter(
+      (value) => typeof value === "string",
+    );
 
     return [...new Set(candidates)];
   }

@@ -131,6 +131,7 @@
                             <div class="chat-mode-menu" id="chat-mode-menu" aria-hidden="true">
                                 <button type="button" class="chat-mode-option" data-mode="guest" title="Guest mode" aria-label="Guest mode">
                                     <img class="chat-mode-icon-img" src="/uploads/guest_icon.jpg" alt="Guest icon" onerror="this.onerror=null;this.src='../assets/images/guest-mode-icon.svg';">
+                                    <span class="material-symbols-outlined" aria-hidden="true">person</span>
                                     <span class="chat-mode-text">Guest</span>
                                 </button>
                                 <button type="button" class="chat-mode-option" data-mode="single" title="Single person mode" aria-label="Single person mode">
@@ -175,6 +176,7 @@
             <video id="chat-camera-video" autoplay playsinline></video>
             <canvas id="chat-camera-canvas"></canvas>
             <div class="camera-actions">
+                <button type="button" id="chat-camera-switch" class="btn btn-secondary btn-sm">Switch Camera</button>
                 <button type="button" id="chat-camera-capture" class="btn btn-primary btn-sm">Capture</button>
                 <button type="button" id="chat-camera-close" class="btn btn-secondary btn-sm">Cancel</button>
             </div>
