@@ -203,6 +203,8 @@ class ChatInterface {
     this.overlayImage = DomUtils.$("#chat-overlay-image");
     this.overlayTitle = DomUtils.$("#chat-overlay-title");
     this.overlayHideTimer = null;
+    this._cameraFacingMode = "environment";
+    this._cameraDevices = [];
     this.selectedImageFile = null;
     this.selectedImagePreviewUrl = null;
     this.typingIndicatorEl = null;
@@ -1188,9 +1190,15 @@ class ChatInterface {
     }
 
     this.messagesArea.addEventListener("click", (event) => {
-      const target = event.target;
+      const clickedEl = event.target;
+      if (!(clickedEl instanceof HTMLElement)) return;
+
+      const target = clickedEl.classList.contains("message-image")
+        ? clickedEl
+        : clickedEl
+            .closest(".message-image-frame")
+            ?.querySelector(".message-image");
       if (!(target instanceof HTMLImageElement)) return;
-      if (!target.classList.contains("message-image")) return;
 
       const src = String(target.getAttribute("src") || "").trim();
       if (!src) return;
@@ -2120,11 +2128,18 @@ class ChatInterface {
     this._startCameraStream();
 
     const captureBtn = DomUtils.$("#chat-camera-capture");
+    const switchBtn = DomUtils.$("#chat-camera-switch");
     const closeBtn = DomUtils.$("#chat-camera-close");
 
     if (captureBtn) {
       captureBtn.onclick = async () => {
         await this._captureCameraPhoto();
+      };
+    }
+
+    if (switchBtn) {
+      switchBtn.onclick = async () => {
+        await this._toggleCameraFacingMode();
       };
     }
 
@@ -2147,12 +2162,22 @@ class ChatInterface {
     try {
       const video = DomUtils.$("#chat-camera-video");
       if (!video) return;
+      this._stopCameraStream();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: {
+          facingMode: { ideal: this._cameraFacingMode },
+        },
       });
       video.srcObject = stream;
       video.play();
       this._cameraStream = stream;
+
+      if (navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        this._cameraDevices = devices.filter((d) => d.kind === "videoinput");
+      }
+
+      this._updateCameraSwitchButtonState();
     } catch (err) {
       console.error("Camera access denied or unavailable:", err);
       const reason = err && err.message ? ` (${err.message})` : "";
@@ -2162,6 +2187,23 @@ class ChatInterface {
       );
       this.closeCameraModal();
     }
+  }
+
+  _updateCameraSwitchButtonState() {
+    const switchBtn = DomUtils.$("#chat-camera-switch");
+    if (!switchBtn) return;
+
+    const hasMultipleCameras = (this._cameraDevices || []).length > 1;
+    switchBtn.disabled = !hasMultipleCameras;
+    switchBtn.style.opacity = hasMultipleCameras ? "" : "0.55";
+    switchBtn.textContent =
+      this._cameraFacingMode === "user" ? "Back Camera" : "Front Camera";
+  }
+
+  async _toggleCameraFacingMode() {
+    this._cameraFacingMode =
+      this._cameraFacingMode === "environment" ? "user" : "environment";
+    await this._startCameraStream();
   }
 
   _stopCameraStream() {
@@ -3025,31 +3067,146 @@ class LoginHandler {
       return;
     }
 
-    let redirectUrl = "user/chat.html";
+    const redirectUrl = await this.resolvePostLoginDestination(role);
+    window.location.href = redirectUrl;
+  }
 
+  escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = String(value || "");
+    return div.innerHTML;
+  }
+
+  async fetchAssignedChatbots() {
     try {
-      // Prefer chatbots the user has been assigned/joined
-      let chatbotResponse = await API.get("/api/user/my-chatbots");
-      let chatbots = Array.isArray(chatbotResponse?.data)
-        ? chatbotResponse.data
-        : [];
-
-      // Fallback to public available chatbots if none assigned
-      if (!chatbots || chatbots.length === 0) {
-        chatbotResponse = await API.get("/api/user/chatbots");
-        chatbots = Array.isArray(chatbotResponse?.data)
-          ? chatbotResponse.data
-          : [];
-      }
-
-      if (chatbots[0]?.id) {
-        redirectUrl = `user/chat.html?id=${chatbots[0].id}`;
-      }
+      const response = await API.get("/api/user/my-chatbots");
+      return Array.isArray(response?.data) ? response.data : [];
     } catch (error) {
-      console.error("Failed loading user chatbots for auto-redirect:", error);
+      console.error("Failed loading assigned chatbots:", error);
+      return [];
+    }
+  }
+
+  buildChatbotSelectionMarkup(chatbots = []) {
+    const cards = chatbots
+      .map((chatbot) => {
+        const chatbotId = Number(chatbot?.id);
+        if (!Number.isFinite(chatbotId)) return "";
+
+        const eventName = String(
+          chatbot?.event_name || chatbot?.name || "Event",
+        ).trim();
+        const chatbotName = String(
+          chatbot?.name || "Conference Chatbot",
+        ).trim();
+        const dateText = DateUtils.formatDateRange(
+          chatbot?.start_date,
+          chatbot?.end_date,
+        );
+
+        return `
+          <button type="button" class="login-chatbot-option" data-chatbot-id="${chatbotId}">
+            <span class="login-chatbot-option-event">${this.escapeHtml(eventName)}</span>
+            <span class="login-chatbot-option-name">${this.escapeHtml(chatbotName)}</span>
+            <span class="login-chatbot-option-date">${this.escapeHtml(dateText)}</span>
+          </button>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="login-chatbot-picker">
+        <p class="login-chatbot-picker-text">You are assigned to multiple events. Select which chatbot you want to open.</p>
+        <div class="login-chatbot-picker-list">
+          ${cards || '<div class="login-chatbot-picker-empty">No assigned events found.</div>'}
+        </div>
+      </div>
+    `;
+  }
+
+  async promptChatbotSelection(chatbots = []) {
+    if (!Array.isArray(chatbots) || chatbots.length <= 1) {
+      const firstId = Number(chatbots?.[0]?.id);
+      return Number.isFinite(firstId) ? firstId : null;
     }
 
-    window.location.href = redirectUrl;
+    const content = this.buildChatbotSelectionMarkup(chatbots);
+
+    return new Promise((resolve) => {
+      const overlay = ModalManager.create("Select Event Chatbot", content, [], {
+        width: "760px",
+      });
+
+      overlay.classList.add("login-chatbot-overlay");
+      const modalCard = overlay.querySelector(".modal");
+      if (modalCard) {
+        modalCard.classList.add("login-chatbot-modal");
+      }
+
+      let settled = false;
+      const settle = (value = null) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      overlay.querySelectorAll(".login-chatbot-option").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const selectedId = Number(btn.getAttribute("data-chatbot-id"));
+          settle(Number.isFinite(selectedId) ? selectedId : null);
+          ModalManager.close(overlay);
+        });
+      });
+
+      const closeBtn = overlay.querySelector(".modal-close");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", () => settle(null));
+      }
+
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+          settle(null);
+        }
+      });
+    });
+  }
+
+  async resolvePostLoginDestination(rawRole) {
+    const role = String(rawRole || "").toLowerCase();
+    if (role === "admin") {
+      return "admin/dashboard.html";
+    }
+
+    const assignedChatbots = await this.fetchAssignedChatbots();
+
+    if (assignedChatbots.length > 1) {
+      const selectedChatbotId =
+        await this.promptChatbotSelection(assignedChatbots);
+
+      if (Number.isFinite(Number(selectedChatbotId))) {
+        return `user/chat.html?id=${Number(selectedChatbotId)}`;
+      }
+
+      return "user/dashboard.html";
+    }
+
+    if (assignedChatbots.length === 1 && assignedChatbots[0]?.id) {
+      return `user/chat.html?id=${assignedChatbots[0].id}`;
+    }
+
+    try {
+      const fallbackResponse = await API.get("/api/user/chatbots");
+      const fallbackChatbots = Array.isArray(fallbackResponse?.data)
+        ? fallbackResponse.data
+        : [];
+      if (fallbackChatbots[0]?.id) {
+        return `user/chat.html?id=${fallbackChatbots[0].id}`;
+      }
+    } catch (error) {
+      console.error("Failed loading fallback chatbots:", error);
+    }
+
+    return "user/dashboard.html";
   }
 
   // ... (keeping validation methods same, skipping to handleLogin)
@@ -3172,24 +3329,8 @@ class LoginHandler {
 
         NotificationManager.success("Login successful!");
         setTimeout(async () => {
-          // Use the user role from the backend response
-          const userRole = response.user.role;
-          let redirectUrl = "admin/dashboard.html";
-
-          if (userRole !== "admin") {
-            redirectUrl = "user/chat.html";
-            try {
-              const chatbotResponse = await API.get("/api/user/my-chatbots");
-              const chatbots = Array.isArray(chatbotResponse?.data)
-                ? chatbotResponse.data
-                : [];
-              if (chatbots[0]?.id) {
-                redirectUrl = `user/chat.html?id=${chatbots[0].id}`;
-              }
-            } catch (error) {
-              console.error("Failed loading user chatbots after login:", error);
-            }
-          }
+          const userRole = response.user?.role;
+          const redirectUrl = await this.resolvePostLoginDestination(userRole);
 
           console.log(`Redirecting to: ${redirectUrl}`); // DEBUG
           window.location.href = redirectUrl;

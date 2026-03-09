@@ -918,6 +918,7 @@ body.chat-focus-active .user-container {
   display: block;
   object-fit: contain;
   box-shadow: 0 2px 8px rgba(2, 6, 23, 0.18);
+  cursor: zoom-in;
 }
 
 .message-image-frame {
@@ -1124,6 +1125,10 @@ body.chat-focus-active .user-container {
     background 0.2s ease;
 }
 
+.message-image-contact-btn span {
+  white-space: nowrap;
+}
+
 .message-image-contact-btn i {
   font-size: 16px;
   color: #34d399;
@@ -1253,7 +1258,14 @@ body.chat-focus-active .user-container {
 
 .camera-actions {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.camera-actions .btn {
+  min-width: 108px;
 }
 
 @media (max-width: 768px) {
@@ -1331,6 +1343,20 @@ body.chat-focus-active .user-container {
     padding: 0 16px;
   }
 
+  #chat-camera-switch,
+  #chat-camera-close {
+    min-width: 118px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(2, 6, 23, 0.52);
+    color: rgba(241, 245, 249, 0.96);
+    font-size: 0.92rem;
+    padding: 0 16px;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
   #chat-camera-capture {
     width: 74px;
     height: 74px;
@@ -1358,18 +1384,6 @@ body.chat-focus-active .user-container {
     transform: scale(0.9);
   }
 
-  #chat-camera-close {
-    min-width: 88px;
-    height: 44px;
-    border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.4);
-    background: rgba(2, 6, 23, 0.52);
-    color: rgba(241, 245, 249, 0.96);
-    font-size: 0.95rem;
-    padding: 0 16px;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-  }
 }
 
 .message-text em {
@@ -2665,11 +2679,13 @@ body.chat-focus-active .user-container {
   }
 
   .chat-mode-text {
-    display: none;
+    display: inline-block;
+    font-size: 0.78rem;
+    line-height: 1.1;
   }
 
   .chat-mode-option {
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .chat-mode-option .material-symbols-outlined {
@@ -2771,8 +2787,8 @@ body.chat-focus-active .user-container {
   }
 
   .chat-mode-menu {
-    min-width: auto;
-    width: 64px;
+    min-width: 168px;
+    width: 168px;
     padding: 6px;
   }
 
@@ -2787,7 +2803,9 @@ body.chat-focus-active .user-container {
   }
 
   .chat-mode-option {
-    padding: 8px 6px;
+    padding: 8px;
+    gap: 8px;
+    justify-content: flex-start;
   }
 
   .chat-guest-selector-list {
@@ -2796,6 +2814,11 @@ body.chat-focus-active .user-container {
 
   .input-field {
     font-size: 0.92rem;
+  }
+
+  .message-image-contact-btn {
+    font-size: 0.82rem;
+    padding: 8px 12px;
   }
 }
 
