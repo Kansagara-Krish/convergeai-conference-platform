@@ -81,6 +81,26 @@ class Config:
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() == 'true'
     MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'false').lower() == 'true'
 
+    # WhatsApp Cloud API
+    WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
+    WHATSAPP_PHONE_NUMBER_ID = os.environ.get('WHATSAPP_PHONE_NUMBER_ID') or os.environ.get('PHONE_NUMBER_ID', '')
+    WHATSAPP_VERIFY_TOKEN = os.environ.get('WHATSAPP_VERIFY_TOKEN') or os.environ.get('VERIFY_TOKEN', '')
+    WHATSAPP_TEMPLATE_NAME = os.environ.get('WHATSAPP_TEMPLATE_NAME', '')
+    WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get('WHATSAPP_TEMPLATE_LANGUAGE', 'en')
+    WHATSAPP_API_VERSION = os.environ.get('WHATSAPP_API_VERSION', 'v23.0')
+
+    # Public base URL used when external providers need to fetch local media.
+    PUBLIC_URL = os.environ.get('PUBLIC_URL', '')
+
+    # Google Drive backup integration
+    GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON = os.environ.get('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON', '')
+    GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE = os.environ.get('GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE', '')
+    GOOGLE_DRIVE_OAUTH_ACCESS_TOKEN = os.environ.get('GOOGLE_DRIVE_OAUTH_ACCESS_TOKEN', '')
+    GOOGLE_DRIVE_PREDEFINED_FOLDERS = os.environ.get('GOOGLE_DRIVE_PREDEFINED_FOLDERS', '[]')
+    GOOGLE_DRIVE_ROOT_FOLDER_ID = os.environ.get('GOOGLE_DRIVE_ROOT_FOLDER_ID', '')
+    GOOGLE_DRIVE_AUTO_CREATE_CHATBOT_FOLDER = os.environ.get('GOOGLE_DRIVE_AUTO_CREATE_CHATBOT_FOLDER', 'true').lower() == 'true'
+    GOOGLE_DRIVE_SHARE_PUBLIC = os.environ.get('GOOGLE_DRIVE_SHARE_PUBLIC', 'false').lower() == 'true'
+
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True

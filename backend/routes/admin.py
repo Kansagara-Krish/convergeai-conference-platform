@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timedelta
 from openpyxl import load_workbook
 from io import BytesIO
-from sqlalchemy import or_
+from sqlalchemy import or_, func, case, extract
 from werkzeug.utils import secure_filename
 import re
 import smtplib
@@ -28,6 +28,7 @@ EMAIL_REGEX = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$')
 NOTIFICATION_RETENTION_DAYS = 7
 GUEST_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 VALID_USER_ROLES = {'admin', 'user', 'speaker', 'volunteer'}
+INDIA_WHATSAPP_REGEX = re.compile(r'^(?:\+91)?[6-9]\d{9}$')
 
 
 def _to_bool(value, default=False):
@@ -191,6 +192,32 @@ def is_valid_email(email):
     return bool(email and EMAIL_REGEX.match(email))
 
 
+def normalize_indian_whatsapp_number(raw_value):
+    raw = str(raw_value or '').strip()
+    if not raw:
+        return None
+
+    compact = re.sub(r'[^\d+]', '', raw)
+    if compact.startswith('+91'):
+        candidate = compact
+    else:
+        digits_only = re.sub(r'\D', '', compact)
+        if digits_only.startswith('91') and len(digits_only) == 12:
+            candidate = f'+{digits_only}'
+        elif len(digits_only) == 10:
+            candidate = f'+91{digits_only}'
+        else:
+            candidate = compact
+
+    if not INDIA_WHATSAPP_REGEX.fullmatch(candidate):
+        return None
+
+    normalized_digits = re.sub(r'\D', '', candidate)
+    if normalized_digits.startswith('91') and len(normalized_digits) == 12:
+        return f'+{normalized_digits}'
+    return None
+
+
 def _make_unique_email(email):
     normalized_email = str(email or '').strip().lower()
     if not normalized_email:
@@ -211,6 +238,23 @@ def _make_unique_email(email):
         if User.query.filter_by(email=candidate).first() is None:
             return candidate, True
         suffix += 1
+
+
+def _make_unique_username(seed_value):
+    base = str(seed_value or '').strip().lower()
+    if '@' in base:
+        base = base.split('@', 1)[0]
+
+    base = re.sub(r'[^a-z0-9._-]', '_', base).strip('._-')
+    base = base or 'user'
+    candidate = base
+    suffix = 1
+
+    while User.query.filter_by(username=candidate).first() is not None:
+        candidate = f"{base}_{suffix}"
+        suffix += 1
+
+    return candidate
 
 
 def send_user_credentials_email(recipient_email, name, role, username, password, allowed_events=None):
@@ -242,7 +286,7 @@ def send_user_credentials_email(recipient_email, name, role, username, password,
             f"Hello {name},\n\n"
             "Your account has been created in ConvergeAI.\n\n"
             f"Role: {role}\n"
-            f"Username: {username}\n"
+            f"Email: {recipient_email}\n"
             f"Password: {password}\n\n"
             f"Allowed Event(s): {events_line}\n\n"
             "Please login and change your password after first login.\n\n"
@@ -289,12 +333,97 @@ def send_bulk_emails_background(app, credentials_list):
                     recipient_email=cred['email'],
                     name=cred['name'],
                     role=cred['role'],
-                    username=cred['username'],
+                    username=cred.get('username') or '',
                     password=cred['password'],
                     allowed_events=cred.get('allowed_events')
                 )
             except Exception as e:
                 print(f"Background email failed for {cred['email']}: {str(e)}")
+
+
+def _parse_year_filter():
+    raw_year = request.args.get('year', type=int)
+    if raw_year is None:
+        return None
+
+    if raw_year < 2000 or raw_year > 2100:
+        return 'invalid'
+
+    return raw_year
+
+
+def _empty_image_stats(chatbot_id):
+    return {
+        'chatbot_id': int(chatbot_id),
+        'total_images_generated': 0,
+        'user_generated_count': 0,
+        'volunteer_generated_count': 0,
+    }
+
+
+def _build_chatbot_image_stats_map(chatbot_ids=None, year=None):
+    normalized_role = func.lower(func.coalesce(User.role, ''))
+    is_user_role = normalized_role == 'user'
+    is_volunteer_role = normalized_role == 'volunteer'
+
+    stats_query = db.session.query(
+        Message.chatbot_id.label('chatbot_id'),
+        func.coalesce(
+            func.sum(
+                case(
+                    (or_(is_user_role, is_volunteer_role), 1),
+                    else_=0,
+                )
+            ),
+            0,
+        ).label('total_images_generated'),
+        func.coalesce(
+            func.sum(
+                case(
+                    (is_user_role, 1),
+                    else_=0,
+                )
+            ),
+            0,
+        ).label('user_generated_count'),
+        func.coalesce(
+            func.sum(
+                case(
+                    (is_volunteer_role, 1),
+                    else_=0,
+                )
+            ),
+            0,
+        ).label('volunteer_generated_count'),
+    ).outerjoin(User, User.id == Message.user_id).filter(
+        Message.is_user_message.is_(False),
+        func.lower(Message.message_type) == 'image',
+        Message.image_url.isnot(None),
+        func.length(func.trim(Message.image_url)) > 0,
+    )
+
+    if chatbot_ids:
+        stats_query = stats_query.filter(Message.chatbot_id.in_(chatbot_ids))
+
+    if year:
+        stats_query = stats_query.filter(extract('year', Message.created_at) == year)
+
+    rows = stats_query.group_by(Message.chatbot_id).all()
+
+    stats_map = {}
+    for row in rows:
+        chatbot_id = int(getattr(row, 'chatbot_id', 0) or 0)
+        if chatbot_id <= 0:
+            continue
+
+        stats_map[chatbot_id] = {
+            'chatbot_id': chatbot_id,
+            'total_images_generated': int(getattr(row, 'total_images_generated', 0) or 0),
+            'user_generated_count': int(getattr(row, 'user_generated_count', 0) or 0),
+            'volunteer_generated_count': int(getattr(row, 'volunteer_generated_count', 0) or 0),
+        }
+
+    return stats_map
 
 # ============================================
 # Dashboard Statistics
@@ -384,6 +513,7 @@ def list_users(user):
     per_page = request.args.get('per_page', 20, type=int)
     role = request.args.get('role')
     active = request.args.get('active')
+    chatbot_id = request.args.get('chatbot_id', type=int)
     search = (request.args.get('search') or '').strip()
     
     query = User.query.order_by(User.created_at.desc(), User.id.desc())
@@ -403,6 +533,14 @@ def list_users(user):
                 User.username.ilike(search_pattern)
             )
         )
+
+    if chatbot_id:
+        query = query.join(
+            ChatbotParticipant,
+            ChatbotParticipant.user_id == User.id
+        ).filter(
+            ChatbotParticipant.chatbot_id == chatbot_id
+        ).distinct()
     
     paginated = query.paginate(page=page, per_page=per_page)
     
@@ -444,11 +582,16 @@ def create_user(user):
     email = (data.get('email') or '').strip().lower()
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
+    whatsapp_number_raw = data.get('whatsapp_number')
     role = (data.get('role') or 'user').strip().lower()
     active_raw = data.get('active', True)
 
     if not name or not email or not username or not password:
         return jsonify({'success': False, 'message': 'name, email, username, and password are required'}), 400
+
+    normalized_whatsapp_number = normalize_indian_whatsapp_number(whatsapp_number_raw)
+    if not normalized_whatsapp_number:
+        return jsonify({'success': False, 'message': 'Valid Indian WhatsApp number is required'}), 400
 
     if not is_valid_email(email):
         return jsonify({'success': False, 'message': 'Invalid email format'}), 400
@@ -471,6 +614,7 @@ def create_user(user):
         name=name,
         email=effective_email,
         username=username,
+        whatsapp_number=normalized_whatsapp_number,
         role=role,
         active=active
     )
@@ -516,7 +660,7 @@ def create_user(user):
     assigned_count = len(chatbot_ids) if chatbot_ids else 0
     create_admin_notification(
         title='New user created',
-        message=f'{name} ({username}) was created with role {role}.',
+        message=f'{name} ({effective_email}) was created with role {role}.',
         entity_type='user',
         entity_id=new_user.id
     )
@@ -583,6 +727,11 @@ def update_user(user, user_id):
         target_user.role = data['role']
     if 'name' in data:
         target_user.name = data['name']
+    if 'whatsapp_number' in data:
+        normalized_whatsapp_number = normalize_indian_whatsapp_number(data.get('whatsapp_number'))
+        if not normalized_whatsapp_number:
+            return jsonify({'success': False, 'message': 'Valid Indian WhatsApp number is required'}), 400
+        target_user.whatsapp_number = normalized_whatsapp_number
     
     db.session.commit()
     
@@ -621,6 +770,85 @@ def delete_user(user, user_id):
         'message': 'User deleted successfully'
     }), 200
 
+
+@admin_bp.route('/users/bulk-delete', methods=['POST', 'DELETE'])
+@token_required
+@admin_required
+def bulk_delete_users(user):
+    """Delete multiple users at once."""
+
+    data = request.get_json(silent=True) or {}
+    requested_ids = data.get('user_ids', [])
+
+    if not isinstance(requested_ids, list) or not requested_ids:
+        return jsonify({'success': False, 'message': 'user_ids list is required'}), 400
+
+    normalized_ids = []
+    for raw_id in requested_ids:
+        try:
+            parsed_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if parsed_id > 0 and parsed_id not in normalized_ids:
+            normalized_ids.append(parsed_id)
+
+    if not normalized_ids:
+        return jsonify({'success': False, 'message': 'No valid user ids provided'}), 400
+
+    self_skipped_ids = []
+    if user.id in normalized_ids:
+        self_skipped_ids.append(user.id)
+
+    candidate_ids = [uid for uid in normalized_ids if uid != user.id]
+    if not candidate_ids:
+        return jsonify({
+            'success': False,
+            'message': 'Cannot delete your own account',
+            'deleted_count': 0,
+            'requested_count': len(normalized_ids),
+            'skipped': {
+                'self': self_skipped_ids,
+                'not_found': []
+            }
+        }), 400
+
+    existing_users = User.query.filter(User.id.in_(candidate_ids)).all()
+    existing_ids = [u.id for u in existing_users]
+    not_found_ids = [uid for uid in candidate_ids if uid not in existing_ids]
+
+    if not existing_ids:
+        return jsonify({
+            'success': False,
+            'message': 'No matching users found for deletion',
+            'deleted_count': 0,
+            'requested_count': len(normalized_ids),
+            'skipped': {
+                'self': self_skipped_ids,
+                'not_found': not_found_ids,
+            }
+        }), 404
+
+    SessionToken.query.filter(SessionToken.user_id.in_(existing_ids)).delete(synchronize_session=False)
+    ChatbotParticipant.query.filter(ChatbotParticipant.user_id.in_(existing_ids)).delete(synchronize_session=False)
+
+    # Use ORM row deletes so SQLAlchemy cascade rules remove dependent rows
+    # (messages, conversations, guests, OTP records, etc.) before deleting users.
+    for target_user in existing_users:
+        db.session.delete(target_user)
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f'{len(existing_ids)} user(s) deleted successfully',
+        'deleted_count': len(existing_ids),
+        'requested_count': len(normalized_ids),
+        'skipped': {
+            'self': self_skipped_ids,
+            'not_found': not_found_ids,
+        }
+    }), 200
+
 # ============================================
 # Chatbot Management
 # ============================================
@@ -640,14 +868,91 @@ def list_chatbots(user):
     
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    year = _parse_year_filter()
+
+    if year == 'invalid':
+        return jsonify({'success': False, 'message': 'year must be between 2000 and 2100'}), 400
     
     paginated = Chatbot.query.paginate(page=page, per_page=per_page)
+
+    chatbot_items = list(paginated.items)
+    chatbot_ids = [item.id for item in chatbot_items]
+    image_stats_map = _build_chatbot_image_stats_map(chatbot_ids=chatbot_ids, year=year)
+
+    data = []
+    for chatbot in chatbot_items:
+        chatbot_data = chatbot.to_dict()
+        chatbot_data.update(image_stats_map.get(chatbot.id, _empty_image_stats(chatbot.id)))
+        data.append(chatbot_data)
     
     return jsonify({
         'success': True,
-        'data': [chatbot.to_dict() for chatbot in paginated.items],
+        'data': data,
         'total': paginated.total,
-        'pages': paginated.pages
+        'pages': paginated.pages,
+        'year': year,
+    }), 200
+
+
+@admin_bp.route('/chatbots/image-stats', methods=['GET'])
+@token_required
+@admin_required
+def chatbot_image_stats(user):
+    """Get chatbot-wise image generation counts with optional year filter."""
+
+    year = _parse_year_filter()
+    if year == 'invalid':
+        return jsonify({'success': False, 'message': 'year must be between 2000 and 2100'}), 400
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    per_page = max(1, min(per_page, 200))
+
+    paginated = Chatbot.query.order_by(Chatbot.created_at.desc(), Chatbot.id.desc()).paginate(page=page, per_page=per_page)
+    chatbot_items = list(paginated.items)
+    chatbot_ids = [item.id for item in chatbot_items]
+    stats_map = _build_chatbot_image_stats_map(chatbot_ids=chatbot_ids, year=year)
+
+    data = []
+    for chatbot in chatbot_items:
+        item = _empty_image_stats(chatbot.id)
+        item.update(stats_map.get(chatbot.id, item))
+        item['chatbot_name'] = chatbot.name
+        item['event_name'] = chatbot.event_name
+        data.append(item)
+
+    return jsonify({
+        'success': True,
+        'data': data,
+        'total': paginated.total,
+        'pages': paginated.pages,
+        'current_page': paginated.page,
+        'year': year,
+    }), 200
+
+
+@admin_bp.route('/chatbots/<int:chatbot_id>/image-count', methods=['GET'])
+@token_required
+@admin_required
+def chatbot_image_count(user, chatbot_id):
+    """Get image generation count for a specific chatbot."""
+
+    chatbot = Chatbot.query.get(chatbot_id)
+    if not chatbot:
+        return jsonify({'success': False, 'message': 'Chatbot not found'}), 404
+
+    year = _parse_year_filter()
+    if year == 'invalid':
+        return jsonify({'success': False, 'message': 'year must be between 2000 and 2100'}), 400
+
+    stats_map = _build_chatbot_image_stats_map(chatbot_ids=[chatbot_id], year=year)
+    data = _empty_image_stats(chatbot_id)
+    data.update(stats_map.get(chatbot_id, data))
+
+    return jsonify({
+        'success': True,
+        'data': data,
+        'year': year,
     }), 200
 
 @admin_bp.route('/chatbots/<int:chatbot_id>', methods=['GET'])
@@ -973,6 +1278,7 @@ def preview_users_from_excel(user):
         skipped_rows = 0
         duplicate_email_rows = 0
         invalid_email_rows = 0
+        invalid_whatsapp_rows = 0
 
         for row in rows[1:]:
             if row is None or all(cell is None or str(cell).strip() == '' for cell in row):
@@ -982,14 +1288,21 @@ def preview_users_from_excel(user):
 
             name = get_value(row, ['name', 'full_name', 'fullname'])
             email = get_value(row, ['email', 'mail']).lower()
-            username = get_value(row, ['username', 'user_name'])
+            raw_username = get_value(row, ['username', 'user_name'])
+            raw_whatsapp_number = get_value(row, ['whatsapp_number', 'whatsapp', 'phone', 'mobile'])
 
-            if not email or not username:
+            if not email or not raw_username or not raw_whatsapp_number:
                 skipped_rows += 1
                 continue
 
             if not is_valid_email(email):
                 invalid_email_rows += 1
+                skipped_rows += 1
+                continue
+
+            whatsapp_number = normalize_indian_whatsapp_number(raw_whatsapp_number)
+            if not whatsapp_number:
+                invalid_whatsapp_rows += 1
                 skipped_rows += 1
                 continue
 
@@ -1007,7 +1320,8 @@ def preview_users_from_excel(user):
                 'valid_rows': valid_rows,
                 'skipped_rows': skipped_rows,
                 'duplicate_email_rows': duplicate_email_rows,
-                'invalid_email_rows': invalid_email_rows
+                'invalid_email_rows': invalid_email_rows,
+                'invalid_whatsapp_rows': invalid_whatsapp_rows
             }
         }), 200
 
@@ -1071,19 +1385,6 @@ def import_users_from_excel(user):
                 return default
             return str(value).strip().lower() in ['1', 'true', 'yes', 'y', 'active']
 
-        def normalize_username(raw_username, email):
-            base = (raw_username or '').strip()
-            if not base:
-                base = (email.split('@')[0] if '@' in email else email).strip()
-            base = re.sub(r'[^a-zA-Z0-9._-]', '_', base)
-            base = base or 'user'
-            candidate = base
-            suffix = 1
-            while User.query.filter_by(username=candidate).first() is not None:
-                candidate = f"{base}_{suffix}"
-                suffix += 1
-            return candidate
-
         credentials = []
         skipped = 0
 
@@ -1095,14 +1396,20 @@ def import_users_from_excel(user):
             email = get_value(row, ['email', 'mail']).lower()
             role = get_value(row, ['role', 'user_role'], default_role).lower()
             raw_username = get_value(row, ['username', 'user_name'])
+            raw_whatsapp_number = get_value(row, ['whatsapp_number', 'whatsapp', 'phone', 'mobile'])
             password = get_value(row, ['password', 'pass'])
             active_value = get_value(row, ['active', 'is_active'], '')
 
-            if not email or not raw_username:
+            if not email or not raw_username or not raw_whatsapp_number:
                 skipped += 1
                 continue
 
             if not is_valid_email(email):
+                skipped += 1
+                continue
+
+            normalized_whatsapp_number = normalize_indian_whatsapp_number(raw_whatsapp_number)
+            if not normalized_whatsapp_number:
                 skipped += 1
                 continue
 
@@ -1115,8 +1422,8 @@ def import_users_from_excel(user):
 
             effective_email, _ = _make_unique_email(email)
 
-            username = normalize_username(raw_username, effective_email)
-            display_name = (name or username).strip()
+            username = _make_unique_username(raw_username)
+            display_name = (name or (effective_email.split('@')[0] if '@' in effective_email else effective_email) or username).strip()
             if not password:
                 password = '123'
 
@@ -1124,6 +1431,7 @@ def import_users_from_excel(user):
                 name=display_name,
                 email=effective_email,
                 username=username,
+                whatsapp_number=normalized_whatsapp_number,
                 role=role,
                 active=parse_bool(active_value, True)
             )
@@ -1152,12 +1460,13 @@ def import_users_from_excel(user):
                 'username': username,
                 'password': password,
                 'email': effective_email,
+                'whatsapp_number': normalized_whatsapp_number,
                 'allowed_events': [chatbot.event_name] if chatbot and chatbot.event_name else []
             })
 
         if not credentials:
             db.session.rollback()
-            return jsonify({'success': False, 'message': 'No valid users imported (required columns: Email, Username)'}), 400
+            return jsonify({'success': False, 'message': 'No valid users imported (required columns: Email, Username, WhatsApp_Number in +91 format)'}), 400
 
         db.session.commit()
 

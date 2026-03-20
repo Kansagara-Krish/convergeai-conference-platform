@@ -11,19 +11,27 @@ import random
 import threading
 import hashlib
 from email.message import EmailMessage
+import re
 
 try:
-    from models import db, User, SessionToken, ChatbotParticipant, Chatbot
+    from models import db, User, SessionToken, ChatbotParticipant, Chatbot, LoginOTP
+    from services.whatsapp_service import send_whatsapp_text, WhatsAppServiceError
 except ImportError:
-    from backend.models import db, User, SessionToken, ChatbotParticipant, Chatbot
+    from backend.models import db, User, SessionToken, ChatbotParticipant, Chatbot, LoginOTP
+    from backend.services.whatsapp_service import send_whatsapp_text, WhatsAppServiceError
 
 auth_bp = Blueprint('auth', __name__)
 
 OTP_EXPIRY_MINUTES = 10
 OTP_RESEND_COOLDOWN_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
+LOGIN_OTP_EXPIRY_SECONDS = 60
+LOGIN_OTP_RESEND_COOLDOWN_SECONDS = 20
+LOGIN_OTP_MAX_REQUESTS_PER_WINDOW = 5
+LOGIN_OTP_REQUEST_WINDOW_MINUTES = 10
 _FORGOT_PASSWORD_OTP_STORE = {}
 _FORGOT_PASSWORD_OTP_LOCK = threading.Lock()
+INDIA_WHATSAPP_REGEX = re.compile(r'^\+91[6-9]\d{9}$')
 
 
 def _otp_store_key(username, email):
@@ -46,6 +54,107 @@ def _cleanup_expired_otp_records(now=None):
 
     for key in expired_keys:
         _FORGOT_PASSWORD_OTP_STORE.pop(key, None)
+
+
+def _normalize_indian_whatsapp_number(raw_value):
+    compact = re.sub(r'[^\d+]', '', str(raw_value or '').strip())
+    if compact.startswith('+91'):
+        candidate = compact
+    else:
+        digits = re.sub(r'\D', '', compact)
+        if len(digits) == 10:
+            candidate = f'+91{digits}'
+        elif digits.startswith('91') and len(digits) == 12:
+            candidate = f'+{digits}'
+        else:
+            candidate = compact
+
+    if not INDIA_WHATSAPP_REGEX.fullmatch(candidate):
+        return None
+    return candidate
+
+
+def _mask_whatsapp_number(number):
+    digits = re.sub(r'\D', '', str(number or ''))
+    if len(digits) < 6:
+        return str(number or '')
+    return f'+{digits[:2]}******{digits[-4:]}'
+
+
+def _get_user_for_login_otp(username):
+    normalized_username = str(username or '').strip()
+    if not normalized_username:
+        return None
+
+    return User.query.filter(User.username.ilike(normalized_username)).first()
+
+
+def _create_and_send_login_otp(user):
+    now = datetime.utcnow()
+    window_start = now - timedelta(minutes=LOGIN_OTP_REQUEST_WINDOW_MINUTES)
+
+    recent_count = LoginOTP.query.filter(
+        LoginOTP.user_id == user.id,
+        LoginOTP.created_at >= window_start
+    ).count()
+
+    if recent_count >= LOGIN_OTP_MAX_REQUESTS_PER_WINDOW:
+        return None, {
+            'status_code': 429,
+            'message': 'Too many OTP requests. Try again later.',
+        }
+
+    latest_record = (
+        LoginOTP.query
+        .filter(
+            LoginOTP.user_id == user.id,
+            LoginOTP.is_used == False
+        )
+        .order_by(LoginOTP.created_at.desc())
+        .first()
+    )
+
+    if latest_record and latest_record.created_at and (now - latest_record.created_at).total_seconds() < LOGIN_OTP_RESEND_COOLDOWN_SECONDS:
+        wait_seconds = LOGIN_OTP_RESEND_COOLDOWN_SECONDS - int((now - latest_record.created_at).total_seconds())
+        return None, {
+            'status_code': 429,
+            'message': f'Please wait {max(wait_seconds, 1)} seconds before requesting another OTP',
+            'wait_seconds': max(wait_seconds, 1),
+        }
+
+    LoginOTP.query.filter_by(user_id=user.id, is_used=False).update({'is_used': True})
+
+    otp_code = f"{random.randint(0, 999999):06d}"
+    expires_at = now + timedelta(seconds=LOGIN_OTP_EXPIRY_SECONDS)
+
+    otp_record = LoginOTP(
+        user_id=user.id,
+        username=(user.username or '').strip(),
+        whatsapp_number=(user.whatsapp_number or '').strip(),
+        otp_code=otp_code,
+        expires_at=expires_at,
+        is_used=False,
+    )
+    db.session.add(otp_record)
+    db.session.commit()
+
+    try:
+        send_whatsapp_text(
+            to_number=user.whatsapp_number,
+            text=(
+                f"Your ConvergeAI login OTP is {otp_code}. "
+                f"It expires in {LOGIN_OTP_EXPIRY_SECONDS // 60} minute."
+            ),
+        )
+    except WhatsAppServiceError as exc:
+        otp_record.is_used = True
+        db.session.commit()
+        return None, {
+            'status_code': exc.status_code if getattr(exc, 'status_code', None) else 502,
+            'message': exc.message or 'Failed to send OTP on WhatsApp',
+        }
+
+    return otp_record, None
 
 
 def send_forgot_password_otp_email(recipient_email, name, otp_code):
@@ -522,4 +631,151 @@ def reset_password(user, user_id):
         'username': target_user.username,
         'event_names': event_names,
         'reset_by': user.name or user.username
+    }), 200
+
+
+# ============================================
+# Login With OTP (WhatsApp)
+# ============================================
+
+@auth_bp.route('/login-otp/request', methods=['POST'])
+def request_login_otp():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+
+    if not username:
+        return jsonify({'success': False, 'message': 'Username is required'}), 400
+
+    user = _get_user_for_login_otp(username)
+    if not user:
+        return jsonify({'success': False, 'message': 'Username not found'}), 404
+
+    if not user.active:
+        return jsonify({'success': False, 'message': 'Account is inactive'}), 403
+
+    normalized_whatsapp_number = _normalize_indian_whatsapp_number(user.whatsapp_number)
+    if not normalized_whatsapp_number:
+        return jsonify({'success': False, 'message': 'No valid WhatsApp number linked to this account'}), 400
+
+    user.whatsapp_number = normalized_whatsapp_number
+    db.session.commit()
+
+    otp_record, error_payload = _create_and_send_login_otp(user)
+    if error_payload:
+        response = {'success': False, 'message': error_payload['message']}
+        if 'wait_seconds' in error_payload:
+            response['wait_seconds'] = error_payload['wait_seconds']
+        return jsonify(response), error_payload['status_code']
+
+    return jsonify({
+        'success': True,
+        'message': 'OTP sent successfully',
+        'masked_whatsapp_number': _mask_whatsapp_number(user.whatsapp_number),
+        'expires_in_seconds': LOGIN_OTP_EXPIRY_SECONDS,
+        'resend_in_seconds': LOGIN_OTP_RESEND_COOLDOWN_SECONDS,
+    }), 200
+
+
+@auth_bp.route('/login-otp/resend', methods=['POST'])
+def resend_login_otp():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+
+    if not username:
+        return jsonify({'success': False, 'message': 'Username is required'}), 400
+
+    user = _get_user_for_login_otp(username)
+    if not user:
+        return jsonify({'success': False, 'message': 'Username not found'}), 404
+
+    if not user.active:
+        return jsonify({'success': False, 'message': 'Account is inactive'}), 403
+
+    normalized_whatsapp_number = _normalize_indian_whatsapp_number(user.whatsapp_number)
+    if not normalized_whatsapp_number:
+        return jsonify({'success': False, 'message': 'No valid WhatsApp number linked to this account'}), 400
+
+    user.whatsapp_number = normalized_whatsapp_number
+    db.session.commit()
+
+    otp_record, error_payload = _create_and_send_login_otp(user)
+    if error_payload:
+        response = {'success': False, 'message': error_payload['message']}
+        if 'wait_seconds' in error_payload:
+            response['wait_seconds'] = error_payload['wait_seconds']
+        return jsonify(response), error_payload['status_code']
+
+    return jsonify({
+        'success': True,
+        'message': 'OTP resent successfully',
+        'masked_whatsapp_number': _mask_whatsapp_number(user.whatsapp_number),
+        'expires_in_seconds': LOGIN_OTP_EXPIRY_SECONDS,
+        'resend_in_seconds': LOGIN_OTP_RESEND_COOLDOWN_SECONDS,
+    }), 200
+
+
+@auth_bp.route('/login-otp/verify', methods=['POST'])
+def verify_login_otp():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    otp_code = (data.get('otp') or '').strip()
+    remember = bool(data.get('remember', False))
+
+    if not username:
+        return jsonify({'success': False, 'message': 'Username is required'}), 400
+
+    if not otp_code:
+        return jsonify({'success': False, 'message': 'OTP is required'}), 400
+
+    if not otp_code.isdigit() or len(otp_code) != 6:
+        return jsonify({'success': False, 'message': 'OTP must be a 6-digit code'}), 400
+
+    user = _get_user_for_login_otp(username)
+    if not user:
+        return jsonify({'success': False, 'message': 'Username not found'}), 404
+
+    if not user.active:
+        return jsonify({'success': False, 'message': 'Account is inactive'}), 403
+
+    now = datetime.utcnow()
+    latest_otp = (
+        LoginOTP.query
+        .filter(
+            LoginOTP.user_id == user.id,
+            LoginOTP.is_used == False,
+            LoginOTP.otp_code.isnot(None),
+            LoginOTP.otp_code != ''
+        )
+        .order_by(LoginOTP.created_at.desc())
+        .first()
+    )
+
+    if not latest_otp:
+        return jsonify({'success': False, 'message': 'OTP expired or not requested'}), 400
+
+    if latest_otp.expires_at and latest_otp.expires_at < now:
+        latest_otp.is_used = True
+        db.session.commit()
+        return jsonify({'success': False, 'message': 'OTP expired'}), 400
+
+    if not latest_otp.otp_code or not latest_otp.otp_code.strip():
+        latest_otp.is_used = True
+        db.session.commit()
+        return jsonify({'success': False, 'message': 'Invalid OTP record. Request a new OTP.'}), 400
+
+    if latest_otp.otp_code.strip() != otp_code:
+        return jsonify({'success': False, 'message': 'Invalid OTP'}), 400
+
+    latest_otp.is_used = True
+    user.last_login = now
+    db.session.commit()
+
+    expires_in_days = 30 if remember else 1
+    token = SessionToken.create_token(user.id, expires_in_days=expires_in_days)
+
+    return jsonify({
+        'success': True,
+        'message': 'OTP login successful',
+        'token': token,
+        'user': user.to_dict(),
     }), 200

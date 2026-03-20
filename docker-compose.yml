@@ -32,6 +32,10 @@ services:
       - DATABASE_URL=postgresql+psycopg2://convergeai:change-in-production@db:5432/convergeai_chatbot
       - SECRET_KEY=docker-secret-key-change-in-production
       - JWT_SECRET_KEY=docker-jwt-secret-change-in-production
+      - WHATSAPP_ACCESS_TOKEN=
+      - WHATSAPP_PHONE_NUMBER_ID=
+      - WHATSAPP_VERIFY_TOKEN=
+      - WHATSAPP_API_VERSION=v23.0
     ports:
       - "5000:5000"
     volumes:

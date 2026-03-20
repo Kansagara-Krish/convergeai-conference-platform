@@ -58,16 +58,22 @@ def create_app(config_name=None):
         from routes.admin import admin_bp
         from routes.user import user_bp
         from routes.chatbot import chatbot_bp
+        from routes.whatsapp import whatsapp_bp
+        from routes.drive import drive_bp
     except ImportError:
         from backend.routes.auth import auth_bp
         from backend.routes.admin import admin_bp
         from backend.routes.user import user_bp
         from backend.routes.chatbot import chatbot_bp
+        from backend.routes.whatsapp import whatsapp_bp
+        from backend.routes.drive import drive_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(user_bp, url_prefix='/api/user')
     app.register_blueprint(chatbot_bp, url_prefix='/api/chatbots')
+    app.register_blueprint(whatsapp_bp, url_prefix='/api/whatsapp')
+    app.register_blueprint(drive_bp, url_prefix='/api/drive')
     
     # Error handlers
     @app.errorhandler(404)
@@ -249,6 +255,23 @@ Requirements:
         except Exception:
             db.session.rollback()
 
+    def ensure_users_schema():
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        if 'users' not in table_names:
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('users')}
+
+        if 'whatsapp_number' not in columns:
+            db.session.execute(text(
+                """
+                ALTER TABLE users
+                ADD COLUMN whatsapp_number VARCHAR(20)
+                """
+            ))
+            db.session.commit()
+
     should_bootstrap_db = not (
         len(sys.argv) > 1 and sys.argv[1] == 'db'
     )
@@ -260,6 +283,7 @@ Requirements:
             ensure_chatbot_prompt_columns()
             ensure_conversation_schema()
             ensure_messages_schema()
+            ensure_users_schema()
             remove_unused_model_columns()
     
     return app

@@ -145,6 +145,12 @@ MAIL_USE_SSL=false
 GEMINI_API_KEY=
 GOOGLE_API_KEY=
 GEMINI_IMAGE_MODEL=gemini-2.0-flash-exp
+
+# WhatsApp Cloud API
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_API_VERSION=v23.0
 ```
 
 Notes:
@@ -217,6 +223,7 @@ Base prefixes:
 - `/api/admin`
 - `/api/user`
 - `/api/chatbots`
+- `/api/whatsapp`
 
 ### Auth (`/api/auth`)
 - `POST /login`
@@ -273,6 +280,11 @@ Base prefixes:
 - `GET /<chatbot_id>`
 - `GET /<chatbot_id>/settings` (admin)
 - `GET /<chatbot_id>/stats`
+
+### WhatsApp (`/api/whatsapp`)
+- `GET /webhook` (Meta webhook verification)
+- `POST /webhook` (Meta status callbacks)
+- `POST /send-image` (authenticated image send)
 
 ### System
 - `GET /api/health`

@@ -185,20 +185,30 @@
 
     <div class="chat-contact-modal" id="chat-contact-modal" aria-hidden="true">
         <div class="chat-contact-modal-card">
-            <h3>Send Your Details</h3>
-            <p>Please share your details.</p>
+            <h3 class="chat-contact-title">Send Your Details</h3>
+            <p class="chat-contact-subtitle">Share your details to receive this generated image on WhatsApp.</p>
             <form id="chat-contact-form" class="chat-contact-form" novalidate>
-                <label for="chat-contact-name">Name</label>
-                <input type="text" id="chat-contact-name" name="name" placeholder="Enter your name" required>
+                <div class="chat-contact-field">
+                    <label for="chat-contact-name">Name</label>
+                    <input type="text" id="chat-contact-name" name="name" placeholder="Enter your full name" autocomplete="name" required>
+                    <p class="chat-contact-error" id="chat-contact-name-error" aria-live="polite"></p>
+                </div>
 
-                <label for="chat-contact-whatsapp">WhatsApp Number</label>
-                <input type="tel" id="chat-contact-whatsapp" name="whatsapp" placeholder="e.g. +91 9876543210" required>
+                <div class="chat-contact-field">
+                    <label for="chat-contact-whatsapp">WhatsApp Number</label>
+                    <div class="chat-contact-phone-group">
+                        <span class="chat-contact-phone-prefix" aria-hidden="true">+91</span>
+                        <input type="tel" id="chat-contact-whatsapp" name="whatsapp" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="Enter 10-digit number" autocomplete="tel-national" required>
+                    </div>
+                    <p class="chat-contact-helper-text">Enter only the 10-digit mobile number. Country code is added automatically.</p>
+                    <p class="chat-contact-error" id="chat-contact-whatsapp-error" aria-live="polite"></p>
+                </div>
 
                 <div class="chat-contact-meta" id="chat-contact-meta"></div>
 
                 <div class="chat-contact-actions">
-                    <button type="button" id="chat-contact-cancel" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" id="chat-contact-submit" class="btn btn-primary">Send</button>
+                    <button type="button" id="chat-contact-cancel" class="btn btn-secondary chat-contact-cancel-btn">Cancel</button>
+                    <button type="submit" id="chat-contact-submit" class="btn btn-primary chat-contact-submit-btn" disabled>Send</button>
                 </div>
             </form>
         </div>

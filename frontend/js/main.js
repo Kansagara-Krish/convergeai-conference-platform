@@ -189,6 +189,8 @@ class ChatInterface {
     this.contactMeta = DomUtils.$("#chat-contact-meta");
     this.contactNameInput = DomUtils.$("#chat-contact-name");
     this.contactWhatsappInput = DomUtils.$("#chat-contact-whatsapp");
+    this.contactNameError = DomUtils.$("#chat-contact-name-error");
+    this.contactWhatsappError = DomUtils.$("#chat-contact-whatsapp-error");
     this.imageLightbox = DomUtils.$("#chat-image-lightbox");
     this.imageLightboxPreview = DomUtils.$("#chat-image-lightbox-preview");
     this.imageLightboxClose = DomUtils.$("#chat-image-lightbox-close");
@@ -209,6 +211,7 @@ class ChatInterface {
     this.selectedImagePreviewUrl = null;
     this.typingIndicatorEl = null;
     this.selectedContactImageUrl = "";
+    this.isContactSubmitting = false;
     this.handleWindowResize = () => {
       this.updateMessageViewportInset();
       this.syncHistoryDrawerState();
@@ -1150,15 +1153,112 @@ class ChatInterface {
     this.updateMessageViewportInset();
   }
 
+  sanitizeWhatsappDigits(value = "") {
+    return String(value || "")
+      .replace(/\D/g, "")
+      .slice(0, 10);
+  }
+
+  setContactFieldError(field, message = "") {
+    const normalizedMessage = String(message || "").trim();
+    if (field === "name") {
+      if (this.contactNameError) {
+        this.contactNameError.textContent = normalizedMessage;
+      }
+      if (this.contactNameInput) {
+        this.contactNameInput.classList.toggle(
+          "is-invalid",
+          !!normalizedMessage,
+        );
+        this.contactNameInput.setAttribute(
+          "aria-invalid",
+          normalizedMessage ? "true" : "false",
+        );
+      }
+      return;
+    }
+
+    if (field === "whatsapp") {
+      if (this.contactWhatsappError) {
+        this.contactWhatsappError.textContent = normalizedMessage;
+      }
+      if (this.contactWhatsappInput) {
+        this.contactWhatsappInput.classList.toggle(
+          "is-invalid",
+          !!normalizedMessage,
+        );
+        this.contactWhatsappInput.setAttribute(
+          "aria-invalid",
+          normalizedMessage ? "true" : "false",
+        );
+      }
+    }
+  }
+
+  clearContactValidationState() {
+    this.setContactFieldError("name", "");
+    this.setContactFieldError("whatsapp", "");
+  }
+
+  validateContactForm({ showErrors = false } = {}) {
+    const name = String(this.contactNameInput?.value || "").trim();
+    const whatsappDigits = this.sanitizeWhatsappDigits(
+      this.contactWhatsappInput?.value || "",
+    );
+    const isNameValid = name.length >= 2;
+    const isWhatsappValid = /^\d{10}$/.test(whatsappDigits);
+
+    if (showErrors) {
+      this.setContactFieldError(
+        "name",
+        isNameValid ? "" : "Please enter at least 2 characters.",
+      );
+      this.setContactFieldError(
+        "whatsapp",
+        isWhatsappValid ? "" : "Please enter a valid 10-digit mobile number.",
+      );
+    }
+
+    return {
+      isValid: isNameValid && isWhatsappValid,
+      isNameValid,
+      isWhatsappValid,
+      name,
+      whatsappDigits,
+      fullWhatsappNumber: `+91${whatsappDigits}`,
+    };
+  }
+
+  updateContactSubmitState() {
+    if (!this.contactSubmitBtn) return;
+    const { isValid } = this.validateContactForm({ showErrors: false });
+    this.contactSubmitBtn.disabled = !isValid || this.isContactSubmitting;
+  }
+
+  setContactSubmitLoading(isLoading) {
+    this.isContactSubmitting = !!isLoading;
+    if (!this.contactSubmitBtn) return;
+
+    this.contactSubmitBtn.disabled = true;
+    this.contactSubmitBtn.classList.toggle("is-loading", !!isLoading);
+    this.contactSubmitBtn.textContent = isLoading ? "Sending..." : "Send";
+
+    if (!isLoading) {
+      this.updateContactSubmitState();
+    }
+  }
+
   openContactModal(imageUrl = "") {
     if (!this.contactModal) return;
     this.selectedContactImageUrl = String(
       imageUrl || this.selectedContactImageUrl || "",
     ).trim();
+    this.clearContactValidationState();
+    this.updateContactSubmitState();
     if (this.contactMeta) {
       this.contactMeta.textContent = this.selectedContactImageUrl
-        ? "Selected generated image is ready to send."
-        : "Please select a generated image before sending.";
+        ? "Selected image is ready to send."
+        : "Select a generated image first.";
       this.contactMeta.classList.remove("is-error", "is-success");
     }
     this.contactModal.classList.add("active");
@@ -1174,10 +1274,7 @@ class ChatInterface {
     this.contactModal.classList.remove("active");
     this.contactModal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("chat-contact-open");
-    if (this.contactSubmitBtn) {
-      this.contactSubmitBtn.disabled = false;
-      this.contactSubmitBtn.textContent = "Send";
-    }
+    this.setContactSubmitLoading(false);
   }
 
   setupImageLightboxHandlers() {
@@ -1279,6 +1376,42 @@ class ChatInterface {
       return;
     }
 
+    this.contactNameInput?.addEventListener("input", () => {
+      this.setContactFieldError("name", "");
+      if (this.contactMeta?.classList.contains("is-error")) {
+        this.contactMeta.textContent = "";
+        this.contactMeta.classList.remove("is-error", "is-success");
+      }
+      this.updateContactSubmitState();
+    });
+
+    this.contactWhatsappInput?.addEventListener("input", () => {
+      const sanitized = this.sanitizeWhatsappDigits(
+        this.contactWhatsappInput?.value || "",
+      );
+      if (this.contactWhatsappInput) {
+        this.contactWhatsappInput.value = sanitized;
+      }
+      this.setContactFieldError("whatsapp", "");
+      if (this.contactMeta?.classList.contains("is-error")) {
+        this.contactMeta.textContent = "";
+        this.contactMeta.classList.remove("is-error", "is-success");
+      }
+      this.updateContactSubmitState();
+    });
+
+    this.contactWhatsappInput?.addEventListener("blur", () => {
+      const { isWhatsappValid } = this.validateContactForm({
+        showErrors: false,
+      });
+      if (!isWhatsappValid) {
+        this.setContactFieldError(
+          "whatsapp",
+          "Please enter a valid 10-digit mobile number.",
+        );
+      }
+    });
+
     this.contactToggleBtn?.addEventListener("click", () => {
       this.openContactModal();
     });
@@ -1296,19 +1429,16 @@ class ChatInterface {
     this.contactForm.addEventListener("submit", (event) => {
       event.preventDefault();
 
-      const name = String(this.contactNameInput?.value || "").trim();
-      const whatsapp = String(this.contactWhatsappInput?.value || "").trim();
+      if (this.isContactSubmitting) return;
 
-      if (name.length < 2) {
-        NotificationManager.error("Please enter a valid name");
+      const validation = this.validateContactForm({ showErrors: true });
+      if (!validation.isValid) {
+        this.updateContactSubmitState();
         return;
       }
 
-      const normalizedNumber = whatsapp.replace(/[\s-]/g, "");
-      if (!/^\+?[0-9]{8,15}$/.test(normalizedNumber)) {
-        NotificationManager.error("Please enter a valid WhatsApp number");
-        return;
-      }
+      const name = validation.name;
+      const whatsappFullNumber = validation.fullWhatsappNumber;
 
       const imageUrlToSend = String(this.selectedContactImageUrl || "").trim();
       if (!imageUrlToSend) {
@@ -1324,20 +1454,16 @@ class ChatInterface {
 
       const sendDetails = async () => {
         try {
-          if (this.contactSubmitBtn) {
-            this.contactSubmitBtn.disabled = true;
-            this.contactSubmitBtn.textContent = "Sending...";
-          }
+          this.setContactSubmitLoading(true);
 
-          await API.post(
-            `/api/user/chatbots/${this.chatbotId}/image-contacts`,
-            {
-              name,
-              whatsapp,
-              image_url: imageUrlToSend,
-              conversation_id: this.currentConversationId,
-            },
-          );
+          await API.post("/api/whatsapp/send-image", {
+            name,
+            whatsapp_number: whatsappFullNumber,
+            image_url: imageUrlToSend,
+            caption: `Hi ${name}, here is your generated conference image.`,
+            conversation_id: this.currentConversationId,
+            chatbot_id: this.chatbotId,
+          });
 
           if (this.contactMeta) {
             this.contactMeta.textContent = "Image sent successfully";
@@ -1357,15 +1483,14 @@ class ChatInterface {
           }
           NotificationManager.error(message);
         } finally {
-          if (this.contactSubmitBtn) {
-            this.contactSubmitBtn.disabled = false;
-            this.contactSubmitBtn.textContent = "Send";
-          }
+          this.setContactSubmitLoading(false);
         }
       };
 
       sendDetails();
     });
+
+    this.updateContactSubmitState();
   }
 
   getImageGenerationHelpMessage(rawMessage = "") {

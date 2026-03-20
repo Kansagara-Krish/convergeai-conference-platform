@@ -22,6 +22,7 @@ class User(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(255), nullable=False)
+    whatsapp_number = db.Column(db.String(20), index=True)
     role = db.Column(db.String(50), default='user', nullable=False)  # admin, user, speaker, volunteer
     active = db.Column(db.Boolean, default=True)
     
@@ -34,6 +35,9 @@ class User(db.Model):
     messages = db.relationship('Message', backref='user', lazy=True, cascade='all, delete-orphan')
     conversations = db.relationship('Conversation', backref='user', lazy=True, cascade='all, delete-orphan')
     guests = db.relationship('Guest', backref='user', lazy=True, cascade='all, delete-orphan')
+    login_otps = db.relationship('LoginOTP', backref='user', lazy=True, cascade='all, delete-orphan')
+    whatsapp_send_history = db.relationship('WhatsAppSendHistory', backref='user', lazy=True)
+    drive_image_backups = db.relationship('DriveImageBackup', backref='user', lazy=True)
     
     def set_password(self, password):
         """Hash and set password"""
@@ -50,6 +54,7 @@ class User(db.Model):
             'username': self.username,
             'email': self.email,
             'name': self.name,
+            'whatsapp_number': self.whatsapp_number,
             'role': self.role,
             'active': self.active,
             'created_at': self.created_at.isoformat(),
@@ -121,6 +126,7 @@ class Chatbot(db.Model):
     messages = db.relationship('Message', backref='chatbot', lazy=True, cascade='all, delete-orphan')
     conversations = db.relationship('Conversation', backref='chatbot', lazy=True, cascade='all, delete-orphan')
     participants = db.relationship('ChatbotParticipant', backref='chatbot', lazy=True, cascade='all, delete-orphan')
+    drive_image_backups = db.relationship('DriveImageBackup', backref='chatbot', lazy=True, cascade='all, delete-orphan')
     
     @property
     def status(self):
@@ -370,3 +376,93 @@ class SessionToken(db.Model):
             return None
         
         return session.user
+
+
+# ============================================
+# Login OTP Model
+# ============================================
+
+class LoginOTP(db.Model):
+    """OTP records for username + WhatsApp OTP login flow."""
+    __tablename__ = 'login_otps'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    username = db.Column(db.String(120), nullable=False, index=True)
+    whatsapp_number = db.Column(db.String(20), nullable=False, index=True)
+    otp_code = db.Column(db.String(12), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    is_used = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.username,
+            'whatsapp_number': self.whatsapp_number,
+            'otp_code': self.otp_code,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'is_used': self.is_used,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# ============================================
+# WhatsApp Send History Model
+# ============================================
+
+class WhatsAppSendHistory(db.Model):
+    """Track outbound WhatsApp sends and inbound webhook status events."""
+    __tablename__ = 'whatsapp_send_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    whatsapp_number = db.Column(db.String(32), nullable=False, index=True)
+    image_url = db.Column(db.String(1024))
+    status = db.Column(db.String(100), nullable=False, index=True)
+    provider_message_id = db.Column(db.String(255), index=True)
+    response_payload = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'whatsapp_number': self.whatsapp_number,
+            'image_url': self.image_url,
+            'status': self.status,
+            'provider_message_id': self.provider_message_id,
+            'response_payload': self.response_payload,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# ============================================
+# Drive Image Backup Model
+# ============================================
+
+class DriveImageBackup(db.Model):
+    """Track generated image backups stored on Google Drive."""
+    __tablename__ = 'drive_image_backups'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chatbot_id = db.Column(db.Integer, db.ForeignKey('chatbots.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    image_path = db.Column(db.String(1024), nullable=False)
+    drive_file_id = db.Column(db.String(255), nullable=False, index=True)
+    drive_folder_id = db.Column(db.String(255), nullable=False, index=True)
+    drive_link = db.Column(db.String(1024), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'chatbot_id': self.chatbot_id,
+            'user_id': self.user_id,
+            'image_path': self.image_path,
+            'drive_file_id': self.drive_file_id,
+            'drive_folder_id': self.drive_folder_id,
+            'drive_link': self.drive_link,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

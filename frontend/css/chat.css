@@ -2081,14 +2081,17 @@ body.chat-focus-active .user-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  background: rgba(2, 6, 23, 0.5);
+  padding: 18px;
+  background:
+    radial-gradient(circle at 20% 16%, rgba(59, 130, 246, 0.14), transparent 40%),
+    radial-gradient(circle at 80% 86%, rgba(16, 185, 129, 0.12), transparent 44%),
+    rgba(2, 6, 23, 0.62);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.22s ease, visibility 0.22s ease;
+  transition: opacity 0.24s ease, visibility 0.24s ease;
   z-index: 85;
 }
 
@@ -2235,13 +2238,16 @@ body.chat-focus-active .user-container {
 }
 
 .chat-contact-meta {
-  min-height: 16px;
-  font-size: 0.76rem;
-  color: rgba(148, 163, 184, 0.95);
+  min-height: 17px;
+  margin-top: -2px;
+  font-size: 0.74rem;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  color: rgba(148, 163, 184, 0.94);
 }
 
 .chat-contact-meta.is-error {
-  color: #fca5a5;
+  color: #fecaca;
 }
 
 .chat-contact-meta.is-success {
@@ -2249,62 +2255,173 @@ body.chat-focus-active .user-container {
 }
 
 #chat-contact-submit:disabled {
-  opacity: 0.72;
-  cursor: wait;
+  opacity: 0.64;
+  cursor: not-allowed;
 }
 
 .chat-contact-modal-card {
-  width: min(94vw, 420px);
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(15, 23, 42, 0.9);
+  width: min(95vw, 458px);
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background:
+    linear-gradient(160deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95)),
+    rgba(15, 23, 42, 0.88);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
-  box-shadow: 0 20px 44px rgba(2, 6, 23, 0.48);
-  padding: 18px;
+  box-shadow:
+    0 26px 55px rgba(2, 6, 23, 0.54),
+    inset 0 1px 0 rgba(226, 232, 240, 0.09);
+  padding: 24px;
+  transform: translateY(12px) scale(0.965);
+  opacity: 0;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
 }
 
-.chat-contact-modal-card h3 {
-  margin: 0 0 6px;
+.chat-contact-modal.active .chat-contact-modal-card {
+  transform: translateY(0) scale(1);
+  opacity: 1;
 }
 
-.chat-contact-modal-card p {
-  margin: 0 0 12px;
-  color: var(--text-secondary);
-  font-size: 0.92rem;
+.chat-contact-title {
+  margin: 0;
+  color: rgba(241, 245, 249, 0.98);
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+  line-height: 1.25;
+}
+
+.chat-contact-subtitle {
+  margin: 6px 0 16px;
+  color: rgba(148, 163, 184, 0.96);
+  font-size: 0.86rem;
+  line-height: 1.4;
 }
 
 .chat-contact-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+}
+
+.chat-contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 
 .chat-contact-form label {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: rgba(226, 232, 240, 0.96);
 }
 
 .chat-contact-form input {
-  height: 40px;
-  border-radius: 10px;
+  height: 46px;
+  border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.34);
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.76);
   color: var(--text-primary);
-  padding: 0 12px;
+  padding: 0 14px;
+  font-size: 0.92rem;
+  font-weight: 500;
   outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.chat-contact-form input::placeholder {
+  color: rgba(148, 163, 184, 0.78);
 }
 
 .chat-contact-form input:focus {
-  border-color: rgba(99, 102, 241, 0.72);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  border-color: rgba(96, 165, 250, 0.78);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.chat-contact-phone-group {
+  display: flex;
+  align-items: stretch;
+}
+
+.chat-contact-phone-prefix {
+  height: 46px;
+  min-width: 62px;
+  padding: 0 14px;
+  border-radius: 12px 0 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  border-right: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.88), rgba(30, 41, 59, 0.72));
+  color: rgba(226, 232, 240, 0.95);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.chat-contact-phone-group input {
+  border-radius: 0 12px 12px 0;
+  flex: 1;
+}
+
+.chat-contact-phone-group input:focus {
+  position: relative;
+  z-index: 1;
+}
+
+.chat-contact-helper-text {
+  margin: -1px 0 0;
+  color: rgba(148, 163, 184, 0.95);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.chat-contact-error {
+  min-height: 14px;
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  color: #fca5a5;
+}
+
+.chat-contact-form input.is-invalid,
+.chat-contact-phone-group input.is-invalid {
+  border-color: rgba(248, 113, 113, 0.75);
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.16);
 }
 
 .chat-contact-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.chat-contact-actions .btn {
+  min-width: 114px;
+  height: 42px;
+  border-radius: 11px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+}
+
+.chat-contact-cancel-btn {
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: rgba(30, 41, 59, 0.78);
+}
+
+.chat-contact-submit-btn {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(14, 165, 233, 0.86));
+  border: 1px solid rgba(96, 165, 250, 0.6);
+}
+
+.chat-contact-submit-btn.is-loading {
+  cursor: wait;
 }
 
 /* File upload preview */
@@ -2799,7 +2916,23 @@ body.chat-focus-active .user-container {
 
   .chat-contact-modal-card {
     width: 100%;
-    border-radius: 14px;
+    border-radius: 16px;
+    padding: 18px 16px;
+  }
+
+  .chat-contact-subtitle {
+    margin-bottom: 14px;
+    font-size: 0.82rem;
+  }
+
+  .chat-contact-actions {
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .chat-contact-actions .btn {
+    flex: 1;
+    min-width: 0;
   }
 
   .chat-mode-option {
@@ -3186,4 +3319,10 @@ body.chat-contact-open {
 
 body.chat-image-lightbox-open {
   overflow: hidden;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .chat-contact-modal-card {
+    width: min(92vw, 500px);
+  }
 }
