@@ -135,7 +135,6 @@ class AdminPanel {
     this.setupEventListeners();
     this.startSidebarBadgeRefresh();
     this.loadDashboardData();
-    this.setupDashboardBell();
     this.startDashboardRefresh();
   }
 
@@ -853,7 +852,7 @@ class AdminPanel {
 
       if (chatbots.length === 0) {
         tbody.innerHTML =
-          '<tr><td colspan="6" class="text-center">No chatbots found.</td></tr>';
+          '<tr><td colspan="7" class="text-center">No chatbots found.</td></tr>';
         this.renderRecentChatbotsPagination();
         return;
       }
@@ -867,6 +866,7 @@ class AdminPanel {
               <td>${DateUtils.formatDateRange(bot.start_date, bot.end_date)}</td>
               <td><span class="status-indicator status-${bot.status}"><span class="status-dot"></span> ${bot.status}</span></td>
               <td>${bot.participants_count || 0}</td>
+              <td>${bot.total_images_generated || 0}</td>
               <td>
                 <div class="table-actions">
                   <a href="create-chatbot.html?id=${bot.id}" class="btn btn-sm btn-icon btn-secondary"><i class="fas fa-edit"></i></a>
@@ -883,7 +883,7 @@ class AdminPanel {
     } catch (error) {
       console.error("Error loading recent chatbots:", error);
       tbody.innerHTML =
-        '<tr><td colspan="6" class="text-center">Failed to load recent chatbots.</td></tr>';
+        '<tr><td colspan="7" class="text-center">Failed to load recent chatbots.</td></tr>';
       this.renderRecentChatbotsPagination(true);
       if (showToast && this.isDashboardNetworkError(error)) {
         this.showDashboardNetworkWarning(
@@ -1968,6 +1968,7 @@ class ImportExcelHandler {
               <th>Username</th>
               <th>Password</th>
               <th>Email</th>
+              <th>WhatsApp</th>
             </tr>
           </thead>
           <tbody>
@@ -1976,9 +1977,10 @@ class ImportExcelHandler {
                 (cred) => `
               <tr>
                 <td>${cred.role || "user"}</td>
-                <td>${cred.username}</td>
+                <td>${cred.username || "-"}</td>
                 <td style="font-family: var(--font-mono); font-size: 0.85rem;">${cred.password}</td>
                 <td>${cred.email}</td>
+                <td>${cred.whatsapp_number || "-"}</td>
               </tr>
             `,
               )
@@ -2012,14 +2014,21 @@ class UserManagementHandler {
     this.table = DomUtils.$('table[data-table="users"]');
     this.roleFilter = DomUtils.$("#user-role-filter");
     this.statusFilter = DomUtils.$("#user-status-filter");
+    this.chatbotFilter = DomUtils.$("#user-chatbot-filter");
     this.searchInput = DomUtils.$("#user-search");
     this.addSingleUserBtn = DomUtils.$("#add-single-user-btn");
+    this.bulkActions = DomUtils.$("#users-bulk-actions");
+    this.bulkDeleteBtn = DomUtils.$("#users-bulk-delete-btn");
+    this.selectedCountLabel = DomUtils.$("#users-selected-count");
+    this.selectAllCheckbox = DomUtils.$("#users-select-all");
     this.paginationContainer = DomUtils.$("#users-pagination-container");
     this.paginationSummary = DomUtils.$("#users-pagination-summary");
     this.paginationButtons = DomUtils.$("#users-pagination-buttons");
     this.searchDebounceTimer = null;
     this.currentPage = 1;
     this.perPage = 7;
+    this.selectedUserIds = new Set();
+    this.visibleUserIds = [];
     if (this.table) {
       this.init();
     }
@@ -2029,8 +2038,40 @@ class UserManagementHandler {
     this.setupActions();
     this.setupFilters();
     this.setupPaginationActions();
+    this.loadChatbotFilterOptions();
     this.loadUserStats();
     this.loadUsers();
+    this.updateSelectionUI();
+  }
+
+  async loadChatbotFilterOptions() {
+    if (!this.chatbotFilter) return;
+
+    try {
+      const response = await API.get("/api/admin/chatbots?per_page=200");
+      const chatbots = Array.isArray(response?.data) ? response.data : [];
+
+      const options = [
+        '<option value="" data-full-label="Filter by chatbot" title="Filter by chatbot">Filter by chatbot</option>',
+      ];
+      chatbots
+        .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        .forEach((chatbot) => {
+          if (!Number.isFinite(Number(chatbot?.id))) return;
+          const fullLabel = chatbot?.event_name
+            ? `${chatbot.name} - ${chatbot.event_name}`
+            : chatbot.name || `Chatbot ${chatbot.id}`;
+          const shortLabel = this.truncateFilterLabel(fullLabel, 46);
+          options.push(
+            `<option value="${chatbot.id}" data-full-label="${this.escapeHtml(fullLabel)}" title="${this.escapeHtml(fullLabel)}">${this.escapeHtml(shortLabel)}</option>`,
+          );
+        });
+
+      this.chatbotFilter.innerHTML = options.join("");
+      this.updateChatbotFilterTitle();
+    } catch (error) {
+      console.error("Failed to load chatbot filter options:", error);
+    }
   }
 
   async loadUserStats() {
@@ -2093,6 +2134,38 @@ class UserManagementHandler {
         this.deleteUser(deleteBtn.dataset.userId, deleteBtn.dataset.userName);
       }
     });
+
+    this.table.addEventListener("change", (event) => {
+      const rowSelect = event.target.closest('[data-action="select-user"]');
+      if (!rowSelect) return;
+
+      const userId = Number(rowSelect.dataset.userId);
+      if (!Number.isFinite(userId)) return;
+
+      if (rowSelect.checked) {
+        this.selectedUserIds.add(userId);
+      } else {
+        this.selectedUserIds.delete(userId);
+      }
+      this.updateSelectionUI();
+    });
+
+    this.selectAllCheckbox?.addEventListener("change", () => {
+      const shouldSelectAll = Boolean(this.selectAllCheckbox.checked);
+      this.visibleUserIds.forEach((id) => {
+        if (shouldSelectAll) {
+          this.selectedUserIds.add(id);
+        } else {
+          this.selectedUserIds.delete(id);
+        }
+      });
+      this.syncRowSelectionCheckboxes();
+      this.updateSelectionUI();
+    });
+
+    this.bulkDeleteBtn?.addEventListener("click", () => {
+      this.bulkDeleteSelectedUsers();
+    });
   }
 
   async openAddSingleUserModal() {
@@ -2103,14 +2176,6 @@ class UserManagementHandler {
           <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
             <i class="fas fa-user-circle"></i> Account Information
           </h4>
-          <div class="form-group">
-            <label for="single-user-name">Full Name <span style="color: var(--accent-red);">*</span></label>
-            <input type="text" id="single-user-name" name="name" placeholder="e.g., John Doe" required />
-          </div>
-          <div class="form-group">
-            <label for="single-user-email">Email <span style="color: var(--accent-red);">*</span></label>
-            <input type="email" id="single-user-email" name="email" placeholder="user@example.com" required />
-          </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label for="single-user-username">Username <span style="color: var(--accent-red);">*</span></label>
@@ -2119,6 +2184,16 @@ class UserManagementHandler {
             <div class="form-group">
               <label for="single-user-password">Password <span style="color: var(--accent-red);">*</span></label>
               <input type="text" id="single-user-password" name="password" placeholder="temporary password" required />
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="single-user-email">Email <span style="color: var(--accent-red);">*</span></label>
+              <input type="email" id="single-user-email" name="email" placeholder="user@example.com" required />
+            </div>
+            <div class="form-group">
+              <label for="single-user-whatsapp">WhatsApp Number <span style="color: var(--accent-red);">*</span></label>
+              <input type="text" id="single-user-whatsapp" name="whatsapp_number" value="+91" placeholder="+91XXXXXXXXXX" required />
             </div>
           </div>
         </div>
@@ -2182,6 +2257,43 @@ class UserManagementHandler {
     const submitBtn = modal.querySelector("#single-user-submit");
     const activeToggle = modal.querySelector("#single-user-active");
     const activeToggleText = modal.querySelector(".toggle-text");
+    const whatsappInput = modal.querySelector("#single-user-whatsapp");
+
+    const ensureDefaultIndianWhatsappPrefix = () => {
+      if (!whatsappInput) return;
+
+      const raw = String(whatsappInput.value || "")
+        .replace(/[^\d+]/g, "")
+        .trim();
+
+      if (!raw || raw === "+") {
+        whatsappInput.value = "+91";
+        return;
+      }
+
+      if (raw.startsWith("+91")) {
+        const digits = raw.replace(/\D/g, "");
+        whatsappInput.value = `+91${digits.slice(2, 12)}`;
+        return;
+      }
+
+      const digits = raw.replace(/\D/g, "");
+      if (digits.startsWith("91")) {
+        whatsappInput.value = `+${digits.slice(0, 12)}`;
+        return;
+      }
+
+      whatsappInput.value = `+91${digits.slice(0, 10)}`;
+    };
+
+    if (whatsappInput) {
+      ensureDefaultIndianWhatsappPrefix();
+      whatsappInput.addEventListener(
+        "focus",
+        ensureDefaultIndianWhatsappPrefix,
+      );
+      whatsappInput.addEventListener("blur", ensureDefaultIndianWhatsappPrefix);
+    }
 
     const getCreateLabelByRole = (role) => {
       if (role === "admin") return "Create Admin";
@@ -2267,10 +2379,33 @@ class UserManagementHandler {
       (opt) => parseInt(opt.value),
     );
 
+    const normalizeIndianWhatsApp = (raw) => {
+      const compact = String(raw || "")
+        .replace(/[^\d+]/g, "")
+        .trim();
+      if (compact.startsWith("+91")) {
+        return compact;
+      }
+
+      const digits = compact.replace(/\D/g, "");
+      if (digits.length === 10) {
+        return `+91${digits}`;
+      }
+
+      if (digits.startsWith("91") && digits.length === 12) {
+        return `+${digits}`;
+      }
+
+      return compact;
+    };
+
+    const username = elements["username"].value.trim();
     const payload = {
-      name: elements["name"].value.trim(),
       email: elements["email"].value.trim(),
-      username: elements["username"].value.trim(),
+      whatsapp_number: normalizeIndianWhatsApp(
+        elements["whatsapp_number"].value,
+      ),
+      username,
       password: elements["password"].value,
       role: elements["role"].value,
       active: elements["active"].checked,
@@ -2278,8 +2413,8 @@ class UserManagementHandler {
     };
 
     if (
-      !payload.name ||
       !payload.email ||
+      !payload.whatsapp_number ||
       !payload.username ||
       !payload.password
     ) {
@@ -2297,6 +2432,14 @@ class UserManagementHandler {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!emailPattern.test(payload.email)) {
       NotificationManager.error("Please enter a valid email address");
+      return;
+    }
+
+    const whatsappPattern = /^\+91[6-9]\d{9}$/;
+    if (!whatsappPattern.test(payload.whatsapp_number)) {
+      NotificationManager.error(
+        "Please enter a valid Indian WhatsApp number in +91XXXXXXXXXX format",
+      );
       return;
     }
 
@@ -2374,6 +2517,35 @@ class UserManagementHandler {
         }, 300);
       });
     }
+
+    if (this.chatbotFilter) {
+      this.chatbotFilter.addEventListener("change", () => {
+        this.updateChatbotFilterTitle();
+        this.currentPage = 1;
+        this.loadUsers(1);
+      });
+    }
+  }
+
+  truncateFilterLabel(value, maxLength = 46) {
+    const text = String(value || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text || text.length <= maxLength) {
+      return text;
+    }
+    return `${text.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+  }
+
+  updateChatbotFilterTitle() {
+    if (!this.chatbotFilter) return;
+    const selected =
+      this.chatbotFilter.options[this.chatbotFilter.selectedIndex];
+    const fullLabel =
+      selected?.getAttribute("data-full-label") ||
+      selected?.textContent ||
+      "Filter by chatbot";
+    this.chatbotFilter.title = fullLabel;
   }
 
   setupPaginationActions() {
@@ -2478,10 +2650,14 @@ class UserManagementHandler {
       const roleQuery = role ? `&role=${encodeURIComponent(role)}` : "";
       const active = this.statusFilter?.value || "";
       const activeQuery = active ? `&active=${encodeURIComponent(active)}` : "";
+      const chatbotId = this.chatbotFilter?.value || "";
+      const chatbotQuery = chatbotId
+        ? `&chatbot_id=${encodeURIComponent(chatbotId)}`
+        : "";
       const search = (this.searchInput?.value || "").trim();
       const searchQuery = search ? `&search=${encodeURIComponent(search)}` : "";
       const response = await API.get(
-        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}${activeQuery}${searchQuery}`,
+        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}${activeQuery}${chatbotQuery}${searchQuery}`,
       );
 
       const users = Array.isArray(response?.data) ? response.data : [];
@@ -2496,13 +2672,24 @@ class UserManagementHandler {
         : page;
 
       this.currentPage = currentPage;
+      this.visibleUserIds = users
+        .map((entry) => Number(entry?.id))
+        .filter((id) => Number.isFinite(id));
+      this.selectedUserIds = new Set(
+        this.visibleUserIds.filter((id) => this.selectedUserIds.has(id)),
+      );
 
       this.renderUsers(users);
+      this.syncRowSelectionCheckboxes();
+      this.updateSelectionUI();
       this.renderPagination(total, currentPage, pages);
     } catch (error) {
       console.error("Error loading users:", error);
       NotificationManager.error("Failed to load users");
+      this.visibleUserIds = [];
+      this.selectedUserIds.clear();
       this.renderUsers([]);
+      this.updateSelectionUI();
       this.renderPagination(0, 1, 1);
     }
   }
@@ -2513,7 +2700,7 @@ class UserManagementHandler {
 
     if (!users.length) {
       tbody.innerHTML =
-        '<tr><td colspan="6" class="text-center">No users found.</td></tr>';
+        '<tr><td colspan="8" class="text-center">No users found.</td></tr>';
       return;
     }
 
@@ -2542,6 +2729,9 @@ class UserManagementHandler {
 
         return `
           <tr>
+            <td class="users-select-col">
+              <input type="checkbox" data-action="select-user" data-user-id="${user.id}" ${this.selectedUserIds.has(Number(user.id)) ? "checked" : ""} aria-label="Select ${this.escapeHtml(user.name || user.username || "user")}">
+            </td>
             <td>
               <div class="table-user-cell">
                 <div class="table-user-avatar">${initials}</div>
@@ -2566,6 +2756,91 @@ class UserManagementHandler {
         `;
       })
       .join("");
+  }
+
+  syncRowSelectionCheckboxes() {
+    const rowCheckboxes = this.table.querySelectorAll(
+      'input[data-action="select-user"]',
+    );
+
+    rowCheckboxes.forEach((checkbox) => {
+      const userId = Number(checkbox.dataset.userId);
+      checkbox.checked = this.selectedUserIds.has(userId);
+    });
+  }
+
+  updateSelectionUI() {
+    const selectedVisibleCount = this.visibleUserIds.filter((id) =>
+      this.selectedUserIds.has(id),
+    ).length;
+    const visibleCount = this.visibleUserIds.length;
+
+    if (this.bulkActions) {
+      this.bulkActions.style.display =
+        selectedVisibleCount > 0 ? "flex" : "none";
+    }
+
+    if (this.selectedCountLabel) {
+      const label = selectedVisibleCount === 1 ? "user" : "users";
+      this.selectedCountLabel.textContent = `${selectedVisibleCount} ${label} selected`;
+    }
+
+    if (this.selectAllCheckbox) {
+      this.selectAllCheckbox.checked =
+        visibleCount > 0 && selectedVisibleCount === visibleCount;
+      this.selectAllCheckbox.indeterminate =
+        selectedVisibleCount > 0 && selectedVisibleCount < visibleCount;
+    }
+  }
+
+  async bulkDeleteSelectedUsers() {
+    const idsToDelete = this.visibleUserIds.filter((id) =>
+      this.selectedUserIds.has(id),
+    );
+
+    if (!idsToDelete.length) {
+      NotificationManager.warning("Select at least one user to delete");
+      return;
+    }
+
+    ModalManager.confirm(
+      `Delete ${idsToDelete.length} selected user(s)? This action cannot be undone.`,
+      async () => {
+        try {
+          const response = await API.post("/api/admin/users/bulk-delete", {
+            user_ids: idsToDelete,
+          });
+
+          this.selectedUserIds.clear();
+          this.visibleUserIds = [];
+          this.updateSelectionUI();
+
+          NotificationManager.success(
+            response?.message || "Selected users deleted successfully",
+          );
+
+          await this.loadUserStats();
+          await this.loadUsers(this.currentPage);
+
+          if (
+            window.adminPanel &&
+            typeof window.adminPanel.loadDashboardStats === "function"
+          ) {
+            window.adminPanel.loadDashboardStats();
+          }
+        } catch (error) {
+          NotificationManager.error(
+            error.message || "Failed to delete selected users",
+          );
+        }
+      },
+    );
+  }
+
+  escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = String(value || "");
+    return div.innerHTML;
   }
 
   renderPagination(totalUsers, currentPage, totalPages) {
@@ -3147,6 +3422,10 @@ class ChatbotListHandler {
                         <div class="chatbot-card-item">
                             <span class="chatbot-card-item-icon"><i class="fas fa-user-tie"></i></span>
                             <span>${bot.guests_count || 0} guests</span>
+                        </div>
+                        <div class="chatbot-card-item">
+                          <span class="chatbot-card-item-icon"><i class="fas fa-image"></i></span>
+                          <span>${bot.total_images_generated || 0} images generated</span>
                         </div>
                     </div>
                     <div class="chatbot-card-footer">

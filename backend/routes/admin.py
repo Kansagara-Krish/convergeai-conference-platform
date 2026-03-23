@@ -19,9 +19,11 @@ import uuid
 try:
     from models import db, User, Chatbot, Guest, Message, SessionToken, ChatbotParticipant, AdminNotification
     from routes.auth import token_required, admin_required
+    from services.email_templates import build_user_credentials_email
 except ImportError:
     from backend.models import db, User, Chatbot, Guest, Message, SessionToken, ChatbotParticipant, AdminNotification
     from backend.routes.auth import token_required, admin_required
+    from backend.services.email_templates import build_user_credentials_email
 
 admin_bp = Blueprint('admin', __name__)
 EMAIL_REGEX = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$')
@@ -257,7 +259,7 @@ def _make_unique_username(seed_value):
     return candidate
 
 
-def send_user_credentials_email(recipient_email, name, role, username, password, allowed_events=None):
+def send_user_credentials_email(recipient_email, name, role, username, password, allowed_events=None, allowed_chatbots=None):
     """Send credentials email synchronously"""
     mail_server = current_app.config.get('MAIL_SERVER')
     mail_port = current_app.config.get('MAIL_PORT', 587)
@@ -270,29 +272,20 @@ def send_user_credentials_email(recipient_email, name, role, username, password,
     if not mail_server:
         return False, 'MAIL_SERVER is not configured'
 
-    if allowed_events and isinstance(allowed_events, list):
-        cleaned_events = [str(event).strip() for event in allowed_events if str(event).strip()]
-    else:
-        cleaned_events = []
-
-    events_line = ', '.join(cleaned_events) if cleaned_events else 'Not assigned yet'
+    template = build_user_credentials_email(
+        role=role,
+        username=username,
+        email=recipient_email,
+        password=password,
+        allowed_events=allowed_events,
+        allowed_chatbots=allowed_chatbots,
+    )
 
     msg = EmailMessage()
-    msg['Subject'] = 'Your ConvergeAI Account Credentials'
+    msg['Subject'] = template['subject']
     msg['From'] = mail_sender
     msg['To'] = recipient_email
-    msg.set_content(
-        (
-            f"Hello {name},\n\n"
-            "Your account has been created in ConvergeAI.\n\n"
-            f"Role: {role}\n"
-            f"Email: {recipient_email}\n"
-            f"Password: {password}\n\n"
-            f"Allowed Event(s): {events_line}\n\n"
-            "Please login and change your password after first login.\n\n"
-            "Regards,\nConvergeAI Admin"
-        )
-    )
+    msg.set_content(template['body'])
 
     try:
         if use_ssl:
@@ -314,11 +307,19 @@ def send_user_credentials_email(recipient_email, name, role, username, password,
         return False, str(exc)
 
 
-def send_email_background(app, recipient_email, name, role, username, password, allowed_events=None):
+def send_email_background(app, recipient_email, name, role, username, password, allowed_events=None, allowed_chatbots=None):
     """Send email in background thread with app context"""
     with app.app_context():
         try:
-            send_user_credentials_email(recipient_email, name, role, username, password, allowed_events)
+            send_user_credentials_email(
+                recipient_email,
+                name,
+                role,
+                username,
+                password,
+                allowed_events,
+                allowed_chatbots,
+            )
         except Exception as e:
             # Log error but don't crash the thread
             print(f"Background email failed for {recipient_email}: {str(e)}")
@@ -335,7 +336,8 @@ def send_bulk_emails_background(app, credentials_list):
                     role=cred['role'],
                     username=cred.get('username') or '',
                     password=cred['password'],
-                    allowed_events=cred.get('allowed_events')
+                    allowed_events=cred.get('allowed_events'),
+                    allowed_chatbots=cred.get('allowed_chatbots')
                 )
             except Exception as e:
                 print(f"Background email failed for {cred['email']}: {str(e)}")
@@ -586,8 +588,12 @@ def create_user(user):
     role = (data.get('role') or 'user').strip().lower()
     active_raw = data.get('active', True)
 
-    if not name or not email or not username or not password:
-        return jsonify({'success': False, 'message': 'name, email, username, and password are required'}), 400
+    if not email or not username or not password:
+        return jsonify({'success': False, 'message': 'email, username, and password are required'}), 400
+
+    # Name is optional in UI; default to username so DB nullable constraint is always satisfied.
+    if not name:
+        name = username
 
     normalized_whatsapp_number = normalize_indian_whatsapp_number(whatsapp_number_raw)
     if not normalized_whatsapp_number:
@@ -626,6 +632,7 @@ def create_user(user):
     # Associate user with chatbots if provided
     chatbot_ids = data.get('chatbot_ids', [])
     assigned_event_names = []
+    assigned_chatbot_names = []
     if chatbot_ids and isinstance(chatbot_ids, list):
         for chatbot_id in chatbot_ids:
             # Verify chatbot exists
@@ -633,6 +640,8 @@ def create_user(user):
             if chatbot:
                 if chatbot.event_name and chatbot.event_name not in assigned_event_names:
                     assigned_event_names.append(chatbot.event_name)
+                if chatbot.name and chatbot.name not in assigned_chatbot_names:
+                    assigned_chatbot_names.append(chatbot.name)
                 # Check if already a participant
                 existing = ChatbotParticipant.query.filter_by(
                     chatbot_id=chatbot_id,
@@ -652,7 +661,7 @@ def create_user(user):
     app = current_app._get_current_object()
     thread = threading.Thread(
         target=send_email_background,
-        args=(app, effective_email, name, role, username, password, assigned_event_names)
+        args=(app, effective_email, name, role, username, password, assigned_event_names, assigned_chatbot_names)
     )
     thread.daemon = True
     thread.start()
@@ -1461,7 +1470,8 @@ def import_users_from_excel(user):
                 'password': password,
                 'email': effective_email,
                 'whatsapp_number': normalized_whatsapp_number,
-                'allowed_events': [chatbot.event_name] if chatbot and chatbot.event_name else []
+                'allowed_events': [chatbot.event_name] if chatbot and chatbot.event_name else [],
+                'allowed_chatbots': [chatbot.name] if chatbot and chatbot.name else []
             })
 
         if not credentials:

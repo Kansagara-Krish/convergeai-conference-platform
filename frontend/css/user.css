@@ -601,6 +601,15 @@
   margin-bottom: var(--spacing-lg);
 }
 
+/* Tighten spacing between Remember me and primary submit button */
+.login-page .login-form-options {
+  margin-bottom: var(--spacing-sm);
+}
+
+.login-page #password-login-fields.login-auth-panel.is-active {
+  margin-bottom: 0;
+}
+
 .login-form-divider {
   display: flex;
   align-items: center;

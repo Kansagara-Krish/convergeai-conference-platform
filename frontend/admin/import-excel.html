@@ -95,16 +95,6 @@
                     <h1>Import Users from Excel</h1>
                 </div>
                 <div class="header-actions">
-                    <div class="dashboard-bell-wrap" id="dashboard-bell-wrap">
-                        <button class="dashboard-bell-btn bell-ringing" id="dashboard-bell-btn" aria-label="Dashboard notifications">
-                            <i class="fas fa-bell"></i>
-                            <span class="dashboard-bell-dot" id="dashboard-bell-dot"></span>
-                        </button>
-                        <div class="dashboard-bell-panel" id="dashboard-bell-panel" aria-hidden="true">
-                            <div class="dashboard-bell-panel-title">Notifications</div>
-                            <div class="dashboard-bell-list" id="dashboard-bell-list">Loading notifications...</div>
-                        </div>
-                    </div>
                     <div class="header-user-menu">
                         <button class="header-user-btn">
                             <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
@@ -126,13 +116,32 @@
                     <div class="card mb-lg">
                         <div class="card-body">
                             <h3><i class="fas fa-clipboard-list"></i> Import Instructions</h3>
-                            <ul style="margin-left: var(--spacing-lg); color: var(--text-secondary);">
-                                <li>Upload an Excel file (.xlsx) with only email and username columns</li>
-                                <li>Use this exact header row to avoid mismatch: <code>email,username</code></li>
-                                <li>Do not add Password, Role, Active, or Name columns for this import format</li>
-                                <li>System will create accounts and assign default password <code>123</code></li>
-                                <li>Credentials will be sent to users' email addresses</li>
-                                <li>You can download and print the credentials list</li>
+                            <div class="import-column-guide">
+                                <div class="import-column-group required">
+                                    <div class="import-column-title"><i class="fas fa-check-circle"></i> Required Columns</div>
+                                    <div class="import-column-tags">
+                                        <span class="column-tag required">email</span>
+                                        <span class="column-tag required">username</span>
+                                        <span class="column-tag required">whatsapp_number</span>
+                                    </div>
+                                </div>
+                                <div class="import-column-group blocked">
+                                    <div class="import-column-title"><i class="fas fa-ban"></i> Do Not Include</div>
+                                    <div class="import-column-tags">
+                                        <span class="column-tag blocked">password</span>
+                                        <span class="column-tag blocked">role</span>
+                                        <span class="column-tag blocked">active</span>
+                                        <span class="column-tag blocked">name</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <ul class="import-instruction-list">
+                                <li>Upload an Excel file (.xlsx) using only the required columns shown above.</li>
+                                <li>Use this exact header row order to avoid mismatch: <code>email,username,whatsapp_number</code></li>
+                                <li>WhatsApp number must be in Indian format and start with <code>+91</code> (example: <code>+919876543210</code>).</li>
+                                <li>System creates accounts and assigns default password <code>123</code>.</li>
+                                <li>Credentials are sent to each user's email address and can be downloaded/printed after import.</li>
                             </ul>
                         </div>
                     </div>

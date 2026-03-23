@@ -368,9 +368,13 @@ class API {
       }
     }
 
-    const candidates = [API_BASE_URL, ...fallbackCandidates, ""].filter(
-      (value) => typeof value === "string",
-    );
+    const normalizedBase = String(API_BASE_URL || "").trim();
+    // Prefer same-origin calls first when API base is empty so we avoid
+    // probing multiple localhost ports before trying the actual working URL.
+    const candidates =
+      normalizedBase === ""
+        ? ["", ...fallbackCandidates]
+        : [normalizedBase, "", ...fallbackCandidates];
 
     return [...new Set(candidates)];
   }
@@ -493,9 +497,14 @@ class API {
         }
       }
       const data = await response.json().catch(() => ({}));
-      throw new Error(
+      const error = new Error(
         data.message || `HTTP ${response.status}: ${response.statusText}`,
       );
+      error.status = response.status;
+      if (data && typeof data === "object") {
+        Object.assign(error, data);
+      }
+      throw error;
     }
     const data = await response.json();
     return data;

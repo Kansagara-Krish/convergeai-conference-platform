@@ -180,6 +180,81 @@
   display: none;
 }
 
+/* Import instructions: highlight required and blocked excel columns */
+.import-column-guide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.import-column-group {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.import-column-group.required {
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.18);
+}
+
+.import-column-group.blocked {
+  border-color: rgba(239, 68, 68, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.16);
+}
+
+.import-column-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.import-column-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.column-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.column-tag.required {
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+}
+
+.column-tag.blocked {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid rgba(252, 165, 165, 0.4);
+}
+
+.import-instruction-list {
+  margin-left: var(--spacing-lg);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .import-column-guide {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ============================================
    2. SIDEBAR STYLING
    ============================================ */
@@ -435,6 +510,17 @@
   gap: var(--spacing-md);
 }
 
+.admin-header .header-title h1 {
+  margin: 0;
+  font-size: clamp(1.1rem, 1.6vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
 .header-breadcrumb {
   display: flex;
   align-items: center;
@@ -451,6 +537,11 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+}
+
+/* Single-admin setup: hide header notification bell globally */
+.dashboard-bell-wrap {
+  display: none !important;
 }
 
 .header-search {
@@ -789,7 +880,10 @@
   transform: translateY(0);
 }
 
-.dropdown-item {
+.dropdown-item,
+.dropdown-item:link,
+.dropdown-item:visited,
+.dropdown-item:active {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
@@ -798,6 +892,13 @@
   transition: all var(--transition-base);
   border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
+  text-decoration: none;
+}
+
+.dropdown-item i {
+  width: 18px;
+  text-align: center;
+  color: inherit;
 }
 
 .dropdown-item:last-child {
@@ -1519,6 +1620,26 @@
   flex: 0 0 180px;
 }
 
+#user-chatbot-filter {
+  width: 220px;
+  flex: 0 0 220px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 2.35rem;
+}
+
+.users-bulk-actions {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: 0 var(--spacing-lg) var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
 .form-section {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
@@ -1853,11 +1974,18 @@ table[data-table="users"] td {
 
 table[data-table="users"] th:nth-child(1),
 table[data-table="users"] td:nth-child(1) {
-  min-width: 220px;
+  min-width: 54px;
+  width: 54px;
+  white-space: nowrap;
 }
 
 table[data-table="users"] th:nth-child(2),
 table[data-table="users"] td:nth-child(2) {
+  min-width: 220px;
+}
+
+table[data-table="users"] th:nth-child(3),
+table[data-table="users"] td:nth-child(3) {
   min-width: 210px;
 }
 
@@ -1866,7 +1994,9 @@ table[data-table="users"] td:nth-child(4),
 table[data-table="users"] th:nth-child(5),
 table[data-table="users"] td:nth-child(5),
 table[data-table="users"] th:nth-child(6),
-table[data-table="users"] td:nth-child(6) {
+table[data-table="users"] td:nth-child(6),
+table[data-table="users"] th:nth-child(7),
+table[data-table="users"] td:nth-child(7) {
   white-space: nowrap;
 }
 
@@ -1874,14 +2004,21 @@ table[data-table="users"] .table-actions {
   flex-wrap: nowrap;
 }
 
-table[data-table="users"] .table-actions .btn {
-  white-space: nowrap;
-}
-
 .table-user-cell {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+}
+
+.users-select-col {
+  text-align: center;
+}
+
+.users-select-col input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
+  cursor: pointer;
 }
 
 .table-user-avatar {
@@ -2410,9 +2547,14 @@ table[data-table="users"] .table-actions .btn {
   }
 
   .user-filter-row .users-filter-select {
-    width: calc(50% - (var(--spacing-sm) / 2));
+    width: calc(33.333% - (var(--spacing-sm) * 0.67));
     min-width: 0;
-    flex: 1 1 0;
+    flex: 1 1 calc(33.333% - (var(--spacing-sm) * 0.67));
+  }
+
+  .users-bulk-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   #guests-pagination-buttons {
@@ -2572,9 +2714,14 @@ table[data-table="users"] .table-actions .btn {
 
   .user-filter-row .users-filter-select {
     width: calc(50% - (var(--spacing-sm) / 2));
-    flex: 1 1 0;
+    flex: 1 1 calc(50% - (var(--spacing-sm) / 2));
     min-width: 0;
     height: 44px;
+  }
+
+  #user-chatbot-filter {
+    width: 100%;
+    flex: 1 1 100%;
   }
 
   #guests-pagination-buttons {
@@ -2809,8 +2956,8 @@ select#guest-status-filter option:checked,
 select#guest-event-filter option:checked,
 select#chatbot-status-filter option:checked,
 .users-filter-select option:checked {
-  background-color: var(--accent-blue) !important;
-  color: #ffffff !important;
+  background-color: #111b33 !important;
+  color: var(--text-primary) !important;
 }
 
 .single-user-role-select {
@@ -2836,8 +2983,8 @@ select#chatbot-status-filter option:checked,
 }
 
 .single-user-role-select option:checked {
-  background-color: #2a6acb !important;
-  color: #ffffff !important;
+  background-color: #171d3a !important;
+  color: var(--text-primary) !important;
 }
 
 .single-user-role-row .single-user-active-wrap {
@@ -2871,8 +3018,8 @@ select#chatbot-status-filter option:checked,
 }
 
 .single-user-events-select option:checked {
-  background: linear-gradient(90deg, rgba(79, 70, 229, 0.9), rgba(99, 102, 241, 0.9));
-  color: #ffffff;
+  background: #171d3a;
+  color: var(--text-primary);
 }
 
 /* ============================================

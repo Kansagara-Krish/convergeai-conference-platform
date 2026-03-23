@@ -365,6 +365,79 @@ def receive_whatsapp_webhook():
         return jsonify({"success": False, "message": "Failed to process webhook"}), 500
 
 
+@whatsapp_bp.route("/send-history", methods=["GET"])
+@token_required
+def get_whatsapp_send_history(user):
+    """Return recent WhatsApp send/webhook status records for diagnostics."""
+    whatsapp_number = str(request.args.get("whatsapp_number") or request.args.get("whatsapp") or "").strip()
+    provider_message_id = str(request.args.get("provider_message_id") or "").strip()
+
+    try:
+        limit = int(request.args.get("limit", 25))
+    except (TypeError, ValueError):
+        limit = 25
+
+    if limit < 1:
+        limit = 1
+    if limit > 100:
+        limit = 100
+
+    query = WhatsAppSendHistory.query
+
+    normalized_whatsapp = ""
+    if whatsapp_number:
+        if not _is_valid_whatsapp_number(whatsapp_number):
+            return jsonify({"success": False, "message": "Please enter a valid WhatsApp number"}), 400
+        normalized_whatsapp = _normalize_whatsapp_number(whatsapp_number)
+        query = query.filter(WhatsAppSendHistory.whatsapp_number == normalized_whatsapp)
+
+    if provider_message_id:
+        query = query.filter(WhatsAppSendHistory.provider_message_id == provider_message_id)
+
+    records = (
+        query.order_by(WhatsAppSendHistory.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    sent_records = [item for item in records if str(item.status or "").startswith("sent:")]
+    webhook_records = [item for item in records if str(item.status or "").startswith("webhook:")]
+    failed_records = [item for item in records if str(item.status or "").startswith("failed:")]
+
+    latest_by_provider_message_id = {}
+    for item in records:
+        message_id = str(item.provider_message_id or "").strip()
+        if not message_id or message_id in latest_by_provider_message_id:
+            continue
+        latest_by_provider_message_id[message_id] = {
+            "provider_message_id": message_id,
+            "latest_status": item.status,
+            "latest_created_at": item.created_at.isoformat() if item.created_at else None,
+        }
+
+    return jsonify(
+        {
+            "success": True,
+            "message": "WhatsApp send history fetched successfully",
+            "data": {
+                "filters": {
+                    "whatsapp_number": normalized_whatsapp or None,
+                    "provider_message_id": provider_message_id or None,
+                    "limit": limit,
+                },
+                "summary": {
+                    "total": len(records),
+                    "sent_count": len(sent_records),
+                    "webhook_count": len(webhook_records),
+                    "failed_count": len(failed_records),
+                },
+                "latest_by_provider_message_id": list(latest_by_provider_message_id.values()),
+                "records": [item.to_dict() for item in records],
+            },
+        }
+    ), 200
+
+
 @whatsapp_bp.route("/send-image", methods=["POST"])
 @token_required
 def send_image_via_whatsapp(user):
@@ -376,9 +449,19 @@ def send_image_via_whatsapp(user):
     image_path = str(data.get("image_path") or "").strip()
     template_name = str(data.get("template_name") or current_app.config.get("WHATSAPP_TEMPLATE_NAME") or "").strip()
     template_language = str(data.get("template_language") or current_app.config.get("WHATSAPP_TEMPLATE_LANGUAGE") or "en").strip() or "en"
+    raw_body_variables = data.get("template_body_variables", data.get("body_variables", []))
 
-    if len(name) < 2:
-        return jsonify({"success": False, "message": "Please enter a valid name"}), 400
+    body_variables = []
+    if isinstance(raw_body_variables, list):
+        for item in raw_body_variables:
+            text = str(item or "").strip()
+            if text:
+                body_variables.append(text)
+
+    # Keep backward compatibility: if caller does not provide template vars,
+    # use name as first body var when available.
+    if not body_variables and name:
+        body_variables = [name]
 
     if not _is_valid_whatsapp_number(whatsapp_number):
         return jsonify({"success": False, "message": "Please enter a valid WhatsApp number"}), 400
@@ -390,7 +473,6 @@ def send_image_via_whatsapp(user):
         return jsonify({"success": False, "message": "WHATSAPP_TEMPLATE_NAME is not configured"}), 500
 
     normalized_to = _normalize_whatsapp_number(whatsapp_number)
-    body_variables = [name] if name else []
 
     try:
         try:
@@ -406,21 +488,45 @@ def send_image_via_whatsapp(user):
             if not _is_template_param_mismatch_error(template_exc):
                 raise
 
-            # Auto-retry once with alternate body params to match template definition.
-            fallback_body_variables = [] if body_variables else ([name] if name else [])
             current_app.logger.warning(
-                "Template parameter mismatch detected; retrying with fallback body params count=%s",
-                len(fallback_body_variables),
+                "Template parameter mismatch detected for template '%s'; retrying with fallback body vars",
+                template_name,
             )
-            api_response, logged_image_value = _send_image_using_template_strategy(
-                to_number=normalized_to,
-                image_url=image_url,
-                image_path=image_path,
-                template_name=template_name,
-                template_language=template_language,
-                body_variables=fallback_body_variables,
-            )
-            body_variables = fallback_body_variables
+
+            fallback_candidates = []
+            fallback_candidates.append([])
+            if name:
+                fallback_candidates.append([name])
+
+            deduped_candidates = []
+            seen = set()
+            for candidate in fallback_candidates:
+                key = tuple(candidate)
+                if key in seen or candidate == body_variables:
+                    continue
+                seen.add(key)
+                deduped_candidates.append(candidate)
+
+            retried = False
+            for candidate_vars in deduped_candidates:
+                try:
+                    api_response, logged_image_value = _send_image_using_template_strategy(
+                        to_number=normalized_to,
+                        image_url=image_url,
+                        image_path=image_path,
+                        template_name=template_name,
+                        template_language=template_language,
+                        body_variables=candidate_vars,
+                    )
+                    body_variables = candidate_vars
+                    retried = True
+                    break
+                except WhatsAppServiceError as retry_exc:
+                    if not _is_template_param_mismatch_error(retry_exc):
+                        raise
+
+            if not retried:
+                raise template_exc
 
         provider_message_id = _extract_provider_message_id(api_response)
 

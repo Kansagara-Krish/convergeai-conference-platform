@@ -87,6 +87,8 @@ class Config:
     WHATSAPP_VERIFY_TOKEN = os.environ.get('WHATSAPP_VERIFY_TOKEN') or os.environ.get('VERIFY_TOKEN', '')
     WHATSAPP_TEMPLATE_NAME = os.environ.get('WHATSAPP_TEMPLATE_NAME', '')
     WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get('WHATSAPP_TEMPLATE_LANGUAGE', 'en')
+    WHATSAPP_LOGIN_OTP_TEMPLATE_NAME = os.environ.get('WHATSAPP_LOGIN_OTP_TEMPLATE_NAME', '')
+    WHATSAPP_LOGIN_OTP_TEMPLATE_LANGUAGE = os.environ.get('WHATSAPP_LOGIN_OTP_TEMPLATE_LANGUAGE', 'en')
     WHATSAPP_API_VERSION = os.environ.get('WHATSAPP_API_VERSION', 'v23.0')
 
     # Public base URL used when external providers need to fetch local media.
@@ -100,6 +102,11 @@ class Config:
     GOOGLE_DRIVE_ROOT_FOLDER_ID = os.environ.get('GOOGLE_DRIVE_ROOT_FOLDER_ID', '')
     GOOGLE_DRIVE_AUTO_CREATE_CHATBOT_FOLDER = os.environ.get('GOOGLE_DRIVE_AUTO_CREATE_CHATBOT_FOLDER', 'true').lower() == 'true'
     GOOGLE_DRIVE_SHARE_PUBLIC = os.environ.get('GOOGLE_DRIVE_SHARE_PUBLIC', 'false').lower() == 'true'
+
+    # Google OAuth for per-user Drive access
+    GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '')
+    GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '')
+    GOOGLE_OAUTH_REDIRECT_URI = os.environ.get('GOOGLE_OAUTH_REDIRECT_URI', '')
 
 class DevelopmentConfig(Config):
     """Development configuration"""

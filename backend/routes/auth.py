@@ -15,10 +15,10 @@ import re
 
 try:
     from models import db, User, SessionToken, ChatbotParticipant, Chatbot, LoginOTP
-    from services.whatsapp_service import send_whatsapp_text, WhatsAppServiceError
+    from services.whatsapp_service import send_whatsapp_text_template, WhatsAppServiceError
 except ImportError:
     from backend.models import db, User, SessionToken, ChatbotParticipant, Chatbot, LoginOTP
-    from backend.services.whatsapp_service import send_whatsapp_text, WhatsAppServiceError
+    from backend.services.whatsapp_service import send_whatsapp_text_template, WhatsAppServiceError
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -138,20 +138,36 @@ def _create_and_send_login_otp(user):
     db.session.add(otp_record)
     db.session.commit()
 
+    otp_template_name = str(current_app.config.get('WHATSAPP_LOGIN_OTP_TEMPLATE_NAME') or '').strip()
+    otp_template_language = str(current_app.config.get('WHATSAPP_LOGIN_OTP_TEMPLATE_LANGUAGE') or 'en').strip() or 'en'
+
     try:
-        send_whatsapp_text(
-            to_number=user.whatsapp_number,
-            text=(
-                f"Your ConvergeAI login OTP is {otp_code}. "
-                f"It expires in {LOGIN_OTP_EXPIRY_SECONDS // 60} minute."
-            ),
-        )
+        from services.whatsapp_service import send_whatsapp_text
+        if otp_template_name:
+            send_whatsapp_text_template(
+                to_number=user.whatsapp_number,
+                template_name=otp_template_name,
+                template_language=otp_template_language,
+                body_variables=[otp_code],
+            )
+        else:
+            # Fallback to free-form text message if no dedicated OTP template is configured.
+            send_whatsapp_text(
+                to_number=user.whatsapp_number,
+                text=f"Your ConvergeAI login OTP is {otp_code}. It expires in 60 seconds."
+            )
     except WhatsAppServiceError as exc:
         otp_record.is_used = True
         db.session.commit()
+        
+        # Friendly error message for free-form fallback 24h window issue
+        error_msg = exc.message or 'Failed to send OTP on WhatsApp'
+        if not otp_template_name and "more than 24 hours" in error_msg.lower():
+            error_msg = "Cannot send OTP because you haven't messaged the bot recently. Please reply to the bot on WhatsApp and try again, or configure WHATSAPP_LOGIN_OTP_TEMPLATE_NAME."
+
         return None, {
             'status_code': exc.status_code if getattr(exc, 'status_code', None) else 502,
-            'message': exc.message or 'Failed to send OTP on WhatsApp',
+            'message': error_msg,
         }
 
     return otp_record, None

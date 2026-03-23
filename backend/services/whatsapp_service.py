@@ -143,6 +143,63 @@ def _post_with_retry(
     ) from last_exception
 
 
+def _build_image_message_payload(to_number: str, image_payload: Dict[str, Any], caption: str = "") -> Dict[str, Any]:
+    template_name = _get_config_value("WHATSAPP_TEMPLATE_NAME")
+    
+    if not template_name:
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_number,
+            "type": "image",
+            "image": image_payload,
+        }
+        if caption:
+            payload["image"]["caption"] = str(caption).strip()
+        return payload
+
+    template_lang = _get_config_value("WHATSAPP_TEMPLATE_LANGUAGE", "en")
+    
+    components = [
+        {
+            "type": "header",
+            "parameters": [
+                {
+                    "type": "image",
+                    "image": image_payload
+                }
+            ]
+        }
+    ]
+    
+    if caption:
+        # Note: If the template has NO body variables defined in Meta, passing a body parameter might cause an error.
+        # We assume the template was created with 1 body variable for the caption (e.g. {{1}}).
+        components.append({
+            "type": "body",
+            "parameters": [
+                {
+                    "type": "text",
+                    "text": str(caption).strip()
+                }
+            ]
+        })
+        
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_number,
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {
+                "code": template_lang
+            },
+            "components": components
+        }
+    }
+    return payload
+
+
 def send_whatsapp_image(to_number: str, image_url: str, caption: str = "") -> Dict[str, Any]:
     """Send image by public URL using Meta Cloud API /messages endpoint."""
     _raise_if_missing_config()
@@ -159,18 +216,20 @@ def send_whatsapp_image(to_number: str, image_url: str, caption: str = "") -> Di
     endpoint_url = f"{_get_graph_api_base_url()}/{cfg['phone_number_id']}/messages"
 
     image_payload: Dict[str, Any] = {"link": link}
-    if caption:
-        image_payload["caption"] = str(caption).strip()
+    payload = _build_image_message_payload(normalized_to, image_payload, caption)
 
-    payload = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": normalized_to,
-        "type": "image",
-        "image": image_payload,
-    }
-
-    return _post_json(endpoint_url, payload)
+    try:
+        return _post_json(endpoint_url, payload)
+    except WhatsAppServiceError as e:
+        # If sending template fails because body parameters were not expected by the template,
+        # retry without the body parameters to be safe.
+        if e.payload and isinstance(e.payload, dict):
+            error_data = e.payload.get("error", {})
+            if "parameter" in str(error_data.get("message", "")).lower() or error_data.get("code") == 100:
+                # Retry without caption as body parameter
+                fallback_payload = _build_image_message_payload(normalized_to, image_payload, "")
+                return _post_json(endpoint_url, fallback_payload)
+        raise e
 
 
 def upload_whatsapp_media(file_path: str) -> Dict[str, Any]:
@@ -246,18 +305,17 @@ def send_whatsapp_image_by_media_id(
     endpoint_url = f"{_get_graph_api_base_url()}/{cfg['phone_number_id']}/messages"
 
     image_payload: Dict[str, Any] = {"id": normalized_media_id}
-    if caption:
-        image_payload["caption"] = str(caption).strip()
+    payload = _build_image_message_payload(normalized_to, image_payload, caption)
 
-    payload = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": normalized_to,
-        "type": "image",
-        "image": image_payload,
-    }
-
-    return _post_json(endpoint_url, payload)
+    try:
+        return _post_json(endpoint_url, payload)
+    except WhatsAppServiceError as e:
+        if e.payload and isinstance(e.payload, dict):
+            error_data = e.payload.get("error", {})
+            if "parameter" in str(error_data.get("message", "")).lower() or error_data.get("code") == 100:
+                fallback_payload = _build_image_message_payload(normalized_to, image_payload, "")
+                return _post_json(endpoint_url, fallback_payload)
+        raise e
 
 
 def send_whatsapp_text(to_number: str, text: str) -> Dict[str, Any]:
@@ -285,6 +343,59 @@ def send_whatsapp_text(to_number: str, text: str) -> Dict[str, Any]:
             "preview_url": False,
             "body": body,
         },
+    }
+
+    return _post_json(endpoint_url, payload)
+
+
+def send_whatsapp_text_template(
+    to_number: str,
+    template_name: str,
+    template_language: str,
+    body_variables: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Send approved text-only template message with optional body variables."""
+    _raise_if_missing_config()
+
+    normalized_to = _normalize_whatsapp_number(to_number)
+    normalized_template_name = str(template_name or "").strip()
+    normalized_language = str(template_language or "").strip() or "en"
+
+    if not normalized_to:
+        raise WhatsAppServiceError("Recipient WhatsApp number is required", status_code=400)
+
+    if not normalized_template_name:
+        raise WhatsAppServiceError("Template name is required", status_code=500)
+
+    components: List[Dict[str, Any]] = []
+    clean_body_vars = [str(item).strip() for item in (body_variables or []) if str(item).strip()]
+    if clean_body_vars:
+        components.append(
+            {
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": body_var}
+                    for body_var in clean_body_vars
+                ],
+            }
+        )
+
+    cfg = _get_whatsapp_config()
+    endpoint_url = f"{_get_graph_api_base_url()}/{cfg['phone_number_id']}/messages"
+
+    template_payload: Dict[str, Any] = {
+        "name": normalized_template_name,
+        "language": {"code": normalized_language},
+    }
+    if components:
+        template_payload["components"] = components
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": normalized_to,
+        "type": "template",
+        "template": template_payload,
     }
 
     return _post_json(endpoint_url, payload)

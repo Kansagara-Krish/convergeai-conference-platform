@@ -1401,8 +1401,8 @@ select option {
 }
 
 select option:checked {
-  background: linear-gradient(#4f46e5, #4f46e5);
-  color: #ffffff;
+  background: #1a1a2e;
+  color: #e0e0e0;
 }
 
 /* Checkbox improvements */
@@ -1440,7 +1440,7 @@ select option:checked {
 /* Login form options layout */
 .login-form-options {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: var(--spacing-lg);
   flex-wrap: wrap;
@@ -1460,6 +1460,188 @@ select option:checked {
   color: #ffffff;
   text-decoration: underline;
   outline: none;
+}
+
+.login-auth-panel {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity var(--transition-base), transform var(--transition-base), max-height var(--transition-base), margin var(--transition-base);
+  margin: 0;
+  will-change: transform, opacity;
+}
+
+.login-auth-panel.is-active {
+  max-height: 460px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  margin-bottom: var(--spacing-xs);
+}
+
+.login-auth-panel.panel-slide-in {
+  animation: loginPanelSlideIn 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.login-auth-panel.panel-slide-out {
+  animation: loginPanelSlideOut 220ms ease-in forwards;
+}
+
+@keyframes loginPanelSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes loginPanelSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.99);
+  }
+}
+
+.otp-login-fields {
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.otp-entry-group {
+  display: none;
+}
+
+.otp-entry-group.is-visible {
+  display: block;
+}
+
+.otp-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 22px;
+  margin-top: 0;
+}
+
+.otp-status-row .form-help {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+#otp-meta {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#otp-timer {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.otp-actions-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: 0;
+}
+
+.otp-actions-row-single .btn {
+  width: 100%;
+}
+
+.otp-actions-row .btn {
+  flex: 1;
+  min-height: 44px;
+}
+
+#otp-resend-btn {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .otp-status-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  #otp-timer {
+    text-align: left;
+  }
+}
+
+.login-secondary-actions {
+  margin-top: var(--spacing-sm);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.login-secondary-btn,
+.login-secondary-btn:visited {
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.48);
+  color: var(--accent-light);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.login-secondary-btn:hover,
+.login-secondary-btn:focus {
+  color: #ffffff;
+  border-color: rgba(96, 165, 250, 0.58);
+  background: rgba(30, 41, 59, 0.72);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12), 0 8px 18px rgba(2, 6, 23, 0.28);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.login-secondary-btn-back i {
+  color: rgba(191, 219, 254, 0.95);
+  font-size: 0.86rem;
+}
+
+.login-secondary-btn-forgot i {
+  color: rgba(191, 219, 254, 0.95);
+  font-size: 0.82rem;
+}
+
+.login-secondary-btn-otp i {
+  color: #25d366;
+  font-size: 0.9rem;
+}
+
+#password-login-link {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .login-secondary-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .forgot-password-title {
@@ -1526,7 +1708,7 @@ select option:checked {
 }
 
 .btn-loader {
-  display: inline-block;
+  display: none;
   margin-left: 8px;
 }
 

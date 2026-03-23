@@ -150,7 +150,12 @@ GEMINI_IMAGE_MODEL=gemini-2.0-flash-exp
 WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_TEMPLATE_NAME=
+WHATSAPP_TEMPLATE_LANGUAGE=en
+WHATSAPP_LOGIN_OTP_TEMPLATE_NAME=
+WHATSAPP_LOGIN_OTP_TEMPLATE_LANGUAGE=en
 WHATSAPP_API_VERSION=v23.0
+PUBLIC_URL=
 ```
 
 Notes:
@@ -284,7 +289,8 @@ Base prefixes:
 ### WhatsApp (`/api/whatsapp`)
 - `GET /webhook` (Meta webhook verification)
 - `POST /webhook` (Meta status callbacks)
-- `POST /send-image` (authenticated image send)
+- `POST /send-image` (authenticated template image send)
+- `POST /send-text` (authenticated text send for diagnostics)
 
 ### System
 - `GET /api/health`

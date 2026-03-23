@@ -5,21 +5,23 @@ from urllib.parse import urlparse
 from flask import Blueprint, current_app, jsonify, request
 
 try:
-    from models import Chatbot, ChatbotParticipant, DriveImageBackup, db
+    from models import Chatbot, ChatbotParticipant, DriveImageBackup, Message, db
     from routes.auth import token_required
     from services.google_drive_service import (
         GoogleDriveServiceError,
         ensure_chatbot_folder,
         get_folder_options,
+        upload_to_drive,
         upload_file,
     )
 except ImportError:
-    from backend.models import Chatbot, ChatbotParticipant, DriveImageBackup, db
+    from backend.models import Chatbot, ChatbotParticipant, DriveImageBackup, Message, db
     from backend.routes.auth import token_required
     from backend.services.google_drive_service import (
         GoogleDriveServiceError,
         ensure_chatbot_folder,
         get_folder_options,
+        upload_to_drive,
         upload_file,
     )
 
@@ -209,3 +211,89 @@ def save_image_to_drive(user):
         db.session.rollback()
         current_app.logger.exception("Unexpected Drive backup error: %s", exc)
         return jsonify({"success": False, "message": "Failed to save image to Drive"}), 500
+
+
+@drive_bp.route("/upload-generated-image", methods=["POST"])
+@token_required
+def upload_generated_image_to_user_drive(user):
+    data = request.get_json(silent=True) or {}
+
+    chatbot_id = data.get("chatbot_id")
+    image_value = str(data.get("image_url") or data.get("image_path") or "").strip()
+    image_id = data.get("image_id")
+
+    message_record = None
+    if not image_value and image_id is not None:
+        try:
+            image_id = int(image_id)
+        except (TypeError, ValueError):
+            image_id = None
+
+        if image_id:
+            message_record = Message.query.get(image_id)
+            if message_record and message_record.image_url:
+                image_value = str(message_record.image_url).strip()
+            elif message_record and message_record.content:
+                image_value = str(message_record.content).strip()
+
+    if not image_value:
+        return jsonify({"success": False, "message": "image_url, image_path, or image_id is required"}), 400
+
+    if chatbot_id is None and message_record is not None:
+        chatbot_id = message_record.chatbot_id
+
+    if chatbot_id is None:
+        return jsonify({"success": False, "message": "chatbot_id is required"}), 400
+
+    try:
+        chatbot_id = int(chatbot_id)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid chatbot_id"}), 400
+
+    chatbot = Chatbot.query.get(chatbot_id)
+    if not chatbot:
+        return jsonify({"success": False, "message": "Chatbot not found"}), 404
+    if not _user_can_access_chatbot(user, chatbot.id):
+        return jsonify({"success": False, "message": "Access denied for chatbot"}), 403
+
+    absolute_image_path = _resolve_image_absolute_path(image_value)
+    if not absolute_image_path:
+        return jsonify({"success": False, "message": "Only valid generated image files can be uploaded"}), 400
+
+    normalized_image_path = _normalize_local_image_path(image_value)
+
+    try:
+        uploaded = upload_to_drive(
+            user=user,
+            file_path=absolute_image_path,
+            filename=os.path.basename(absolute_image_path),
+        )
+
+        backup = DriveImageBackup(
+            chatbot_id=chatbot_id,
+            user_id=getattr(user, "id", None),
+            image_path=normalized_image_path,
+            drive_file_id=uploaded["drive_file_id"],
+            drive_folder_id=uploaded.get("folder_id") or "root",
+            drive_link=uploaded["drive_link"],
+        )
+
+        db.session.add(backup)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Image uploaded to Google Drive",
+            "data": {
+                "drive_file_id": uploaded["drive_file_id"],
+                "drive_link": uploaded["drive_link"],
+                "chatbot_id": chatbot_id,
+            },
+        }), 200
+    except GoogleDriveServiceError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": exc.message}), exc.status_code
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception("Unexpected user drive upload error: %s", exc)
+        return jsonify({"success": False, "message": "Failed to upload image to Google Drive"}), 500

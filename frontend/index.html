@@ -45,6 +45,8 @@
                         <span id="username-error" class="form-error"></span>
                     </div>
 
+                    <div id="password-login-fields" class="login-auth-panel is-active" aria-hidden="false">
+
                     <!-- Password -->
                     <div class="login-form-group">
                         <label for="password">Password <span aria-label="required">*</span></label>
@@ -66,16 +68,51 @@
                             <input type="checkbox" name="remember">
                             <span>Remember me</span>
                         </label>
-                        <a href="forgot-password.html" class="login-form-forgot" tabindex="0">Forgot password?</a>
+                    </div>
+
+                    </div>
+
+                    <div id="otp-login-fields" class="login-auth-panel otp-login-fields" aria-hidden="true">
+                        <div class="otp-actions-row otp-actions-row-single">
+                            <button type="button" id="otp-request-btn" class="btn btn-secondary">Send OTP</button>
+                        </div>
+                        <div class="login-form-group otp-entry-group" id="otp-entry-group">
+                            <label for="otp-code">One-Time Password <span aria-label="required">*</span></label>
+                            <input type="text" id="otp-code" name="otp" inputmode="numeric" maxlength="6"
+                                placeholder="Enter 6-digit OTP" autocomplete="one-time-code" aria-describedby="otp-error">
+                            <span id="otp-error" class="form-error"></span>
+                        </div>
+                        <div class="otp-status-row">
+                            <small id="otp-meta" class="form-help"></small>
+                            <small id="otp-timer" class="form-help"></small>
+                        </div>
+                        <div class="otp-actions-row">
+                            <button type="button" id="otp-resend-btn" class="btn btn-secondary" disabled>Resend OTP</button>
+                        </div>
                     </div>
 
                     <!-- Submit Button -->
-                    <button type="submit" class="btn btn-primary btn-lg login-form-btn" aria-busy="false">
+                    <button type="submit" class="btn btn-primary btn-lg login-form-btn" id="login-submit-btn" aria-busy="false">
                         <span class="btn-text">Sign In</span>
-                        <span class="btn-loader" style="display: none;">
+                        <span class="btn-loader">
                             <span class="spinner"></span>
                         </span>
                     </button>
+
+                    <div class="login-secondary-actions">
+                        <a href="forgot-password.html" class="login-secondary-btn login-secondary-btn-forgot" id="forgot-password-link" tabindex="0">
+                            <i class="fas fa-key" aria-hidden="true"></i>
+                            <span>Forgot password</span>
+                        </a>
+                        <button type="button" id="otp-login-link" class="login-secondary-btn login-secondary-btn-otp">
+                            <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                            <span>Sign in with OTP</span>
+                        </button>
+                        <button type="button" id="password-login-link" class="login-secondary-btn login-secondary-btn-back">
+                            <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                            <span>Back</span>
+                        </button>
+                    </div>
 
                 </form>
             </div>

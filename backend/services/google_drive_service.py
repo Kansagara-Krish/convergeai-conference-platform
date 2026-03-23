@@ -1,9 +1,16 @@
 import json
 import mimetypes
 import os
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+import requests
 from flask import current_app
+
+try:
+    from models import UserGoogleToken, db
+except ImportError:
+    from backend.models import UserGoogleToken, db
 
 
 class GoogleDriveServiceError(Exception):
@@ -12,6 +19,11 @@ class GoogleDriveServiceError(Exception):
         self.message = message
         self.status_code = status_code
         self.payload = payload
+
+
+GOOGLE_DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+_GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_GOOGLE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
 
 
 def _get_config_value(name: str, default: str = "") -> str:
@@ -295,4 +307,167 @@ def upload_file(local_file_path: str, drive_folder_id: str, desired_filename: Op
         "file_id": file_id,
         "name": str(result.get("name") or filename).strip(),
         "link": link,
+    }
+
+
+def _get_oauth_client_config() -> Dict[str, str]:
+    client_id = _get_config_value("GOOGLE_OAUTH_CLIENT_ID")
+    client_secret = _get_config_value("GOOGLE_OAUTH_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
+        raise GoogleDriveServiceError(
+            "Google OAuth client is not configured.",
+            status_code=500,
+        )
+
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }
+
+
+def _get_user_token_row(user) -> Optional[UserGoogleToken]:
+    user_id = getattr(user, "id", None)
+    if user_id is None:
+        return None
+    return UserGoogleToken.query.filter_by(user_id=user_id).first()
+
+
+def _refresh_user_access_token(token_row: UserGoogleToken) -> UserGoogleToken:
+    refresh_token = str(token_row.refresh_token or "").strip()
+    if not refresh_token:
+        raise GoogleDriveServiceError(
+            "Google Drive refresh token is missing. Please connect Google Drive again.",
+            status_code=401,
+        )
+
+    oauth_cfg = _get_oauth_client_config()
+
+    try:
+        response = requests.post(
+            _GOOGLE_TOKEN_URL,
+            data={
+                "client_id": oauth_cfg["client_id"],
+                "client_secret": oauth_cfg["client_secret"],
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            },
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        raise GoogleDriveServiceError(
+            "Failed to refresh Google Drive access token.",
+            status_code=502,
+        ) from exc
+
+    payload = response.json() if response.content else {}
+    if response.status_code >= 400:
+        message = payload.get("error_description") or payload.get("error") or "Google token refresh failed"
+        raise GoogleDriveServiceError(str(message), status_code=401, payload=payload)
+
+    new_access_token = str(payload.get("access_token") or "").strip()
+    expires_in = int(payload.get("expires_in") or 3600)
+    scope = str(payload.get("scope") or token_row.scope or GOOGLE_DRIVE_FILE_SCOPE).strip()
+
+    if not new_access_token:
+        raise GoogleDriveServiceError(
+            "Google token refresh returned no access token.",
+            status_code=502,
+            payload=payload,
+        )
+
+    token_row.access_token = new_access_token
+    token_row.token_expiry = datetime.utcnow() + timedelta(seconds=max(expires_in - 60, 60))
+    token_row.scope = scope
+    db.session.commit()
+
+    return token_row
+
+
+def _get_valid_user_access_token(user) -> str:
+    token_row = _get_user_token_row(user)
+    if not token_row:
+        raise GoogleDriveServiceError("Connect Google Drive first.", status_code=400)
+
+    if token_row.is_access_token_valid(buffer_seconds=60):
+        return str(token_row.access_token or "").strip()
+
+    refreshed = _refresh_user_access_token(token_row)
+    return str(refreshed.access_token or "").strip()
+
+
+def upload_to_drive(user, file_path: str, filename: str, folder_id: Optional[str] = None) -> Dict[str, str]:
+    local_file_path = os.path.abspath(str(file_path or "").strip())
+    if not os.path.isfile(local_file_path):
+        raise GoogleDriveServiceError("Image file not found for upload.", status_code=400)
+
+    resolved_filename = str(filename or "").strip() or os.path.basename(local_file_path)
+    resolved_folder_id = str(folder_id or "").strip()
+    mime_type = mimetypes.guess_type(local_file_path)[0] or "application/octet-stream"
+
+    metadata: Dict[str, Any] = {
+        "name": resolved_filename,
+    }
+    if resolved_folder_id:
+        metadata["parents"] = [resolved_folder_id]
+
+    def _send_upload(access_token: str):
+        with open(local_file_path, "rb") as file_handle:
+            files = [
+                (
+                    "metadata",
+                    (
+                        "metadata",
+                        json.dumps(metadata),
+                        "application/json; charset=UTF-8",
+                    ),
+                ),
+                ("file", (resolved_filename, file_handle, mime_type)),
+            ]
+
+            return requests.post(
+                f"{_GOOGLE_UPLOAD_URL}?uploadType=multipart&fields=id,webViewLink",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                },
+                files=files,
+                timeout=60,
+            )
+
+    access_token = _get_valid_user_access_token(user)
+
+    try:
+        response = _send_upload(access_token)
+    except requests.RequestException as exc:
+        raise GoogleDriveServiceError("Failed to upload image to Google Drive.", status_code=502) from exc
+
+    if response.status_code == 401:
+        # Retry once after refresh.
+        token_row = _get_user_token_row(user)
+        if not token_row:
+            raise GoogleDriveServiceError("Connect Google Drive first.", status_code=400)
+        refreshed = _refresh_user_access_token(token_row)
+        try:
+            response = _send_upload(str(refreshed.access_token or ""))
+        except requests.RequestException as exc:
+            raise GoogleDriveServiceError("Failed to upload image to Google Drive.", status_code=502) from exc
+
+    payload = response.json() if response.content else {}
+    if response.status_code >= 400:
+        message = "Google Drive upload failed."
+        if isinstance(payload, dict):
+            error_obj = payload.get("error") if isinstance(payload.get("error"), dict) else {}
+            message = str(error_obj.get("message") or message)
+        raise GoogleDriveServiceError(message, status_code=502, payload=payload)
+
+    file_id = str(payload.get("id") or "").strip()
+    if not file_id:
+        raise GoogleDriveServiceError("Google Drive upload returned no file id.", status_code=502, payload=payload)
+
+    link = str(payload.get("webViewLink") or "").strip() or f"https://drive.google.com/file/d/{file_id}/view"
+
+    return {
+        "drive_file_id": file_id,
+        "drive_link": link,
+        "folder_id": resolved_folder_id or "root",
     }

@@ -95,16 +95,6 @@
                     <h1>User Management</h1>
                 </div>
                 <div class="header-actions">
-                    <div class="dashboard-bell-wrap" id="dashboard-bell-wrap">
-                        <button class="dashboard-bell-btn bell-ringing" id="dashboard-bell-btn" aria-label="Dashboard notifications">
-                            <i class="fas fa-bell"></i>
-                            <span class="dashboard-bell-dot" id="dashboard-bell-dot"></span>
-                        </button>
-                        <div class="dashboard-bell-panel" id="dashboard-bell-panel" aria-hidden="true">
-                            <div class="dashboard-bell-panel-title">Notifications</div>
-                            <div class="dashboard-bell-list" id="dashboard-bell-list">Loading notifications...</div>
-                        </div>
-                    </div>
                     <div class="header-user-menu">
                         <button class="header-user-btn">
                             <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
@@ -169,11 +159,21 @@
                             <option value="true">Active</option>
                             <option value="false">Deactive</option>
                         </select>
+                        <select id="user-chatbot-filter" class="users-filter-select" title="Filter users by chatbot/event" aria-label="Filter users by chatbot/event">
+                            <option value="">Filter by chatbot</option>
+                        </select>
+                    </div>
+                    <div class="users-bulk-actions" id="users-bulk-actions">
+                        <span id="users-selected-count">0 users selected</span>
+                        <button type="button" id="users-bulk-delete-btn" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Delete Selected</button>
                     </div>
                     <div class="table-container">
                         <table class="table" data-table="users">
                             <thead>
                                 <tr>
+                                    <th class="users-select-col">
+                                        <input type="checkbox" id="users-select-all" aria-label="Select all visible users">
+                                    </th>
                                     <th>Name</th>
                                     <th>Email</th>
                                     <th>Role</th>
@@ -184,7 +184,7 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td colspan="6" class="text-center">Loading users...</td>
+                                    <td colspan="8" class="text-center">Loading users...</td>
                                 </tr>
                             </tbody>
                         </table>

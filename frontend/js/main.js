@@ -8,6 +8,14 @@ class UserPanel {
     this.init();
   }
 
+  getAvatarInitial(userLike = {}) {
+    const candidate =
+      String(
+        userLike?.name || userLike?.username || userLike?.email || "U",
+      ).trim() || "U";
+    return candidate.charAt(0).toUpperCase();
+  }
+
   init() {
     if (!this.currentUser) {
       AppAuth.redirectToLogin();
@@ -77,11 +85,10 @@ class UserPanel {
       ...DomUtils.$$("[data-user-name]"),
     ];
 
-    if (this.currentUser?.name) {
-      avatarTargets.forEach((avatar) => {
-        avatar.textContent = this.currentUser.name.charAt(0).toUpperCase();
-      });
-    }
+    const initial = this.getAvatarInitial(this.currentUser || {});
+    avatarTargets.forEach((avatar) => {
+      avatar.textContent = initial;
+    });
   }
 
   setupLogout() {
@@ -163,9 +170,12 @@ class ChatInterface {
     this.sendBtn = DomUtils.$(".send-btn");
     this.convListEl = DomUtils.$("#chat-conversations-list");
     this.newChatBtn = DomUtils.$("#new-chat-btn");
-    this.historyPanel = DomUtils.$("#chat-conversations");
+    this.chatMain = DomUtils.$(".chat-main");
+    this.historyPanel =
+      DomUtils.$("#chat-conversations") || DomUtils.$("#sidebar");
     this.historyToggleBtn = DomUtils.$("#chat-history-toggle");
-    this.historyCloseBtn = DomUtils.$("#chat-history-close");
+    this.historyCloseBtn =
+      DomUtils.$("#chat-history-close") || DomUtils.$("#toggleSidebar");
     this.historyBackdrop = DomUtils.$("#chat-history-backdrop");
     this.usagePanel = DomUtils.$("#chat-usage-panel");
     this.usageStepsLabel = DomUtils.$("#chat-usage-steps-label");
@@ -189,12 +199,15 @@ class ChatInterface {
     this.contactMeta = DomUtils.$("#chat-contact-meta");
     this.contactNameInput = DomUtils.$("#chat-contact-name");
     this.contactWhatsappInput = DomUtils.$("#chat-contact-whatsapp");
+    this.contactCountryCodeInput = DomUtils.$("#chat-contact-country-code");
     this.contactNameError = DomUtils.$("#chat-contact-name-error");
     this.contactWhatsappError = DomUtils.$("#chat-contact-whatsapp-error");
     this.imageLightbox = DomUtils.$("#chat-image-lightbox");
     this.imageLightboxPreview = DomUtils.$("#chat-image-lightbox-preview");
     this.imageLightboxClose = DomUtils.$("#chat-image-lightbox-close");
     this.imageLightboxSend = DomUtils.$("#chat-image-lightbox-send");
+    this.imageLightboxDrive = DomUtils.$("#chat-image-lightbox-drive");
+    this.imageLightboxDownload = DomUtils.$("#chat-image-lightbox-download");
     this.guestModeIcon = DomUtils.$(
       '.chat-mode-option[data-mode="guest"] .chat-mode-icon-img',
     );
@@ -223,6 +236,9 @@ class ChatInterface {
     this.messages = [];
     this.conversations = [];
     this.currentConversationId = null;
+    this.isDesktopSidebarCollapsed = false;
+    this.desktopSidebarStateKey = "chat:sidebar:collapsed";
+    this._conversationMenuDocHandlerAttached = false;
     // Guest and background image tracking
     this.selectedGuest = null;
     this.selectedGuestImage = null;
@@ -278,12 +294,22 @@ class ChatInterface {
         '<div class="chat-conversations-empty">No conversations</div>';
       return;
     }
-    this.convListEl.innerHTML = this.conversations
-      .map(
-        (
-          c,
-        ) => `<div class="conversation-item ${this.currentConversationId === c.id ? "active" : ""}" data-id="${c.id}">
-        <span class="conv-title">${this.escapeHtml(c.title || "New chat")}</span>
+
+    const grouped = this.groupConversationsByDate(this.conversations);
+
+    this.convListEl.innerHTML = grouped
+      .map(({ label, rows }) => {
+        const groupItems = rows
+          .map((c) => {
+            const title = this.escapeHtml(c.title || "New chat");
+            const initial = this.escapeHtml(
+              (c.title || "N").charAt(0).toUpperCase(),
+            );
+            return `<div class="conversation-item ${this.currentConversationId === c.id ? "active" : ""}" data-id="${c.id}" title="${title}">
+        <button type="button" class="conversation-main" title="${title}" aria-label="Open ${title}">
+          <span class="conv-avatar" aria-hidden="true">${initial}</span>
+          <span class="conv-title text">${title}</span>
+        </button>
         <div class="conv-menu-container">
           <button class="conv-menu-btn" title="More options" aria-label="More options">
             <span class="material-symbols-outlined">more_vert</span>
@@ -293,30 +319,49 @@ class ChatInterface {
             <button class="conv-menu-item conv-delete-item">Delete</button>
           </div>
         </div>
-      </div>`,
-      )
+      </div>`;
+          })
+          .join("");
+
+        return `<div class="conversation-date-label">${this.escapeHtml(label)}</div>${groupItems}`;
+      })
       .join("");
 
     this.convListEl.querySelectorAll(".conversation-item").forEach((el) => {
       const id = parseInt(el.dataset.id);
-      const titleEl = el.querySelector(".conv-title");
+      const mainBtn = el.querySelector(".conversation-main");
       const menuBtn = el.querySelector(".conv-menu-btn");
       const dropdown = el.querySelector(".conv-menu-dropdown");
       const renameBtn = el.querySelector(".conv-rename-item");
       const deleteBtn = el.querySelector(".conv-delete-item");
 
       // Handle conversation selection
-      titleEl.addEventListener("click", () => this.selectConversation(id));
+      mainBtn?.addEventListener("click", () => this.selectConversation(id));
 
       // Handle menu toggle
       menuBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains("active");
+        this.convListEl.querySelectorAll(".conv-menu-dropdown").forEach((d) => {
+          d.classList.remove("active");
+          d.classList.remove("open-down");
+        });
         this.convListEl
-          .querySelectorAll(".conv-menu-dropdown")
-          .forEach((d) => d.classList.remove("active"));
+          .querySelectorAll(".conversation-item")
+          .forEach((item) => item.classList.remove("menu-open"));
         if (!isOpen) {
+          const listRect = this.convListEl?.getBoundingClientRect();
+          const itemRect = el.getBoundingClientRect();
+          const estimatedMenuHeight = 98;
+          const spaceAbove = listRect ? itemRect.top - listRect.top : 0;
+          const spaceBelow = listRect ? listRect.bottom - itemRect.bottom : 0;
+          const shouldOpenDown =
+            spaceAbove < estimatedMenuHeight &&
+            spaceBelow >= estimatedMenuHeight;
+
+          dropdown.classList.toggle("open-down", shouldOpenDown);
           dropdown.classList.add("active");
+          el.classList.add("menu-open");
         }
       });
 
@@ -324,23 +369,94 @@ class ChatInterface {
       renameBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         dropdown.classList.remove("active");
-        this.showRenameConversationModal(id, titleEl.textContent);
+        dropdown.classList.remove("open-down");
+        el.classList.remove("menu-open");
+        this.showRenameConversationModal(
+          id,
+          el.querySelector(".conv-title")?.textContent || "Conversation",
+        );
       });
 
       // Handle delete
       deleteBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         dropdown.classList.remove("active");
-        this.showDeleteConversationModal(id, titleEl.textContent);
+        dropdown.classList.remove("open-down");
+        el.classList.remove("menu-open");
+        this.showDeleteConversationModal(
+          id,
+          el.querySelector(".conv-title")?.textContent || "Conversation",
+        );
       });
     });
 
     // Close menu when clicking outside
-    document.addEventListener("click", () => {
-      this.convListEl
-        .querySelectorAll(".conv-menu-dropdown")
-        .forEach((d) => d.classList.remove("active"));
+    if (!this._conversationMenuDocHandlerAttached) {
+      this._conversationMenuDocHandlerAttached = true;
+      document.addEventListener("click", () => {
+        this.convListEl
+          ?.querySelectorAll(".conv-menu-dropdown")
+          .forEach((d) => {
+            d.classList.remove("active");
+            d.classList.remove("open-down");
+          });
+        this.convListEl
+          ?.querySelectorAll(".conversation-item")
+          .forEach((item) => item.classList.remove("menu-open"));
+      });
+    }
+  }
+
+  getConversationLabelDate(conversation) {
+    return (
+      conversation?.updated_at ||
+      conversation?.last_message_at ||
+      conversation?.created_at ||
+      null
+    );
+  }
+
+  formatConversationDateLabel(dateValue) {
+    if (!dateValue) return "Older";
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return "Older";
+
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const dateStart = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
+    const dayDiff = Math.floor((todayStart - dateStart) / 86400000);
+
+    if (dayDiff <= 0) return "Today";
+    if (dayDiff === 1) return "Yesterday";
+    if (dayDiff < 7) return "Previous 7 Days";
+    if (dayDiff < 30) return "Previous 30 Days";
+    return date.toLocaleString(undefined, { month: "short", year: "numeric" });
+  }
+
+  groupConversationsByDate(conversations) {
+    const groups = [];
+    const index = new Map();
+
+    conversations.forEach((conversation) => {
+      const label = this.formatConversationDateLabel(
+        this.getConversationLabelDate(conversation),
+      );
+      if (!index.has(label)) {
+        index.set(label, groups.length);
+        groups.push({ label, rows: [] });
+      }
+      groups[index.get(label)].rows.push(conversation);
     });
+
+    return groups;
   }
 
   showDeleteConversationModal(conversationId, conversationTitle) {
@@ -497,20 +613,121 @@ class ChatInterface {
     return window.innerWidth <= 1024;
   }
 
-  setHistoryToggleState(isOpen) {
-    if (!this.historyToggleBtn) return;
+  isDesktopSidebarMode() {
+    return window.innerWidth > 1024;
+  }
 
-    this.historyToggleBtn.setAttribute(
-      "aria-expanded",
-      isOpen ? "true" : "false",
+  setDesktopSidebarState(isCollapsed, persist = true) {
+    this.isDesktopSidebarCollapsed = Boolean(isCollapsed);
+
+    if (persist) {
+      try {
+        localStorage.setItem(
+          this.desktopSidebarStateKey,
+          this.isDesktopSidebarCollapsed ? "1" : "0",
+        );
+      } catch (error) {
+        // no-op if storage is unavailable
+      }
+    }
+
+    const shouldCollapse =
+      this.isDesktopSidebarMode() && this.isDesktopSidebarCollapsed;
+    document.body.classList.toggle("chat-sidebar-collapsed", shouldCollapse);
+    this.historyPanel?.classList.toggle("sidebar-collapsed", shouldCollapse);
+    this.historyPanel?.classList.toggle("collapsed", shouldCollapse);
+    this.historyPanel?.classList.toggle("expanded", !shouldCollapse);
+    this.setHistoryToggleState(
+      this.historyPanel?.classList.contains("drawer-open"),
     );
-    this.historyToggleBtn.classList.toggle("active", Boolean(isOpen));
+  }
 
-    const iconEl = this.historyToggleBtn.querySelector(
+  setHistoryToggleState(isOpen) {
+    if (!this.historyToggleBtn && !this.historyCloseBtn) return;
+
+    const iconEl = this.historyToggleBtn?.querySelector(
       ".material-symbols-outlined",
     );
+    const closeIconEl = this.historyCloseBtn?.querySelector(
+      ".material-symbols-outlined",
+    );
+
+    if (!this.isHistoryDrawerMode()) {
+      const isExpanded = !this.isDesktopSidebarCollapsed;
+      if (this.historyToggleBtn) {
+        this.historyToggleBtn.setAttribute(
+          "aria-expanded",
+          isExpanded ? "true" : "false",
+        );
+        this.historyToggleBtn.classList.toggle("active", !isExpanded);
+        this.historyToggleBtn.setAttribute(
+          "aria-label",
+          isExpanded ? "Collapse sidebar" : "Expand sidebar",
+        );
+        this.historyToggleBtn.setAttribute(
+          "title",
+          isExpanded ? "Collapse sidebar" : "Expand sidebar",
+        );
+      }
+      if (this.historyCloseBtn) {
+        this.historyCloseBtn.setAttribute(
+          "aria-expanded",
+          isExpanded ? "true" : "false",
+        );
+        this.historyCloseBtn.classList.toggle("active", !isExpanded);
+        this.historyCloseBtn.setAttribute(
+          "aria-label",
+          isExpanded ? "Collapse sidebar" : "Expand sidebar",
+        );
+        this.historyCloseBtn.setAttribute(
+          "title",
+          isExpanded ? "Collapse sidebar" : "Expand sidebar",
+        );
+      }
+      if (iconEl) {
+        iconEl.textContent = isExpanded ? "menu_open" : "menu";
+      }
+      if (closeIconEl) {
+        closeIconEl.textContent = isExpanded ? "menu_open" : "menu";
+      }
+      return;
+    }
+
+    if (this.historyToggleBtn) {
+      this.historyToggleBtn.setAttribute(
+        "aria-expanded",
+        isOpen ? "true" : "false",
+      );
+      this.historyToggleBtn.classList.toggle("active", Boolean(isOpen));
+      this.historyToggleBtn.setAttribute(
+        "aria-label",
+        isOpen ? "Close sidebar" : "Open sidebar",
+      );
+      this.historyToggleBtn.setAttribute(
+        "title",
+        isOpen ? "Close sidebar" : "Open sidebar",
+      );
+    }
+    if (this.historyCloseBtn) {
+      this.historyCloseBtn.setAttribute(
+        "aria-expanded",
+        isOpen ? "true" : "false",
+      );
+      this.historyCloseBtn.classList.toggle("active", Boolean(isOpen));
+      this.historyCloseBtn.setAttribute(
+        "aria-label",
+        isOpen ? "Close sidebar" : "Open sidebar",
+      );
+      this.historyCloseBtn.setAttribute(
+        "title",
+        isOpen ? "Close sidebar" : "Open sidebar",
+      );
+    }
     if (iconEl) {
-      iconEl.textContent = isOpen ? "close" : "menu";
+      iconEl.textContent = "menu";
+    }
+    if (closeIconEl) {
+      closeIconEl.textContent = isOpen ? "close" : "menu";
     }
   }
 
@@ -538,24 +755,49 @@ class ChatInterface {
     }
   }
 
+  toggleSidebarPanel() {
+    if (this.isHistoryDrawerMode()) {
+      this.toggleHistoryDrawer();
+      return;
+    }
+
+    this.setDesktopSidebarState(!this.isDesktopSidebarCollapsed, true);
+  }
+
   syncHistoryDrawerState() {
-    if (this.isHistoryDrawerMode()) return;
+    if (this.isHistoryDrawerMode()) {
+      document.body.classList.remove("chat-sidebar-collapsed");
+      this.historyPanel?.classList.remove("sidebar-collapsed");
+      this.setHistoryToggleState(
+        this.historyPanel?.classList.contains("drawer-open"),
+      );
+      return;
+    }
+
     this.closeHistoryDrawer();
-    this.setHistoryToggleState(false);
+    this.setDesktopSidebarState(this.isDesktopSidebarCollapsed, false);
   }
 
   setupHistoryDrawer() {
     if (!this.historyPanel) return;
 
+    try {
+      const stored = localStorage.getItem(this.desktopSidebarStateKey);
+      this.isDesktopSidebarCollapsed = stored === "1";
+    } catch (error) {
+      this.isDesktopSidebarCollapsed = false;
+    }
+
     this.historyToggleBtn?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this.toggleHistoryDrawer();
+      this.toggleSidebarPanel();
     });
 
     this.historyCloseBtn?.addEventListener("click", (event) => {
       event.preventDefault();
-      this.closeHistoryDrawer();
+      event.stopPropagation();
+      this.toggleSidebarPanel();
     });
 
     this.historyBackdrop?.addEventListener("click", () => {
@@ -568,7 +810,7 @@ class ChatInterface {
       }
     });
 
-    this.setHistoryToggleState(false);
+    this.setDesktopSidebarState(this.isDesktopSidebarCollapsed, false);
     this.syncHistoryDrawerState();
   }
 
@@ -748,7 +990,6 @@ class ChatInterface {
   }
 
   async init() {
-    console.log("ChatInterface.init() called", { chatbotId: this.chatbotId });
     if (!this.messagesArea || !this.inputField || !this.sendBtn) {
       console.warn("ChatInterface missing required DOM elements", {
         messagesArea: this.messagesArea,
@@ -793,12 +1034,16 @@ class ChatInterface {
     this.setupImageLightboxHandlers();
     this.setupHistoryDrawer();
 
+    let hasLoadedInitialConversationMessages = false;
+
     try {
       await this.loadConversations();
       if (this.conversations.length === 0) {
         await this.createConversation("New chat");
+        hasLoadedInitialConversationMessages = true;
       } else {
         await this.selectConversation(this.conversations[0].id);
+        hasLoadedInitialConversationMessages = true;
       }
     } catch (error) {
       console.error("Error loading conversations:", error);
@@ -846,7 +1091,7 @@ class ChatInterface {
     }
 
     // Load message history for selected conversation
-    if (this.currentConversationId) {
+    if (this.currentConversationId && !hasLoadedInitialConversationMessages) {
       await this.loadMessages(this.currentConversationId);
     }
 
@@ -889,10 +1134,6 @@ class ChatInterface {
     }
 
     this.showMessagesLoadingSkeleton();
-
-    if (this.inputArea) {
-      this.inputArea.classList.add("chat-input-loading");
-    }
   }
 
   clearInitialChatLoading() {
@@ -1156,7 +1397,14 @@ class ChatInterface {
   sanitizeWhatsappDigits(value = "") {
     return String(value || "")
       .replace(/\D/g, "")
-      .slice(0, 10);
+      .slice(0, 12);
+  }
+
+  sanitizeCountryCode(value = "") {
+    const digits = String(value || "")
+      .replace(/\D/g, "")
+      .slice(0, 4);
+    return digits ? `+${digits}` : "+";
   }
 
   setContactFieldError(field, message = "") {
@@ -1192,6 +1440,16 @@ class ChatInterface {
           normalizedMessage ? "true" : "false",
         );
       }
+      if (this.contactCountryCodeInput) {
+        this.contactCountryCodeInput.classList.toggle(
+          "is-invalid",
+          !!normalizedMessage,
+        );
+        this.contactCountryCodeInput.setAttribute(
+          "aria-invalid",
+          normalizedMessage ? "true" : "false",
+        );
+      }
     }
   }
 
@@ -1202,11 +1460,17 @@ class ChatInterface {
 
   validateContactForm({ showErrors = false } = {}) {
     const name = String(this.contactNameInput?.value || "").trim();
+    const countryCode = this.sanitizeCountryCode(
+      this.contactCountryCodeInput?.value || "+91",
+    );
     const whatsappDigits = this.sanitizeWhatsappDigits(
       this.contactWhatsappInput?.value || "",
     );
     const isNameValid = name.length >= 2;
-    const isWhatsappValid = /^\d{10}$/.test(whatsappDigits);
+    const isCountryCodeValid = /^\+[1-9]\d{0,3}$/.test(countryCode);
+    const isWhatsappValid = /^\d{6,12}$/.test(whatsappDigits);
+    const fullWhatsappNumber = `${countryCode}${whatsappDigits}`;
+    const isFullWhatsappValid = /^\+[1-9]\d{7,14}$/.test(fullWhatsappNumber);
 
     if (showErrors) {
       this.setContactFieldError(
@@ -1215,17 +1479,25 @@ class ChatInterface {
       );
       this.setContactFieldError(
         "whatsapp",
-        isWhatsappValid ? "" : "Please enter a valid 10-digit mobile number.",
+        isCountryCodeValid && isWhatsappValid && isFullWhatsappValid
+          ? ""
+          : "Enter a valid country code and mobile number.",
       );
     }
 
     return {
-      isValid: isNameValid && isWhatsappValid,
+      isValid:
+        isNameValid &&
+        isCountryCodeValid &&
+        isWhatsappValid &&
+        isFullWhatsappValid,
       isNameValid,
+      isCountryCodeValid,
       isWhatsappValid,
       name,
+      countryCode,
       whatsappDigits,
-      fullWhatsappNumber: `+91${whatsappDigits}`,
+      fullWhatsappNumber,
     };
   }
 
@@ -1233,6 +1505,90 @@ class ChatInterface {
     if (!this.contactSubmitBtn) return;
     const { isValid } = this.validateContactForm({ showErrors: false });
     this.contactSubmitBtn.disabled = !isValid || this.isContactSubmitting;
+  }
+
+  getContactDetailsStorageKey() {
+    if (this.isVolunteerUser()) return "";
+
+    const userPart =
+      this.currentUser?.id ||
+      this.currentUser?.username ||
+      this.currentUser?.email ||
+      "default";
+    return `chat_image_contact_details_${String(userPart).trim().toLowerCase()}`;
+  }
+
+  loadStoredContactDetails() {
+    const key = this.getContactDetailsStorageKey();
+    if (!key) return null;
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  saveContactDetails(details = {}) {
+    const key = this.getContactDetailsStorageKey();
+    if (!key) return;
+
+    const name = String(details?.name || "").trim();
+    const countryCode = this.sanitizeCountryCode(details?.countryCode || "+91");
+    const whatsappDigits = this.sanitizeWhatsappDigits(
+      details?.whatsappDigits || "",
+    );
+
+    if (!name || !whatsappDigits) return;
+
+    const payload = {
+      name,
+      countryCode,
+      whatsappDigits,
+      savedAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem(key, JSON.stringify(payload));
+    } catch (_) {
+      // Ignore storage write issues (private mode/quota)
+    }
+  }
+
+  prefillContactDetailsFromStorage() {
+    if (this.isVolunteerUser()) return;
+
+    const saved = this.loadStoredContactDetails();
+    if (!saved) return;
+
+    if (
+      this.contactNameInput &&
+      !String(this.contactNameInput.value || "").trim()
+    ) {
+      this.contactNameInput.value = String(saved?.name || "").trim();
+    }
+
+    if (this.contactCountryCodeInput) {
+      const value = String(this.contactCountryCodeInput.value || "").trim();
+      if (!value || value === "+") {
+        this.contactCountryCodeInput.value = this.sanitizeCountryCode(
+          saved?.countryCode || "+91",
+        );
+      }
+    }
+
+    if (
+      this.contactWhatsappInput &&
+      !String(this.contactWhatsappInput.value || "").trim()
+    ) {
+      this.contactWhatsappInput.value = this.sanitizeWhatsappDigits(
+        saved?.whatsappDigits || "",
+      );
+    }
   }
 
   setContactSubmitLoading(isLoading) {
@@ -1253,6 +1609,14 @@ class ChatInterface {
     this.selectedContactImageUrl = String(
       imageUrl || this.selectedContactImageUrl || "",
     ).trim();
+    if (this.contactCountryCodeInput) {
+      const normalizedCode = this.sanitizeCountryCode(
+        this.contactCountryCodeInput.value || "+91",
+      );
+      this.contactCountryCodeInput.value =
+        normalizedCode === "+" ? "+91" : normalizedCode;
+    }
+    this.prefillContactDetailsFromStorage();
     this.clearContactValidationState();
     this.updateContactSubmitState();
     if (this.contactMeta) {
@@ -1307,6 +1671,8 @@ class ChatInterface {
 
       const canSendFromLightbox =
         String(target.dataset.contactEligible || "false") === "true";
+      const canDriveFromLightbox =
+        String(target.dataset.driveEligible || "false") === "true";
       this.selectedContactImageUrl = canSendFromLightbox ? src : "";
       if (this.imageLightboxSend) {
         this.imageLightboxSend.style.display = canSendFromLightbox
@@ -1315,6 +1681,24 @@ class ChatInterface {
         this.imageLightboxSend.setAttribute(
           "aria-hidden",
           String(!canSendFromLightbox),
+        );
+      }
+      if (this.imageLightboxDrive) {
+        this.imageLightboxDrive.style.display = canDriveFromLightbox
+          ? "inline-flex"
+          : "none";
+        this.imageLightboxDrive.setAttribute(
+          "aria-hidden",
+          String(!canDriveFromLightbox),
+        );
+      }
+      if (this.imageLightboxDownload) {
+        this.imageLightboxDownload.style.display = canDriveFromLightbox
+          ? "inline-flex"
+          : "none";
+        this.imageLightboxDownload.setAttribute(
+          "aria-hidden",
+          String(!canDriveFromLightbox),
         );
       }
 
@@ -1338,8 +1722,18 @@ class ChatInterface {
       const isDesktop = window.matchMedia("(min-width: 769px)").matches;
       const clickedPreview = clickedEl.closest(".chat-image-lightbox-preview");
       const clickedSend = clickedEl.closest(".chat-image-lightbox-send");
+      const clickedDrive = clickedEl.closest(".chat-image-lightbox-drive");
+      const clickedDownload = clickedEl.closest(
+        ".chat-image-lightbox-download",
+      );
 
-      if (isDesktop && !clickedPreview && !clickedSend) {
+      if (
+        isDesktop &&
+        !clickedPreview &&
+        !clickedSend &&
+        !clickedDrive &&
+        !clickedDownload
+      ) {
         closeLightbox();
         return;
       }
@@ -1355,6 +1749,21 @@ class ChatInterface {
       ).trim();
       closeLightbox();
       this.openContactModal(focusedImageUrl);
+    });
+
+    this.imageLightboxDrive?.addEventListener("click", () => {
+      const focusedImageUrl = String(
+        this.imageLightboxPreview?.src || "",
+      ).trim();
+      closeLightbox();
+      this.uploadGeneratedImageToDriveDirect(focusedImageUrl);
+    });
+
+    this.imageLightboxDownload?.addEventListener("click", () => {
+      const focusedImageUrl = String(
+        this.imageLightboxPreview?.src || "",
+      ).trim();
+      this.downloadGeneratedImage(focusedImageUrl);
     });
 
     document.addEventListener("keydown", (event) => {
@@ -1385,6 +1794,21 @@ class ChatInterface {
       this.updateContactSubmitState();
     });
 
+    this.contactCountryCodeInput?.addEventListener("input", () => {
+      const sanitizedCode = this.sanitizeCountryCode(
+        this.contactCountryCodeInput?.value || "+",
+      );
+      if (this.contactCountryCodeInput) {
+        this.contactCountryCodeInput.value = sanitizedCode;
+      }
+      this.setContactFieldError("whatsapp", "");
+      if (this.contactMeta?.classList.contains("is-error")) {
+        this.contactMeta.textContent = "";
+        this.contactMeta.classList.remove("is-error", "is-success");
+      }
+      this.updateContactSubmitState();
+    });
+
     this.contactWhatsappInput?.addEventListener("input", () => {
       const sanitized = this.sanitizeWhatsappDigits(
         this.contactWhatsappInput?.value || "",
@@ -1400,6 +1824,18 @@ class ChatInterface {
       this.updateContactSubmitState();
     });
 
+    this.contactCountryCodeInput?.addEventListener("blur", () => {
+      const { isCountryCodeValid } = this.validateContactForm({
+        showErrors: false,
+      });
+      if (!isCountryCodeValid) {
+        this.setContactFieldError(
+          "whatsapp",
+          "Enter a valid country code and mobile number.",
+        );
+      }
+    });
+
     this.contactWhatsappInput?.addEventListener("blur", () => {
       const { isWhatsappValid } = this.validateContactForm({
         showErrors: false,
@@ -1407,7 +1843,7 @@ class ChatInterface {
       if (!isWhatsappValid) {
         this.setContactFieldError(
           "whatsapp",
-          "Please enter a valid 10-digit mobile number.",
+          "Enter a valid country code and mobile number.",
         );
       }
     });
@@ -1463,6 +1899,12 @@ class ChatInterface {
             caption: `Hi ${name}, here is your generated conference image.`,
             conversation_id: this.currentConversationId,
             chatbot_id: this.chatbotId,
+          });
+
+          this.saveContactDetails({
+            name,
+            countryCode: validation.countryCode,
+            whatsappDigits: validation.whatsappDigits,
           });
 
           if (this.contactMeta) {
@@ -1560,7 +2002,7 @@ class ChatInterface {
     return {
       element: loaderEl,
       startedAt: Date.now(),
-      minDurationMs: 3400,
+      minDurationMs: 3000,
     };
   }
 
@@ -1580,6 +2022,51 @@ class ChatInterface {
     if (loaderState.element.isConnected) {
       loaderState.element.remove();
     }
+  }
+
+  async preloadMessageImages(imageUrls = [], timeoutMs = 6000) {
+    const sources = (Array.isArray(imageUrls) ? imageUrls : [])
+      .map((url) => String(this.resolveMediaUrl(url) || url || "").trim())
+      .filter((url) => Boolean(url));
+
+    if (sources.length === 0) return;
+
+    await Promise.all(
+      sources.map(
+        (src) =>
+          new Promise((resolve) => {
+            const img = new Image();
+            let settled = false;
+            const finish = () => {
+              if (settled) return;
+              settled = true;
+              resolve();
+            };
+            const timer = setTimeout(
+              finish,
+              Math.max(Number(timeoutMs) || 0, 0),
+            );
+
+            img.onload = async () => {
+              try {
+                if (typeof img.decode === "function") {
+                  await img.decode();
+                }
+              } catch (_) {
+                // Decoding errors are non-fatal; continue with loaded image.
+              }
+              clearTimeout(timer);
+              finish();
+            };
+            img.onerror = () => {
+              clearTimeout(timer);
+              finish();
+            };
+
+            img.src = src;
+          }),
+      ),
+    );
   }
 
   async initializeGuestSelectorData(fallbackGuests = []) {
@@ -2008,9 +2495,14 @@ class ChatInterface {
       }
 
       if (botMessageType === "image" && responseImageUrls.length > 0) {
+        if (!imageLoaderState) {
+          imageLoaderState = this.showImageGenerationLoader();
+        }
+        await this.preloadMessageImages(responseImageUrls);
         await this.clearImageGenerationLoader(imageLoaderState);
         this.addMessage("", "bot", botResponse?.timestamp, responseImageUrls, {
           showImageContactCta: true,
+          showDriveUploadCta: true,
           fadeInMessage: true,
         });
         this.setContactCtaVisible(true);
@@ -2018,6 +2510,13 @@ class ChatInterface {
         const shouldEnableContactCta =
           responseImageUrls.length > 0 &&
           this.isLikelyImageRequest(text, selectedImage);
+
+        if (responseImageUrls.length > 0) {
+          if (!imageLoaderState && shouldEnableContactCta) {
+            imageLoaderState = this.showImageGenerationLoader();
+          }
+          await this.preloadMessageImages(responseImageUrls);
+        }
 
         await this.clearImageGenerationLoader(imageLoaderState);
         this.addMessage(
@@ -2027,6 +2526,7 @@ class ChatInterface {
           responseImageUrls,
           {
             showImageContactCta: shouldEnableContactCta,
+            showDriveUploadCta: shouldEnableContactCta,
             fadeInMessage: shouldEnableContactCta,
           },
         );
@@ -2521,6 +3021,7 @@ class ChatInterface {
     options = {},
   ) {
     const showImageContactCta = Boolean(options?.showImageContactCta);
+    const showDriveUploadCta = Boolean(options?.showDriveUploadCta);
     const fadeInMessage = Boolean(options?.fadeInMessage);
     const timestamp = DateUtils.formatTime(messageTimestamp || new Date());
     const normalizedSender = sender === "user" ? "user" : "assistant";
@@ -2574,7 +3075,7 @@ class ChatInterface {
 
     const withImageFallback = (source) => {
       const safeSource = this.escapeHtml(source);
-      return `<div class="message-image-frame loading"><span class="message-image-frame-skeleton" aria-hidden="true"></span><img class="message-image" src="${safeSource}" alt="Message image" loading="lazy" data-contact-eligible="${showImageContactCta ? "true" : "false"}" data-fallback-step="0" onload="(function(img){var frame=img.parentElement; if(frame){frame.classList.remove('loading');}})(this)" onerror="(function(img){var step=Number(img.dataset.fallbackStep||'0'); if(step===0){img.dataset.fallbackStep='1'; img.src=img.src.replace('/static/generated/','/uploads/messages/'); return;} if(step===1){img.dataset.fallbackStep='2'; img.src=img.src.replace('/uploads/messages/','/uploads/guests/'); return;} img.onerror=null; var frame=img.parentElement; if(frame){frame.classList.remove('loading'); frame.classList.add('failed');}})(this)" /></div>`;
+      return `<div class="message-image-frame loading"><span class="message-image-frame-skeleton" aria-hidden="true"></span><img class="message-image" src="${safeSource}" alt="Message image" loading="lazy" data-contact-eligible="${showImageContactCta ? "true" : "false"}" data-drive-eligible="${showDriveUploadCta ? "true" : "false"}" data-fallback-step="0" onload="(function(img){var frame=img.parentElement; if(frame){frame.classList.remove('loading');}})(this)" onerror="(function(img){var step=Number(img.dataset.fallbackStep||'0'); if(step===0){img.dataset.fallbackStep='1'; img.src=img.src.replace('/static/generated/','/uploads/messages/'); return;} if(step===1){img.dataset.fallbackStep='2'; img.src=img.src.replace('/uploads/messages/','/uploads/guests/'); return;} img.onerror=null; var frame=img.parentElement; if(frame){frame.classList.remove('loading'); frame.classList.add('failed');}})(this)" /></div>`;
     };
 
     let imageHtml = "";
@@ -2594,23 +3095,44 @@ class ChatInterface {
       !hideAssistantTextWhenImage && renderedText
         ? `<div class="message-text">${renderedText}</div>`
         : "";
-    const imageContactCtaHtml =
-      showImageContactCta &&
-      normalizedSender === "assistant" &&
-      imageSources.length > 0
-        ? `
-          <button type="button" class="message-image-contact-btn" data-image-url="${this.escapeHtml(imageSources[0])}" aria-label="Send details for this generated image">
-            <i class="fab fa-whatsapp" aria-hidden="true"></i>
-            <span>Send</span>
-          </button>
+    const shouldShowImageActions =
+      normalizedSender === "assistant" && imageSources.length > 0;
+    const imageActionButtonsHtml = shouldShowImageActions
+      ? `
+          <div class="message-image-actions">
+            ${
+              showImageContactCta
+                ? `<button type="button" class="message-image-contact-btn" data-image-url="${this.escapeHtml(imageSources[0])}" aria-label="Send details for this generated image">
+              <i class="fab fa-whatsapp" aria-hidden="true"></i>
+              <span>Send</span>
+            </button>`
+                : ""
+            }
+            ${
+              showDriveUploadCta
+                ? `<button type="button" class="message-image-drive-btn" data-image-url="${this.escapeHtml(imageSources[0])}" aria-label="Upload generated image to Google Drive manually">
+              <i class="fab fa-google-drive" aria-hidden="true"></i>
+              <span>Upload to Drive</span>
+            </button>`
+                : ""
+            }
+            ${
+              showDriveUploadCta
+                ? `<button type="button" class="message-image-download-btn" data-image-url="${this.escapeHtml(imageSources[0])}" aria-label="Download generated image">
+              <i class="fas fa-download" aria-hidden="true"></i>
+              <span>Download</span>
+            </button>`
+                : ""
+            }
+          </div>
         `
-        : "";
+      : "";
 
     messageEl.innerHTML = `
       <div class="message-bubble">
         ${textHtml}
         ${imageHtml}
-        ${imageContactCtaHtml}
+        ${imageActionButtonsHtml}
         <div class="message-time">${timestamp}</div>
       </div>
     `;
@@ -2627,6 +3149,28 @@ class ChatInterface {
       });
     }
 
+    const messageDriveBtn = messageEl.querySelector(".message-image-drive-btn");
+    if (messageDriveBtn) {
+      messageDriveBtn.addEventListener("click", () => {
+        const selectedImage = String(
+          messageDriveBtn.dataset.imageUrl || "",
+        ).trim();
+        this.uploadGeneratedImageToDriveDirect(selectedImage, messageDriveBtn);
+      });
+    }
+
+    const messageDownloadBtn = messageEl.querySelector(
+      ".message-image-download-btn",
+    );
+    if (messageDownloadBtn) {
+      messageDownloadBtn.addEventListener("click", () => {
+        const selectedImage = String(
+          messageDownloadBtn.dataset.imageUrl || "",
+        ).trim();
+        this.downloadGeneratedImage(selectedImage);
+      });
+    }
+
     this.messagesArea.appendChild(messageEl);
 
     if (fadeInMessage) {
@@ -2637,6 +3181,209 @@ class ChatInterface {
     }
 
     this.scrollToBottom();
+  }
+
+  async downloadGeneratedImage(imageUrl = "") {
+    const sourceUrl = String(imageUrl || "").trim();
+    if (!sourceUrl) return;
+
+    const fallbackDownload = () => {
+      const fallbackAnchor = document.createElement("a");
+      fallbackAnchor.href = sourceUrl;
+      fallbackAnchor.target = "_blank";
+      fallbackAnchor.rel = "noopener noreferrer";
+      fallbackAnchor.download = "ai-generated-image";
+      document.body.appendChild(fallbackAnchor);
+      fallbackAnchor.click();
+      fallbackAnchor.remove();
+    };
+
+    try {
+      const response = await fetch(sourceUrl, { mode: "cors" });
+      if (!response.ok) {
+        throw new Error("Unable to fetch generated image");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const extension = blob.type?.split("/")?.[1] || "png";
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.href = objectUrl;
+      downloadAnchor.download = `ai-generated-${Date.now()}.${extension}`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1200);
+    } catch (_) {
+      fallbackDownload();
+    }
+  }
+
+  async getGoogleDriveAuthStatus() {
+    try {
+      const response = await API.get("/api/google/auth/status");
+      return Boolean(response?.data?.connected);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  connectGoogleDriveWithPopup(authUrl) {
+    return new Promise((resolve, reject) => {
+      const popup = window.open(
+        authUrl,
+        "googleDriveOAuth",
+        "popup=yes,width=560,height=720,noopener,noreferrer",
+      );
+
+      if (!popup) {
+        reject(new Error("Popup blocked. Please allow popups and try again."));
+        return;
+      }
+
+      let settled = false;
+      const timeoutMs = 120000;
+      const startedAt = Date.now();
+
+      const cleanup = () => {
+        window.removeEventListener("message", handleMessage);
+        window.clearInterval(pollTimer);
+      };
+
+      const finish = (ok, message = "") => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (ok) {
+          resolve({ success: true, message });
+        } else {
+          reject(new Error(message || "Google Drive connection failed."));
+        }
+      };
+
+      const handleMessage = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const payload = event?.data || {};
+        if (payload?.type !== "google-drive-connected") return;
+        finish(Boolean(payload?.success), String(payload?.message || ""));
+      };
+
+      const pollTimer = window.setInterval(() => {
+        if (popup.closed) {
+          finish(false, "Google Drive connection window was closed.");
+          return;
+        }
+        if (Date.now() - startedAt > timeoutMs) {
+          try {
+            popup.close();
+          } catch (_) {
+            // no-op
+          }
+          finish(false, "Google Drive connection timed out. Please try again.");
+        }
+      }, 500);
+
+      window.addEventListener("message", handleMessage);
+    });
+  }
+
+  async connectGoogleDrive() {
+    const returnTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    const response = await API.get(
+      `/api/google/auth/login?mode=json&popup=1&return_to=${encodeURIComponent(returnTo)}`,
+    );
+    const authUrl = String(response?.data?.auth_url || "").trim();
+    if (!authUrl) {
+      throw new Error("Unable to start Google Drive connection.");
+    }
+
+    await this.connectGoogleDriveWithPopup(authUrl);
+    return this.getGoogleDriveAuthStatus();
+  }
+
+  async uploadGeneratedImageToDrive(imageUrl = "") {
+    const chatbotId = Number(this.chatbotId);
+    if (!Number.isFinite(chatbotId)) {
+      throw new Error(
+        "Chatbot context missing. Reload this chat and try again.",
+      );
+    }
+
+    const response = await API.post("/api/drive/upload-generated-image", {
+      chatbot_id: chatbotId,
+      image_url: String(imageUrl || "").trim(),
+    });
+
+    const driveLink = String(response?.data?.drive_link || "").trim();
+    if (!driveLink) {
+      throw new Error(
+        "Google Drive upload succeeded but no Drive link was returned.",
+      );
+    }
+
+    return driveLink;
+  }
+
+  async uploadGeneratedImageToDriveDirect(imageUrl = "", triggerButton = null) {
+    const selectedImage = String(imageUrl || "").trim();
+    if (!selectedImage) {
+      NotificationManager.error("Select a generated image first");
+      return;
+    }
+
+    const actionButton =
+      triggerButton instanceof HTMLElement ? triggerButton : null;
+    const actionLabel = actionButton?.querySelector("span");
+    const defaultLabel = actionLabel?.textContent || "Upload to Drive";
+
+    try {
+      if (actionButton) {
+        actionButton.disabled = true;
+      }
+      if (actionLabel) {
+        actionLabel.textContent = "Uploading...";
+      }
+
+      let isConnected = await this.getGoogleDriveAuthStatus();
+      if (!isConnected) {
+        isConnected = await this.connectGoogleDrive();
+      }
+
+      if (!isConnected) {
+        throw new Error("Google Drive is not connected. Please try again.");
+      }
+
+      await this.uploadGeneratedImageToDrive(selectedImage);
+      NotificationManager.success("Image uploaded to your Google Drive.");
+    } catch (error) {
+      NotificationManager.error(
+        error?.message || "Failed to upload image to Google Drive.",
+      );
+    } finally {
+      if (actionButton) {
+        actionButton.disabled = false;
+      }
+      if (actionLabel) {
+        actionLabel.textContent = defaultLabel;
+      }
+    }
+  }
+
+  isGeneratedAiImageMessage(
+    content = "",
+    messageType = "",
+    isAssistant = false,
+  ) {
+    if (!isAssistant) return false;
+    const normalizedType = String(messageType || "").toLowerCase();
+    if (normalizedType === "image") return true;
+
+    const normalizedContent = String(content || "").toLowerCase();
+    return (
+      normalizedContent.includes("image generated") ||
+      normalizedContent.includes("generated image") ||
+      normalizedContent.includes("ai generated")
+    );
   }
 
   startTypingIndicator() {
@@ -2695,13 +3442,6 @@ class ChatInterface {
         return;
       }
 
-      const holdSkeletonDuringInitialLoad = Boolean(
-        this.inputArea?.classList.contains("chat-input-loading"),
-      );
-      const minSkeletonDelay = holdSkeletonDuringInitialLoad
-        ? new Promise((resolve) => setTimeout(resolve, 3000))
-        : Promise.resolve();
-
       this.showMessagesLoadingSkeleton();
 
       let response;
@@ -2724,11 +3464,34 @@ class ChatInterface {
         );
       }
 
-      await minSkeletonDelay;
+      const messages = Array.isArray(response?.data) ? response.data : [];
+      const historyImageUrls = [];
+
+      messages.forEach((msg) => {
+        if (msg?.image_url) {
+          historyImageUrls.push(msg.image_url);
+        }
+        if (Array.isArray(msg?.image_urls)) {
+          msg.image_urls
+            .filter((url) => Boolean(String(url || "").trim()))
+            .forEach((url) => historyImageUrls.push(url));
+        }
+      });
+
+      const hasHistoryImages = historyImageUrls.length > 0;
+      const minSkeletonDelay = hasHistoryImages
+        ? new Promise((resolve) => setTimeout(resolve, 3000))
+        : Promise.resolve();
+
+      await Promise.all([
+        minSkeletonDelay,
+        hasHistoryImages
+          ? this.preloadMessageImages(historyImageUrls)
+          : Promise.resolve(),
+      ]);
 
       this.messages = [];
       this.messagesArea.innerHTML = "";
-      const messages = Array.isArray(response?.data) ? response.data : [];
       let hasContactEligibleHistoryImage = false;
 
       messages.forEach((msg) => {
@@ -2752,6 +3515,12 @@ class ChatInterface {
           hasContactEligibleHistoryImage = true;
         }
 
+        const shouldShowDriveUpload = this.isGeneratedAiImageMessage(
+          content,
+          messageType,
+          normalizedSender !== "user",
+        );
+
         if (messageType === "image") {
           if (messageImageUrls.length === 0) return;
           this.addMessage(
@@ -2759,7 +3528,10 @@ class ChatInterface {
             normalizedSender,
             msg.timestamp,
             messageImageUrls,
-            { showImageContactCta: isAssistantImageMessage },
+            {
+              showImageContactCta: isAssistantImageMessage,
+              showDriveUploadCta: shouldShowDriveUpload,
+            },
           );
           return;
         }
@@ -2770,7 +3542,10 @@ class ChatInterface {
           normalizedSender,
           msg.timestamp,
           messageImageUrls,
-          { showImageContactCta: isAssistantImageMessage },
+          {
+            showImageContactCta: isAssistantImageMessage,
+            showDriveUploadCta: shouldShowDriveUpload,
+          },
         );
       });
 
@@ -2798,9 +3573,17 @@ class ChatInterface {
       if (!chatbot) return null;
 
       const topTitleEl = DomUtils.$("#chatbot-top-title");
+      const topAvatarEl = DomUtils.$("#chatbot-top-avatar");
 
       if (topTitleEl) {
-        topTitleEl.textContent = chatbot.name || "Chatbot";
+        topTitleEl.textContent = chatbot.name || "ConvergeAI";
+      }
+
+      if (topAvatarEl) {
+        topAvatarEl.textContent = String(chatbot.name || "ConvergeAI")
+          .trim()
+          .charAt(0)
+          .toUpperCase();
       }
 
       const isExpired = chatbot.status === "expired";
@@ -3121,6 +3904,11 @@ class ChatInterface {
 class LoginHandler {
   constructor() {
     this.form = DomUtils.$('form[data-form="login"]');
+    this.loginMode = "password";
+    this.otpRequested = false;
+    this.otpExpiresAt = 0;
+    this.otpResendAt = 0;
+    this.otpCountdownTimer = null;
     if (this.form) {
       this.init();
     }
@@ -3130,14 +3918,27 @@ class LoginHandler {
     this.restoreRememberPreference();
     this.redirectIfAuthenticated();
 
-    console.log("LoginHandler initialized"); // DEBUG
-    // Form submission
+    this.passwordGroup = this.form.querySelector("#password-login-fields");
+    this.otpGroup = this.form.querySelector("#otp-login-fields");
+    this.otpEntryGroup = this.form.querySelector("#otp-entry-group");
+    this.otpInput = this.form.querySelector('input[name="otp"]');
+    this.otpMeta = this.form.querySelector("#otp-meta");
+    this.otpTimer = this.form.querySelector("#otp-timer");
+    this.otpRequestBtn = this.form.querySelector("#otp-request-btn");
+    this.otpResendBtn = this.form.querySelector("#otp-resend-btn");
+    this.otpLinkBtn = this.form.querySelector("#otp-login-link");
+    this.passwordLinkBtn = this.form.querySelector("#password-login-link");
+    this.submitBtn = this.form.querySelector('button[type="submit"]');
+    this.submitBtnText = this.submitBtn?.querySelector(".btn-text");
+    this.submitBtnLoader = this.submitBtn?.querySelector(".btn-loader");
+
+    this.setupModeLinks();
+    this.setMode("password");
+
     this.form.addEventListener("submit", (e) => {
-      console.log("Form submitted"); // DEBUG
       this.handleLogin(e);
     });
 
-    // Real-time validation on blur
     const usernameInput = this.form.querySelector('input[name="username"]');
     const passwordInput = this.form.querySelector('input[name="password"]');
 
@@ -3157,6 +3958,26 @@ class LoginHandler {
       passwordInput.addEventListener("input", () =>
         this.clearError("password"),
       );
+    }
+
+    if (this.otpInput) {
+      this.otpInput.addEventListener("input", () => {
+        this.clearError("otp");
+        this.otpInput.value = this.otpInput.value
+          .replace(/\D/g, "")
+          .slice(0, 6);
+      });
+      this.otpInput.addEventListener("blur", () => this.validateField("otp"));
+    }
+
+    if (this.otpRequestBtn) {
+      this.otpRequestBtn.addEventListener("click", () =>
+        this.requestOtp(false),
+      );
+    }
+
+    if (this.otpResendBtn) {
+      this.otpResendBtn.addEventListener("click", () => this.requestOtp(true));
     }
   }
 
@@ -3200,6 +4021,187 @@ class LoginHandler {
     const div = document.createElement("div");
     div.textContent = String(value || "");
     return div.innerHTML;
+  }
+
+  setupModeLinks() {
+    this.otpLinkBtn?.addEventListener("click", () => this.setMode("otp"));
+    this.passwordLinkBtn?.addEventListener("click", () =>
+      this.setMode("password"),
+    );
+  }
+
+  setElementVisibility(element, visible, displayValue = "inline-flex") {
+    if (!element) return;
+    element.style.display = visible ? displayValue : "none";
+  }
+
+  setPanelActive(panel, active) {
+    if (!panel) return;
+    panel.classList.toggle("is-active", active);
+    panel.setAttribute("aria-hidden", active ? "false" : "true");
+  }
+
+  animatePanelSwitch(fromPanel, toPanel) {
+    if (!fromPanel || !toPanel || fromPanel === toPanel) {
+      this.setPanelActive(fromPanel, false);
+      this.setPanelActive(toPanel, true);
+      return;
+    }
+
+    fromPanel.classList.remove("panel-slide-in");
+    toPanel.classList.remove("panel-slide-out");
+
+    fromPanel.classList.add("panel-slide-out");
+    this.setPanelActive(toPanel, true);
+
+    requestAnimationFrame(() => {
+      toPanel.classList.add("panel-slide-in");
+    });
+
+    setTimeout(() => {
+      this.setPanelActive(fromPanel, false);
+      fromPanel.classList.remove("panel-slide-out");
+      toPanel.classList.remove("panel-slide-in");
+    }, 220);
+  }
+
+  resetOtpState() {
+    this.otpRequested = false;
+    this.otpExpiresAt = 0;
+    this.otpResendAt = 0;
+
+    if (this.otpCountdownTimer) {
+      clearInterval(this.otpCountdownTimer);
+      this.otpCountdownTimer = null;
+    }
+
+    if (this.otpInput) {
+      this.otpInput.value = "";
+    }
+
+    this.updateOtpMetaText("");
+    if (this.otpTimer) {
+      this.otpTimer.textContent = "";
+    }
+    this.clearError("otp");
+  }
+
+  setMode(mode) {
+    const modeChanged = this.loginMode !== mode;
+    this.loginMode = mode;
+
+    if (mode === "password" && modeChanged) {
+      this.resetOtpState();
+    }
+
+    if (modeChanged) {
+      if (mode === "otp") {
+        this.animatePanelSwitch(this.passwordGroup, this.otpGroup);
+      } else if (mode === "password") {
+        this.animatePanelSwitch(this.otpGroup, this.passwordGroup);
+      }
+    } else {
+      this.setPanelActive(this.passwordGroup, mode === "password");
+      this.setPanelActive(this.otpGroup, mode === "otp");
+    }
+
+    if (this.submitBtnText) {
+      this.submitBtnText.textContent =
+        mode === "otp" ? "Verify OTP" : "Sign In";
+    }
+
+    this.setElementVisibility(
+      this.otpLinkBtn,
+      mode === "password",
+      "inline-flex",
+    );
+    this.setElementVisibility(
+      this.passwordLinkBtn,
+      mode === "otp",
+      "inline-flex",
+    );
+
+    this.clearError("password");
+    this.updateOtpButtonsState();
+  }
+
+  updateOtpMetaText(text) {
+    if (this.otpMeta) {
+      this.otpMeta.textContent = text || "";
+    }
+  }
+
+  startOtpCountdown() {
+    if (this.otpCountdownTimer) {
+      clearInterval(this.otpCountdownTimer);
+      this.otpCountdownTimer = null;
+    }
+
+    this.updateOtpButtonsState();
+
+    this.otpCountdownTimer = setInterval(() => {
+      const now = Date.now();
+      if (this.otpExpiresAt <= now && this.otpResendAt <= now) {
+        clearInterval(this.otpCountdownTimer);
+        this.otpCountdownTimer = null;
+      }
+      this.updateOtpButtonsState();
+    }, 1000);
+  }
+
+  updateOtpButtonsState() {
+    const now = Date.now();
+    const otpExpired = this.otpRequested && this.otpExpiresAt <= now;
+    const resendLocked = this.otpRequested && this.otpResendAt > now;
+
+    if (this.otpEntryGroup) {
+      this.otpEntryGroup.classList.toggle("is-visible", this.otpRequested);
+    }
+
+    if (this.otpTimer) {
+      if (!this.otpRequested) {
+        this.otpTimer.textContent = "";
+      } else if (resendLocked) {
+        const seconds = Math.max(0, Math.ceil((this.otpResendAt - now) / 1000));
+        this.otpTimer.textContent = `You can request OTP again in ${seconds}s`;
+      } else if (!otpExpired) {
+        const seconds = Math.max(
+          0,
+          Math.ceil((this.otpExpiresAt - now) / 1000),
+        );
+        this.otpTimer.textContent = `OTP expires in ${seconds}s`;
+      } else {
+        this.otpTimer.textContent = "OTP expired. You can resend OTP now.";
+      }
+    }
+
+    if (this.otpRequestBtn) {
+      this.otpRequestBtn.disabled = false;
+      this.setElementVisibility(
+        this.otpRequestBtn,
+        !this.otpRequested,
+        "inline-flex",
+      );
+    }
+
+    if (this.otpResendBtn) {
+      this.setElementVisibility(
+        this.otpResendBtn,
+        this.otpRequested,
+        "inline-flex",
+      );
+      this.otpResendBtn.disabled = !this.otpRequested || resendLocked;
+    }
+
+    if (this.submitBtn) {
+      const shouldShowVerify = this.loginMode === "otp" && this.otpRequested;
+      const shouldShowSignIn = this.loginMode === "password";
+      this.setElementVisibility(
+        this.submitBtn,
+        shouldShowVerify || shouldShowSignIn,
+        "inline-flex",
+      );
+    }
   }
 
   async fetchAssignedChatbots() {
@@ -3337,7 +4339,6 @@ class LoginHandler {
   // ... (keeping validation methods same, skipping to handleLogin)
 
   validateField(fieldName) {
-    // ... implementation matches original ...
     const field = this.form.querySelector(`[name="${fieldName}"]`);
     const errorElement = this.form.querySelector(`#${fieldName}-error`);
 
@@ -3354,14 +4355,21 @@ class LoginHandler {
         isValid = false;
         errorMessage = "Username must be at least 3 characters";
       }
-    } else if (fieldName === "password") {
+    } else if (fieldName === "password" && this.loginMode === "password") {
       if (!field.value) {
         isValid = false;
         errorMessage = "Password is required";
       }
+    } else if (fieldName === "otp" && this.loginMode === "otp") {
+      if (!field.value.trim()) {
+        isValid = false;
+        errorMessage = "OTP is required";
+      } else if (!/^\d{6}$/.test(field.value.trim())) {
+        isValid = false;
+        errorMessage = "OTP must be 6 digits";
+      }
     }
 
-    // Update UI
     if (isValid) {
       field.classList.remove("input-error");
       field.classList.remove("input-success");
@@ -3397,20 +4405,27 @@ class LoginHandler {
 
   validateAllFields() {
     const usernameValid = this.validateField("username");
+    if (this.loginMode === "otp") {
+      const otpValid = this.validateField("otp");
+      return usernameValid && otpValid;
+    }
+
     const passwordValid = this.validateField("password");
-    console.log(
-      `Validation result: User=${usernameValid}, Pass=${passwordValid}`,
-    ); // DEBUG
     return usernameValid && passwordValid;
   }
 
   async handleLogin(e) {
     e.preventDefault();
-    console.log("handleLogin called"); // DEBUG
+    if (this.loginMode === "otp") {
+      await this.handleOtpVerify();
+      return;
+    }
 
-    // Validate all fields first
+    await this.handlePasswordLogin();
+  }
+
+  async handlePasswordLogin() {
     if (!this.validateAllFields()) {
-      console.log("Validation failed"); // DEBUG
       return;
     }
 
@@ -3422,62 +4437,157 @@ class LoginHandler {
       this.form.querySelector('input[name="remember"]')?.checked,
     );
 
-    console.log(`Attempting login for: ${username}`); // DEBUG
-
-    const submitBtn = this.form.querySelector('button[type="submit"]');
-    const btnText = submitBtn.querySelector(".btn-text");
-    const btnLoader = submitBtn.querySelector(".btn-loader");
-
-    // Show loading state
-    submitBtn.disabled = true;
-    if (btnText && btnLoader) {
-      btnText.style.display = "none";
-      btnLoader.style.display = "inline-block";
-    }
+    this.setSubmitLoading(true);
 
     try {
-      console.log("Sending API request to /api/auth/login"); // DEBUG
       const response = await API.post("/api/auth/login", {
-        username: username,
-        password: password,
-        remember: remember,
+        username,
+        password,
+        remember,
       });
 
-      console.log("API Response:", response); // DEBUG
-
-      if (response.success) {
-        Storage.setAuthSession({
-          user: response.user,
-          token: response.token,
-          remember,
-        });
-
-        NotificationManager.success("Login successful!");
-        setTimeout(async () => {
-          const userRole = response.user?.role;
-          const redirectUrl = await this.resolvePostLoginDestination(userRole);
-
-          console.log(`Redirecting to: ${redirectUrl}`); // DEBUG
-          window.location.href = redirectUrl;
-        }, 500);
-      } else {
-        // Handle specific error messages from backend
-        console.log("Login failed with response:", response); // DEBUG
-        this.showLoginError(response.message, response.field);
-      }
+      await this.onLoginSuccess(response, remember, "Login successful!");
     } catch (error) {
-      console.error("Login error:", error);
       this.showLoginError(
         error.message || "Invalid credentials or server error",
         null,
       );
     } finally {
-      // Hide loading state
-      submitBtn.disabled = false;
-      if (btnText && btnLoader) {
-        btnText.style.display = "inline";
-        btnLoader.style.display = "none";
+      this.setSubmitLoading(false);
+    }
+  }
+
+  async requestOtp(isResend) {
+    const username =
+      this.form.querySelector('input[name="username"]')?.value.trim() || "";
+    if (!username) {
+      this.showLoginError("Username is required", "username");
+      return;
+    }
+
+    this.clearError("username");
+    this.clearError("otp");
+    this.updateOtpMetaText("");
+
+    const targetBtn = isResend ? this.otpResendBtn : this.otpRequestBtn;
+    const originalLabel = targetBtn ? targetBtn.textContent : "";
+    if (targetBtn) {
+      targetBtn.disabled = true;
+      targetBtn.textContent = isResend ? "Resending..." : "Sending...";
+    }
+
+    try {
+      const endpoint = isResend
+        ? "/api/auth/login-otp/resend"
+        : "/api/auth/login-otp/request";
+
+      const response = await API.post(endpoint, { username });
+
+      this.otpRequested = true;
+      this.otpInput.value = "";
+
+      const now = Date.now();
+      const expiresIn = Number(response?.expires_in_seconds || 60);
+      const resendIn = Number(response?.resend_in_seconds || 20);
+      this.otpExpiresAt = now + expiresIn * 1000;
+      this.otpResendAt = now + resendIn * 1000;
+
+      const masked = response?.masked_whatsapp_number
+        ? `OTP sent to ${response.masked_whatsapp_number}`
+        : "OTP sent to your linked WhatsApp number";
+      this.updateOtpMetaText(masked);
+
+      this.startOtpCountdown();
+      this.otpInput?.focus();
+      NotificationManager.success(response?.message || "OTP sent successfully");
+    } catch (error) {
+      const waitSeconds = Number(error?.wait_seconds || 0);
+      if (waitSeconds > 0) {
+        this.otpRequested = true;
+        this.otpResendAt = Date.now() + waitSeconds * 1000;
+        this.otpExpiresAt = Math.max(this.otpExpiresAt, this.otpResendAt);
+        this.startOtpCountdown();
       }
+      this.updateOtpMetaText(error?.message || "Unable to send OTP");
+      NotificationManager.error(error?.message || "Failed to send OTP");
+    } finally {
+      if (targetBtn) {
+        targetBtn.textContent = originalLabel;
+      }
+      this.updateOtpButtonsState();
+    }
+  }
+
+  async handleOtpVerify() {
+    if (!this.otpRequested) {
+      NotificationManager.warning("Request OTP before verification");
+      return;
+    }
+
+    if (!this.validateAllFields()) {
+      return;
+    }
+
+    if (Date.now() > this.otpExpiresAt) {
+      this.showLoginError("OTP expired. Request a new one.", "otp");
+      this.updateOtpButtonsState();
+      return;
+    }
+
+    const username =
+      this.form.querySelector('input[name="username"]')?.value.trim() || "";
+    const otp = this.otpInput?.value.trim() || "";
+    const remember = Boolean(
+      this.form.querySelector('input[name="remember"]')?.checked,
+    );
+
+    this.setSubmitLoading(true);
+
+    try {
+      const response = await API.post("/api/auth/login-otp/verify", {
+        username,
+        otp,
+        remember,
+      });
+
+      await this.onLoginSuccess(response, remember, "OTP login successful!");
+    } catch (error) {
+      this.showLoginError(error?.message || "Invalid or expired OTP", "otp");
+    } finally {
+      this.setSubmitLoading(false);
+    }
+  }
+
+  async onLoginSuccess(response, remember, successMessage) {
+    if (!response?.success) {
+      this.showLoginError(
+        response?.message || "Login failed",
+        response?.field || null,
+      );
+      return;
+    }
+
+    Storage.setAuthSession({
+      user: response.user,
+      token: response.token,
+      remember,
+    });
+
+    NotificationManager.success(successMessage || "Login successful!");
+    setTimeout(async () => {
+      const userRole = response.user?.role;
+      const redirectUrl = await this.resolvePostLoginDestination(userRole);
+      window.location.href = redirectUrl;
+    }, 400);
+  }
+
+  setSubmitLoading(isLoading) {
+    if (!this.submitBtn) return;
+
+    this.submitBtn.disabled = Boolean(isLoading);
+    if (this.submitBtnText && this.submitBtnLoader) {
+      this.submitBtnText.style.display = isLoading ? "none" : "inline";
+      this.submitBtnLoader.style.display = isLoading ? "inline-block" : "none";
     }
   }
 
@@ -3505,6 +4615,17 @@ class LoginHandler {
           passwordInput.focus();
         }
       }
+    } else if (field && field === "otp") {
+      const otpError = this.form.querySelector("#otp-error");
+      if (otpError) {
+        otpError.textContent = message || "Invalid OTP";
+        otpError.style.display = "block";
+        const otpInput = this.form.querySelector('input[name="otp"]');
+        if (otpInput) {
+          otpInput.classList.add("input-error");
+          otpInput.focus();
+        }
+      }
     } else {
       // Show general error
       NotificationManager.error(message || "Login failed");
@@ -3520,6 +4641,14 @@ class ProfilePage {
   constructor() {
     this.currentUser = Storage.getUser();
     this.init();
+  }
+
+  getAvatarInitial(userLike = {}) {
+    const candidate =
+      String(
+        userLike?.name || userLike?.username || userLike?.email || "U",
+      ).trim() || "U";
+    return candidate.charAt(0).toUpperCase();
   }
 
   init() {
@@ -3549,9 +4678,7 @@ class ProfilePage {
       if (emailEl) emailEl.textContent = profile.email || "-";
       if (roleEl) roleEl.textContent = profile.role || "-";
       if (avatarEl) {
-        avatarEl.textContent = (profile.name || "U")
-          .substring(0, 1)
-          .toUpperCase();
+        avatarEl.textContent = this.getAvatarInitial(profile);
       }
 
       const usernameEl = DomUtils.$("[data-profile-username]");
@@ -3581,7 +4708,7 @@ class ProfilePage {
   syncHeaderProfile(profile) {
     if (!profile) return;
 
-    const initials = (profile.name || "U").substring(0, 1).toUpperCase();
+    const initials = this.getAvatarInitial(profile);
     const headerAvatarEls = [
       ...DomUtils.$$("[data-user-avatar]"),
       ...DomUtils.$$("[data-user-name]"),
@@ -3697,10 +4824,8 @@ window.downloadCredentials = function () {
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize based on current page
   const page = window.location.pathname;
-  console.log("Page loaded, path:", page); // DEBUG
 
   if (page === "/" || page.includes("login") || page.endsWith("index.html")) {
-    console.log("Condition met: Initializing LoginHandler"); // DEBUG
     window.loginHandler = new LoginHandler();
   }
 
