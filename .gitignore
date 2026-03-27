@@ -31,6 +31,8 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+convergence-internship-1-af5ff99abec1.json
+
 # Virtual Environments
 venv/
 ENV/
