@@ -357,8 +357,8 @@ def login():
     db.session.commit()
     
     # Create session token
-    # Remember me: longer-lived token; otherwise shorter-lived session token
-    expires_in_days = 30 if remember else 1
+    # Remember me: longer-lived token (7 days); otherwise shorter-lived session token (1 day)
+    expires_in_days = 7 if remember else 1
     token = SessionToken.create_token(user.id, expires_in_days=expires_in_days)
     
     return jsonify({
@@ -401,8 +401,8 @@ def register():
     db.session.add(user)
     db.session.commit()
     
-    # Create session token
-    token = SessionToken.create_token(user.id)
+    # Create session token (7 days for new registrations)
+    token = SessionToken.create_token(user.id, expires_in_days=7)
     
     return jsonify({
         'success': True,
@@ -786,7 +786,7 @@ def verify_login_otp():
     user.last_login = now
     db.session.commit()
 
-    expires_in_days = 30 if remember else 1
+    expires_in_days = 7 if remember else 1
     token = SessionToken.create_token(user.id, expires_in_days=expires_in_days)
 
     return jsonify({

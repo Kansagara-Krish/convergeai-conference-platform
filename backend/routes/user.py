@@ -3,7 +3,7 @@
 # ============================================
 
 from flask import Blueprint, request, jsonify, current_app
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, extract
 from datetime import datetime
 import base64
 import json
@@ -15,11 +15,21 @@ import uuid
 from werkzeug.utils import secure_filename
 
 try:
-    from models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification
+    from models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification, DriveImageBackup
     from routes.auth import token_required
+    from services.google_drive_service import (
+        GoogleDriveServiceError,
+        get_or_create_chatbot_folder,
+        upload_image_to_folder,
+    )
 except ImportError:
-    from backend.models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification
+    from backend.models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification, DriveImageBackup
     from backend.routes.auth import token_required
+    from backend.services.google_drive_service import (
+        GoogleDriveServiceError,
+        get_or_create_chatbot_folder,
+        upload_image_to_folder,
+    )
 
 user_bp = Blueprint('user', __name__)
 
@@ -255,6 +265,96 @@ def _save_generated_image_to_static(image_bytes, mime_type='image/png'):
     file_path = generated_root / file_name
     file_path.write_bytes(image_bytes)
     return f"/static/generated/{file_name}"
+
+
+def _sanitize_drive_filename_component(raw_value, fallback='user'):
+    cleaned = re.sub(r'[^a-zA-Z0-9_-]+', '_', str(raw_value or '').strip().lower())
+    cleaned = cleaned.strip('_')
+    return cleaned or fallback
+
+
+def _resolve_generated_static_file_path(image_url):
+    normalized = str(image_url or '').strip().replace('\\', '/')
+    if not normalized:
+        return None
+
+    if normalized.startswith('http://') or normalized.startswith('https://'):
+        return None
+
+    normalized = normalized.split('?', 1)[0].split('#', 1)[0].lstrip('/')
+    if not normalized.startswith('static/generated/'):
+        return None
+
+    candidate = Path(current_app.root_path) / normalized
+    generated_root = Path(current_app.static_folder or (Path(current_app.root_path) / 'static')) / 'generated'
+    if not _is_path_within_root(candidate, generated_root):
+        return None
+    return candidate
+
+
+def _build_drive_image_filename(user, mime_type='image/png'):
+    username_part = _sanitize_drive_filename_component(getattr(user, 'username', ''), fallback='user')
+    timestamp_part = datetime.utcnow().strftime('%Y-%m-%d_%H-%M')
+    return f"{username_part}_{timestamp_part}.png"
+
+
+def _upload_generated_image_to_admin_drive(chatbot, user, image_url, mime_type='image/png'):
+    """Best-effort admin-drive upload for generated chatbot images. Does not raise to caller."""
+    absolute_path = _resolve_generated_static_file_path(image_url)
+    if not absolute_path or not absolute_path.exists() or not absolute_path.is_file():
+        return "\n*(Drive Upload Error: Could not find generated image path locally)*"
+
+    try:
+        from services.google_drive_service import upload_to_drive
+        image_bytes = absolute_path.read_bytes()
+        username = getattr(user, 'username', 'user')
+        
+        uploaded = upload_to_drive(
+            image_bytes=image_bytes,
+            chatbot_id=chatbot.id,
+            username=username
+        )
+
+        if "error" in uploaded:
+            return f"\n*(Drive Upload Error: {uploaded['error']})*"
+
+        file_id = str(uploaded.get('file_id') or '').strip()
+        drive_link = str(uploaded.get('link') or '').strip()
+        folder_id = str(uploaded.get('folder_id') or '').strip()
+        
+        if not file_id or not drive_link:
+            current_app.logger.warning('Admin Drive upload returned incomplete metadata for chatbot_id=%s', chatbot.id)
+            return "\n*(Drive Upload Error: Incomplete metadata from Google)*"
+
+        backup = DriveImageBackup(
+            chatbot_id=chatbot.id,
+            user_id=getattr(user, 'id', None),
+            image_path=str(image_url or '').strip(),
+            drive_file_id=file_id,
+            drive_folder_id=folder_id,
+            drive_link=drive_link,
+        )
+        db.session.add(backup)
+        db.session.commit()
+        return f"\n\n*(✅ Successfully uploaded AI Image to Admin's Google Drive: [View]({drive_link}))*"
+    except GoogleDriveServiceError as exc:
+        db.session.rollback()
+        current_app.logger.warning(
+            'Admin Drive upload failed for chatbot_id=%s user_id=%s: %s',
+            getattr(chatbot, 'id', None),
+            getattr(user, 'id', None),
+            exc.message,
+        )
+        return f"\n*(Drive Upload Error: {exc.message})*"
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception(
+            'Unexpected admin Drive upload error for chatbot_id=%s user_id=%s: %s',
+            getattr(chatbot, 'id', None),
+            getattr(user, 'id', None),
+            exc,
+        )
+        return f"\n*(Drive Upload Error: {str(exc)})*"
 
 
 def _is_path_within_root(candidate_path, root_path):
@@ -714,6 +814,17 @@ def _sync_inactive_if_expired(chatbot):
     return expired
 
 
+def _is_user_allowed_for_chatbot_year(user, chatbot):
+    if not chatbot or not chatbot.start_date:
+        return True
+
+    user_year = int(user.created_at.year) if getattr(user, 'created_at', None) else datetime.utcnow().year
+    event_year = int(chatbot.start_date.year)
+    if user_year < event_year and not bool(getattr(chatbot, 'allow_previous_year_users', False)):
+        return False
+    return True
+
+
 def _get_participant(chatbot_id, user_id):
     return ChatbotParticipant.query.filter(
         and_(
@@ -792,12 +903,17 @@ def get_available_chatbots(user):
     search = request.args.get('search', '')
     
     today = datetime.utcnow().date()
+    user_year = int(user.created_at.year) if getattr(user, 'created_at', None) else datetime.utcnow().year
     query = Chatbot.query.filter(
         Chatbot.public == True,
         Chatbot.active == True,
         or_(
             Chatbot.end_date == Chatbot.INFINITE_END_DATE,
             Chatbot.end_date >= today
+        ),
+        or_(
+            extract('year', Chatbot.start_date) <= user_year,
+            Chatbot.allow_previous_year_users == True
         )
     )
     
@@ -908,6 +1024,17 @@ def join_chatbot(user, chatbot_id):
     is_expired = _sync_inactive_if_expired(chatbot)
     if is_expired or not chatbot.active:
         return jsonify({'success': False, 'message': 'This chatbot is inactive because the event has ended'}), 400
+
+    if not _is_user_allowed_for_chatbot_year(user, chatbot):
+        user_year = int(user.created_at.year) if getattr(user, 'created_at', None) else datetime.utcnow().year
+        event_year = int(chatbot.start_date.year) if chatbot.start_date else None
+        return jsonify({
+            'success': False,
+            'message': (
+                f'This event is for year {event_year}. '
+                f'Your user year is {user_year}, and previous-year users are not allowed.'
+            )
+        }), 403
     
     # Check if already joined
     existing = ChatbotParticipant.query.filter(
@@ -1368,6 +1495,8 @@ def send_message(user, chatbot_id):
         return 'Unable to generate image right now. Please try again or contact admin/volunteer support.'
 
     bot_response = None
+    generated_image_url = None
+    generated_image_mime_type = None
     try:
         gemini_result = _call_gemini(
             chatbot,
@@ -1379,12 +1508,12 @@ def send_message(user, chatbot_id):
         )
 
         if is_image_request and gemini_result.get('message_type') == 'image':
-            generated_image_url = None
             generated_bytes = gemini_result.get('image_bytes') or b''
             if generated_bytes:
+                generated_image_mime_type = gemini_result.get('mime_type') or 'image/png'
                 generated_image_url = _save_generated_image_to_static(
                     generated_bytes,
-                    gemini_result.get('mime_type') or 'image/png'
+                    generated_image_mime_type
                 )
             else:
                 generated_image_url = str(gemini_result.get('image_url') or '').strip() or None
@@ -1454,6 +1583,24 @@ def send_message(user, chatbot_id):
     
     db.session.add(bot_response)
     db.session.commit()
+
+    if bot_response.message_type == 'image' and bot_response.image_url:
+        try:
+            from services.auto_drive_uploader import upload_to_drive, log_metadata
+        except ImportError:
+            from backend.services.auto_drive_uploader import upload_to_drive, log_metadata
+
+        absolute_path = _resolve_generated_static_file_path(bot_response.image_url)
+        username = getattr(user, 'username', 'user')
+
+        if absolute_path and absolute_path.exists() and absolute_path.is_file():
+            link, error_msg = upload_to_drive(str(absolute_path), username)
+            if link:
+                log_metadata(username, link)
+                bot_response.content = (bot_response.content or "") + f"\n\n*(✅ Successfully uploaded AI Image: [View]({link}))*"
+            else:
+                bot_response.content = (bot_response.content or "") + f"\n\n*(❌ Failed to upload image to Drive: {error_msg})*"
+            db.session.commit()
     
     return jsonify({
         'success': True,

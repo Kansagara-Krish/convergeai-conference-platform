@@ -251,6 +251,8 @@ class AdminPanel {
       }
     };
 
+    this.ensureAnalyticsMenuItem();
+
     // Active menu item based on current page
     const currentPage =
       window.location.pathname.split("/").pop() || "dashboard.html";
@@ -356,6 +358,46 @@ class AdminPanel {
     this.bindScrollPersistence(sidebar);
     this.resetSidebarBadges();
     updateSidebarControl();
+  }
+
+  ensureAnalyticsMenuItem() {
+    const sidebarMenu = document.querySelector(".sidebar-menu");
+    if (!sidebarMenu) return;
+
+    if (sidebarMenu.querySelector('a[href="analytics.html"]')) {
+      return;
+    }
+
+    const menuSections = Array.from(
+      sidebarMenu.querySelectorAll(".menu-section"),
+    );
+    const usersDataSection = menuSections.find((section) => {
+      const label = section.querySelector(".menu-label");
+      return String(label?.textContent || "")
+        .trim()
+        .toLowerCase()
+        .includes("users & data");
+    });
+
+    if (!usersDataSection) return;
+
+    const analyticsItem = document.createElement("a");
+    analyticsItem.href = "analytics.html";
+    analyticsItem.className = "menu-item";
+    analyticsItem.innerHTML = `
+      <span class="menu-icon"><i class="fas fa-chart-pie"></i></span>
+      <span>Analytics</span>
+    `;
+
+    const importLink = usersDataSection.querySelector(
+      'a[href="import-excel.html"]',
+    );
+    if (importLink && importLink.parentElement === usersDataSection) {
+      importLink.insertAdjacentElement("afterend", analyticsItem);
+      return;
+    }
+
+    usersDataSection.appendChild(analyticsItem);
   }
 
   bindScrollPersistence(sidebar) {
@@ -1433,14 +1475,14 @@ class ChatbotFormHandler {
   }
 
   setupToggleSwitch() {
-    const activeCheckbox = DomUtils.$("#chatbot-active");
-    if (activeCheckbox) {
-      activeCheckbox.addEventListener("change", (e) => {
-        this.updateToggleText(activeCheckbox);
+    const checkboxes = [DomUtils.$("#chatbot-active")].filter(Boolean);
+
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        this.updateToggleText(checkbox);
       });
-      // Set initial text
-      this.updateToggleText(activeCheckbox);
-    }
+      this.updateToggleText(checkbox);
+    });
   }
 
   setupRichEditor() {
@@ -1700,12 +1742,23 @@ class ImportExcelHandler {
       const chatbots = Array.isArray(response?.data) ? response.data : [];
 
       this.eventSelect.innerHTML =
-        '<option value="">Select an event...</option>' +
+        '<option value="" selected disabled>Select an event...</option>' +
         chatbots
-          .map(
-            (bot) =>
-              `<option value="${bot.id}">${bot.event_name || bot.name || `Chatbot ${bot.id}`}</option>`,
-          )
+          .map((bot) => {
+            const eventName = String(bot?.event_name || "").trim();
+            const chatbotName = String(bot?.name || "").trim();
+            let label = `Chatbot ${bot.id}`;
+
+            if (eventName && chatbotName) {
+              label = `${eventName} - ${chatbotName}`;
+            } else if (eventName) {
+              label = eventName;
+            } else if (chatbotName) {
+              label = chatbotName;
+            }
+
+            return `<option value="${bot.id}">${label}</option>`;
+          })
           .join("");
     } catch (error) {
       console.error("Failed to load event options:", error);
@@ -1797,13 +1850,127 @@ class ImportExcelHandler {
       formData.append("file", file);
       const data = await API.post("/api/admin/import/excel/preview", formData);
       const info = data?.preview || {};
+      const emailConflicts = Number(info.email_conflict_rows || 0);
+      const usernameConflicts = Number(info.username_conflict_rows || 0);
 
       if (uploadHint) {
         uploadHint.textContent = `Uploaded • Size: ${(file.size / 1024).toFixed(2)} KB • Click to change file`;
       }
 
       if (countBox) {
-        countBox.innerHTML = `<p><strong>Users:</strong> <span style="color: var(--accent-green);">${info.total_rows ?? 0}</span></p>`;
+        const totalRows = Number(info.total_rows || 0);
+        const validRows = Number(info.valid_rows || 0);
+        const skippedRows = Number(info.skipped_rows || 0);
+        const missingRequiredRows = Number(info.missing_required_rows || 0);
+        const invalidEmailRows = Number(info.invalid_email_rows || 0);
+        const invalidWhatsappRows = Number(info.invalid_whatsapp_rows || 0);
+        const duplicateEmailInFile = Number(info.duplicate_email_rows || 0);
+        const duplicateEmailExisting = Number(info.existing_email_rows || 0);
+        const duplicateInFile = Number(info.duplicate_username_rows || 0);
+        const duplicateExisting = Number(info.existing_username_rows || 0);
+        const conflictColor =
+          usernameConflicts > 0 ? "var(--accent-red)" : "var(--accent-green)";
+        const readyColor =
+          validRows > 0 ? "var(--accent-green)" : "var(--accent-orange)";
+        const requiredHeaderStatus =
+          info && typeof info.required_header_status === "object"
+            ? info.required_header_status
+            : {};
+        const issueDetails =
+          info && typeof info.issue_details === "object"
+            ? info.issue_details
+            : {};
+        const invalidEmailDetails = Array.isArray(issueDetails.invalid_email)
+          ? issueDetails.invalid_email
+          : [];
+        const invalidWhatsappDetails = Array.isArray(
+          issueDetails.invalid_whatsapp,
+        )
+          ? issueDetails.invalid_whatsapp
+          : [];
+        const duplicateFileDetails = Array.isArray(
+          issueDetails.duplicate_username_in_file,
+        )
+          ? issueDetails.duplicate_username_in_file
+          : [];
+        const duplicateEmailInFileDetails = Array.isArray(
+          issueDetails.duplicate_email_in_file,
+        )
+          ? issueDetails.duplicate_email_in_file
+          : [];
+        const duplicateEmailExistingDetails = Array.isArray(
+          issueDetails.duplicate_email_existing,
+        )
+          ? issueDetails.duplicate_email_existing
+          : [];
+        const duplicateExistingDetails = Array.isArray(
+          issueDetails.duplicate_username_existing,
+        )
+          ? issueDetails.duplicate_username_existing
+          : [];
+        const formatDetail = (item, valueKey, label) =>
+          `Row ${item.row}: ${label} ${String(item?.[valueKey] || "").trim()}`;
+        const detailLines = [];
+
+        invalidEmailDetails.forEach((item) => {
+          detailLines.push(formatDetail(item, "email", "email ="));
+        });
+        duplicateEmailInFileDetails.forEach((item) => {
+          detailLines.push(
+            formatDetail(item, "email", "duplicate email (auto-adjusted) ="),
+          );
+        });
+        duplicateEmailExistingDetails.forEach((item) => {
+          detailLines.push(
+            formatDetail(item, "email", "existing email (auto-adjusted) ="),
+          );
+        });
+        invalidWhatsappDetails.forEach((item) => {
+          detailLines.push(formatDetail(item, "whatsapp_number", "whatsapp ="));
+        });
+        duplicateFileDetails.forEach((item) => {
+          detailLines.push(
+            formatDetail(item, "username", "duplicate username ="),
+          );
+        });
+        duplicateExistingDetails.forEach((item) => {
+          detailLines.push(
+            formatDetail(item, "username", "existing username ="),
+          );
+        });
+        const detailsHtml =
+          detailLines.length > 0
+            ? `<div style="margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(148, 163, 184, 0.2);"><small><strong>Wrong entries:</strong><br>${detailLines
+                .slice(0, 20)
+                .map((line) =>
+                  line.replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
+                )
+                .join("<br>")}</small></div>`
+            : "";
+        const missingHeaders = [
+          requiredHeaderStatus.email ? null : "email",
+          requiredHeaderStatus.username ? null : "username",
+          requiredHeaderStatus.whatsapp_number ? null : "whatsapp_number",
+        ].filter(Boolean);
+        const showHeaderHint = missingHeaders.length > 0;
+
+        countBox.innerHTML = `
+          <p><strong>Total rows:</strong> <span style="color: var(--accent-blue);">${totalRows}</span></p>
+          <p><strong>Ready to import:</strong> <span style="color: ${readyColor};">${validRows}</span></p>
+          <p><strong>Skipped rows:</strong> <span style="color: var(--accent-orange);">${skippedRows}</span></p>
+          <p><strong>Missing required fields:</strong> <span style="color: var(--accent-orange);">${missingRequiredRows}</span></p>
+          <p><strong>Email duplicates (auto-adjusted):</strong> <span style="color: ${emailConflicts > 0 ? "var(--accent-orange)" : "var(--accent-green)"};">${emailConflicts}</span></p>
+          <p><strong>Username conflicts:</strong> <span style="color: ${conflictColor};">${usernameConflicts}</span></p>
+          <p style="margin-left: 10px;"><small>Invalid email: ${invalidEmailRows} • Invalid WhatsApp: ${invalidWhatsappRows}</small></p>
+          <p style="margin-left: 10px;"><small>Email in file: ${duplicateEmailInFile} • Email in system: ${duplicateEmailExisting}</small></p>
+          <p style="margin-left: 10px;"><small>In file: ${duplicateInFile} • Already in system: ${duplicateExisting}</small></p>
+          ${
+            showHeaderHint
+              ? `<p style="margin-left: 10px;"><small style="color: var(--accent-red);">Header mapping issue: missing/invalid header(s): ${missingHeaders.join(", ")}</small></p>`
+              : ""
+          }
+          ${detailsHtml}
+        `;
       }
     } catch (error) {
       if (uploadHint) {
@@ -1837,6 +2004,14 @@ class ImportExcelHandler {
 
     const selectedRole = this.roleSelect?.value || "user";
     const selectedEvent = this.eventSelect?.value || "";
+
+    if (!selectedEvent) {
+      NotificationManager.error(
+        "Please select an event before importing users",
+      );
+      return;
+    }
+
     if (selectedRole) formData.append("default_role", selectedRole);
     if (selectedEvent) formData.append("event_id", selectedEvent);
     this.setSubmitLoading(true);
@@ -1847,18 +2022,13 @@ class ImportExcelHandler {
         ? Number(data.skipped)
         : 0;
 
-      NotificationManager.success(`Imported ${data.count} users successfully`);
-      NotificationManager.info(
-        `Credentials emails are being sent to ${data.count} users in background`,
+      NotificationManager.success(
+        "Credentials emails are being sent successfully",
       );
-      this.showCredentials(data.credentials, skipped);
-      this.appendRecentImportRow({
-        fileName: file.name,
-        count: data.count,
-        eventName:
-          this.eventSelect?.options?.[this.eventSelect.selectedIndex]?.text ||
-          "-",
-      });
+      // Redirect to user management page after successful import.
+      setTimeout(() => {
+        window.location.href = "user-management.html?msg=imported";
+      }, 600);
     } catch (error) {
       console.error("Import error:", error);
       NotificationManager.error(error.message || "Failed to import file");
@@ -2014,10 +2184,13 @@ class UserManagementHandler {
     this.table = DomUtils.$('table[data-table="users"]');
     this.roleFilter = DomUtils.$("#user-role-filter");
     this.statusFilter = DomUtils.$("#user-status-filter");
+    this.yearFilter = DomUtils.$("#user-year-filter");
     this.chatbotFilter = DomUtils.$("#user-chatbot-filter");
     this.searchInput = DomUtils.$("#user-search");
     this.addSingleUserBtn = DomUtils.$("#add-single-user-btn");
     this.bulkActions = DomUtils.$("#users-bulk-actions");
+    this.bulkActivateBtn = DomUtils.$("#users-bulk-activate-btn");
+    this.bulkDeactivateBtn = DomUtils.$("#users-bulk-deactivate-btn");
     this.bulkDeleteBtn = DomUtils.$("#users-bulk-delete-btn");
     this.selectedCountLabel = DomUtils.$("#users-selected-count");
     this.selectAllCheckbox = DomUtils.$("#users-select-all");
@@ -2038,10 +2211,87 @@ class UserManagementHandler {
     this.setupActions();
     this.setupFilters();
     this.setupPaginationActions();
+    this.loadYearFilterOptions();
     this.loadChatbotFilterOptions();
     this.loadUserStats();
     this.loadUsers();
     this.updateSelectionUI();
+  }
+
+  async loadYearFilterOptions() {
+    if (!this.yearFilter) return;
+
+    try {
+      const response = await API.get("/api/admin/users/years");
+      const years = Array.isArray(response?.data) ? response.data : [];
+
+      const options = [
+        '<option value="">Filter by year</option>',
+        ...years.map((year) => `<option value="${year}">${year}</option>`),
+      ];
+
+      this.yearFilter.innerHTML = options.join("");
+    } catch (error) {
+      console.error("Failed to load user year options:", error);
+      this.yearFilter.innerHTML = '<option value="">Filter by year</option>';
+    }
+  }
+
+  async loadUserSearchSuggestions(term) {
+    if (!this.searchSuggestions) return;
+
+    const trimmedTerm = String(term || "").trim();
+    if (trimmedTerm.length < 1) {
+      this.searchSuggestions.innerHTML = "";
+      this.searchSuggestions.style.display = "none";
+      return;
+    }
+
+    try {
+      const response = await API.get(
+        `/api/admin/users?search=${encodeURIComponent(trimmedTerm)}&per_page=6`,
+      );
+      const users = Array.isArray(response?.data) ? response.data : [];
+      if (users.length === 0) {
+        this.searchSuggestions.innerHTML = "";
+        this.searchSuggestions.style.display = "none";
+        return;
+      }
+
+      this.searchSuggestions.innerHTML = users
+        .map((user) => {
+          const username = String(user.username || "").trim();
+          const name = String(user.name || "").trim();
+          const label = username
+            ? `${username}${name ? ` (${name})` : ""}`
+            : name;
+          return `<button type="button" class="users-search-suggestion" data-username="${username}">${this.escapeHtml(label)}</button>`;
+        })
+        .join("");
+
+      this.searchSuggestions.style.display = "block";
+      const inputRect = this.searchInput.getBoundingClientRect();
+      const parentRect = this.searchInput.parentElement.getBoundingClientRect();
+      this.searchSuggestions.style.width = `${inputRect.width}px`;
+      this.searchSuggestions.style.left = `${this.searchInput.offsetLeft}px`;
+
+      this.searchSuggestions
+        .querySelectorAll("button.users-search-suggestion")
+        .forEach((button) => {
+          button.addEventListener("click", () => {
+            const selectedUsername = button.getAttribute("data-username") || "";
+            this.searchInput.value = selectedUsername;
+            this.searchSuggestions.innerHTML = "";
+            this.searchSuggestions.style.display = "none";
+            this.currentPage = 1;
+            this.loadUsers(1);
+          });
+        });
+    } catch (error) {
+      console.error("Failed to load user search suggestions:", error);
+      this.searchSuggestions.innerHTML = "";
+      this.searchSuggestions.style.display = "none";
+    }
   }
 
   async loadChatbotFilterOptions() {
@@ -2166,6 +2416,16 @@ class UserManagementHandler {
     this.bulkDeleteBtn?.addEventListener("click", () => {
       this.bulkDeleteSelectedUsers();
     });
+
+    const bulkActivateBtn = DomUtils.$("#users-bulk-activate-btn");
+    bulkActivateBtn?.addEventListener("click", () => {
+      this.bulkActivateSelectedUsers();
+    });
+
+    const bulkDeactivateBtn = DomUtils.$("#users-bulk-deactivate-btn");
+    bulkDeactivateBtn?.addEventListener("click", () => {
+      this.bulkDeactivateSelectedUsers();
+    });
   }
 
   async openAddSingleUserModal() {
@@ -2227,11 +2487,17 @@ class UserManagementHandler {
           <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; color: var(--accent-blue);">
             <i class="fas fa-calendar-check"></i> Assign to Active Events <span class="required">*</span>
           </h4>
+          <div style="display: grid; grid-template-columns: 220px 1fr; gap: 12px; margin-bottom: 12px;">
+            <div class="form-group">
+              <label for="single-user-registration-year">User Year <span style="color: var(--accent-red);">*</span></label>
+              <input type="number" id="single-user-registration-year" name="registration_year" min="2000" max="2100" step="1" value="${new Date().getFullYear()}" required />
+            </div>
+          </div>
           <select id="single-user-chatbots" name="chatbots" multiple class="single-user-events-select" style="width: 100%; height: 160px; padding: 10px; border-radius: 8px; border: 2px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 14px; cursor: pointer; font-family: inherit;">
             <option value="" disabled>Loading active events...</option>
           </select>
           <small style="color: var(--text-secondary); display: block; margin-top: 8px; font-style: italic;">
-            <i class="fas fa-info-circle"></i> Select one or more events • Hold Ctrl/Cmd to multi-select
+            <i class="fas fa-info-circle"></i> Select one or more events • Hold Ctrl/Cmd to multi-select • If an event blocks previous-year users, this user year must be same/newer than event year.
           </small>
         </div>
 
@@ -2258,6 +2524,9 @@ class UserManagementHandler {
     const activeToggle = modal.querySelector("#single-user-active");
     const activeToggleText = modal.querySelector(".toggle-text");
     const whatsappInput = modal.querySelector("#single-user-whatsapp");
+    const registrationYearInput = modal.querySelector(
+      "#single-user-registration-year",
+    );
 
     const ensureDefaultIndianWhatsappPrefix = () => {
       if (!whatsappInput) return;
@@ -2294,6 +2563,52 @@ class UserManagementHandler {
       );
       whatsappInput.addEventListener("blur", ensureDefaultIndianWhatsappPrefix);
     }
+
+    const getSelectedRegistrationYear = () => {
+      const fallbackYear = new Date().getFullYear();
+      const parsed = Number.parseInt(registrationYearInput?.value || "", 10);
+      return Number.isFinite(parsed) ? parsed : fallbackYear;
+    };
+
+    const validateSelectedChatbotYears = () => {
+      if (!chatbotsSelect) return true;
+
+      const selectedYear = getSelectedRegistrationYear();
+      const blockedOptions = Array.from(chatbotsSelect.selectedOptions).filter(
+        (option) => {
+          const chatbotYear = Number.parseInt(
+            option.getAttribute("data-event-year") || "",
+            10,
+          );
+          const allowsPrevious =
+            String(option.getAttribute("data-allow-previous-year") || "0") ===
+            "1";
+
+          if (!Number.isFinite(chatbotYear)) {
+            return false;
+          }
+
+          return selectedYear < chatbotYear && !allowsPrevious;
+        },
+      );
+
+      if (blockedOptions.length === 0) {
+        return true;
+      }
+
+      NotificationManager.error(
+        `Selected user year cannot be assigned to: ${blockedOptions.map((option) => option.textContent || "Event").join(", ")}`,
+      );
+      return false;
+    };
+
+    registrationYearInput?.addEventListener("change", () => {
+      validateSelectedChatbotYears();
+    });
+
+    chatbotsSelect?.addEventListener("change", () => {
+      validateSelectedChatbotYears();
+    });
 
     const getCreateLabelByRole = (role) => {
       if (role === "admin") return "Create Admin";
@@ -2348,7 +2663,7 @@ class UserManagementHandler {
         chatbotsSelect.innerHTML = activeChatbots
           .map(
             (chatbot) =>
-              `<option value="${chatbot.id}">${chatbot.name} - ${chatbot.event_name}</option>`,
+              `<option value="${chatbot.id}" data-event-year="${Number.parseInt(chatbot.event_year, 10) || ""}" data-allow-previous-year="${chatbot.allow_previous_year_users ? "1" : "0"}">${chatbot.name} - ${chatbot.event_name}${chatbot.event_year ? ` (${chatbot.event_year})` : ""}</option>`,
           )
           .join("");
       }
@@ -2365,6 +2680,9 @@ class UserManagementHandler {
     if (form) {
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (!validateSelectedChatbotYears()) {
+          return;
+        }
         await this.submitSingleUser(form, modal);
       });
     }
@@ -2400,6 +2718,45 @@ class UserManagementHandler {
     };
 
     const username = elements["username"].value.trim();
+    const registrationYear = Number.parseInt(
+      String(elements["registration_year"]?.value || "").trim(),
+      10,
+    );
+
+    if (
+      !Number.isFinite(registrationYear) ||
+      registrationYear < 2000 ||
+      registrationYear > 2100
+    ) {
+      NotificationManager.error("User year must be between 2000 and 2100");
+      return;
+    }
+
+    const blockedSelections = Array.from(chatbotsSelect.selectedOptions).filter(
+      (option) => {
+        const chatbotYear = Number.parseInt(
+          option.getAttribute("data-event-year") || "",
+          10,
+        );
+        const allowsPrevious =
+          String(option.getAttribute("data-allow-previous-year") || "0") ===
+          "1";
+
+        return (
+          Number.isFinite(chatbotYear) &&
+          registrationYear < chatbotYear &&
+          !allowsPrevious
+        );
+      },
+    );
+
+    if (blockedSelections.length > 0) {
+      NotificationManager.error(
+        `User year is not allowed for: ${blockedSelections.map((option) => option.textContent || "Event").join(", ")}`,
+      );
+      return;
+    }
+
     const payload = {
       email: elements["email"].value.trim(),
       whatsapp_number: normalizeIndianWhatsApp(
@@ -2410,6 +2767,7 @@ class UserManagementHandler {
       role: elements["role"].value,
       active: elements["active"].checked,
       chatbot_ids: selectedChatbots,
+      registration_year: registrationYear,
     };
 
     if (
@@ -2505,16 +2863,84 @@ class UserManagementHandler {
       });
     }
 
+    if (this.yearFilter) {
+      this.yearFilter.addEventListener("change", () => {
+        this.currentPage = 1;
+        this.loadUsers(1);
+      });
+    }
+
     if (this.searchInput) {
+      this.searchSuggestions = document.createElement("div");
+      this.searchSuggestions.className = "users-search-suggestions";
+      this.searchInput.parentElement.style.position = "relative";
+      this.searchInput.parentElement.appendChild(this.searchSuggestions);
+
       this.searchInput.addEventListener("input", () => {
+        const term = (this.searchInput.value || "").trim();
+
+        this.searchSuggestionIndex = -1;
+
         if (this.searchDebounceTimer) {
           clearTimeout(this.searchDebounceTimer);
         }
 
-        this.searchDebounceTimer = setTimeout(() => {
+        this.searchDebounceTimer = setTimeout(async () => {
           this.currentPage = 1;
+          await this.loadUserSearchSuggestions(term);
           this.loadUsers(1);
-        }, 300);
+        }, 150);
+      });
+
+      this.searchInput.addEventListener("keydown", (event) => {
+        const items = Array.from(
+          this.searchSuggestions.querySelectorAll(
+            "button.users-search-suggestion",
+          ),
+        );
+        if (items.length === 0) return;
+
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          this.searchSuggestionIndex = Math.min(
+            (this.searchSuggestionIndex || -1) + 1,
+            items.length - 1,
+          );
+        } else if (event.key === "ArrowUp") {
+          event.preventDefault();
+          this.searchSuggestionIndex = Math.max(
+            (this.searchSuggestionIndex || 0) - 1,
+            0,
+          );
+        } else if (event.key === "Escape") {
+          this.searchSuggestions.innerHTML = "";
+          this.searchSuggestions.style.display = "none";
+          return;
+        } else if (event.key === "Enter") {
+          if (
+            this.searchSuggestionIndex >= 0 &&
+            this.searchSuggestionIndex < items.length
+          ) {
+            event.preventDefault();
+            items[this.searchSuggestionIndex].click();
+            return;
+          }
+        }
+
+        items.forEach((item, idx) => {
+          item.classList.toggle("active", idx === this.searchSuggestionIndex);
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (
+          this.searchSuggestions &&
+          !this.searchSuggestions.contains(event.target) &&
+          event.target !== this.searchInput
+        ) {
+          this.searchSuggestions.innerHTML = "";
+          this.searchSuggestions.style.display = "none";
+        }
       });
     }
 
@@ -2650,6 +3076,8 @@ class UserManagementHandler {
       const roleQuery = role ? `&role=${encodeURIComponent(role)}` : "";
       const active = this.statusFilter?.value || "";
       const activeQuery = active ? `&active=${encodeURIComponent(active)}` : "";
+      const year = this.yearFilter?.value || "";
+      const yearQuery = year ? `&year=${encodeURIComponent(year)}` : "";
       const chatbotId = this.chatbotFilter?.value || "";
       const chatbotQuery = chatbotId
         ? `&chatbot_id=${encodeURIComponent(chatbotId)}`
@@ -2657,7 +3085,7 @@ class UserManagementHandler {
       const search = (this.searchInput?.value || "").trim();
       const searchQuery = search ? `&search=${encodeURIComponent(search)}` : "";
       const response = await API.get(
-        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}${activeQuery}${chatbotQuery}${searchQuery}`,
+        `/api/admin/users?page=${page}&per_page=${this.perPage}${roleQuery}${activeQuery}${yearQuery}${chatbotQuery}${searchQuery}`,
       );
 
       const users = Array.isArray(response?.data) ? response.data : [];
@@ -2835,6 +3263,86 @@ class UserManagementHandler {
         }
       },
     );
+  }
+
+  async bulkActivateSelectedUsers() {
+    const idsToActivate = this.visibleUserIds.filter((id) =>
+      this.selectedUserIds.has(id),
+    );
+
+    if (!idsToActivate.length) {
+      NotificationManager.warning("Select at least one user to activate");
+      return;
+    }
+
+    try {
+      const response = await API.post("/api/admin/users/bulk-activate", {
+        user_ids: idsToActivate,
+      });
+
+      this.selectedUserIds.clear();
+      this.visibleUserIds = [];
+      this.updateSelectionUI();
+
+      NotificationManager.success(
+        response?.message ||
+          `${idsToActivate.length} user(s) activated successfully`,
+      );
+
+      await this.loadUserStats();
+      await this.loadUsers(this.currentPage);
+
+      if (
+        window.adminPanel &&
+        typeof window.adminPanel.loadDashboardStats === "function"
+      ) {
+        window.adminPanel.loadDashboardStats();
+      }
+    } catch (error) {
+      NotificationManager.error(
+        error.message || "Failed to activate selected users",
+      );
+    }
+  }
+
+  async bulkDeactivateSelectedUsers() {
+    const idsToDeactivate = this.visibleUserIds.filter((id) =>
+      this.selectedUserIds.has(id),
+    );
+
+    if (!idsToDeactivate.length) {
+      NotificationManager.warning("Select at least one user to deactivate");
+      return;
+    }
+
+    try {
+      const response = await API.post("/api/admin/users/bulk-deactivate", {
+        user_ids: idsToDeactivate,
+      });
+
+      this.selectedUserIds.clear();
+      this.visibleUserIds = [];
+      this.updateSelectionUI();
+
+      NotificationManager.success(
+        response?.message ||
+          `${idsToDeactivate.length} user(s) deactivated successfully`,
+      );
+
+      await this.loadUserStats();
+      await this.loadUsers(this.currentPage);
+
+      if (
+        window.adminPanel &&
+        typeof window.adminPanel.loadDashboardStats === "function"
+      ) {
+        window.adminPanel.loadDashboardStats();
+      }
+    } catch (error) {
+      NotificationManager.error(
+        error.message || "Failed to deactivate selected users",
+      );
+    }
   }
 
   escapeHtml(value) {
@@ -3152,7 +3660,76 @@ class ChatbotListHandler {
     }
 
     if (this.searchInput) {
-      this.searchInput.addEventListener("input", () => this.applyFilters(true));
+      this.chatbotSuggestions = document.createElement("div");
+      this.chatbotSuggestions.className = "chatbot-search-suggestions";
+      this.searchInput.parentElement.style.position = "relative";
+      this.searchInput.parentElement.appendChild(this.chatbotSuggestions);
+      this.chatbotSuggestionIndex = -1;
+
+      this.searchInput.addEventListener("input", () => {
+        const term = (this.searchInput.value || "").trim();
+        this.chatbotSuggestionIndex = -1;
+
+        if (this.chatbotSearchDebounce) {
+          clearTimeout(this.chatbotSearchDebounce);
+        }
+
+        this.chatbotSearchDebounce = setTimeout(async () => {
+          await this.loadChatbotSearchSuggestions(term);
+          this.applyFilters(true);
+        }, 150);
+      });
+
+      this.searchInput.addEventListener("keydown", (event) => {
+        const items = Array.from(
+          this.chatbotSuggestions.querySelectorAll(
+            "button.chatbot-search-suggestion",
+          ),
+        );
+        if (items.length === 0) return;
+
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          this.chatbotSuggestionIndex = Math.min(
+            (this.chatbotSuggestionIndex || -1) + 1,
+            items.length - 1,
+          );
+        } else if (event.key === "ArrowUp") {
+          event.preventDefault();
+          this.chatbotSuggestionIndex = Math.max(
+            (this.chatbotSuggestionIndex || 0) - 1,
+            0,
+          );
+        } else if (event.key === "Escape") {
+          this.chatbotSuggestions.innerHTML = "";
+          this.chatbotSuggestions.style.display = "none";
+          return;
+        } else if (event.key === "Enter") {
+          if (
+            this.chatbotSuggestionIndex >= 0 &&
+            this.chatbotSuggestionIndex < items.length
+          ) {
+            event.preventDefault();
+            items[this.chatbotSuggestionIndex].click();
+            return;
+          }
+        }
+
+        items.forEach((item, idx) => {
+          item.classList.toggle("active", idx === this.chatbotSuggestionIndex);
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (
+          this.chatbotSuggestions &&
+          !this.chatbotSuggestions.contains(event.target) &&
+          event.target !== this.searchInput
+        ) {
+          this.chatbotSuggestions.innerHTML = "";
+          this.chatbotSuggestions.style.display = "none";
+        }
+      });
     }
 
     if (this.statusFilter) {
@@ -3220,6 +3797,71 @@ class ChatbotListHandler {
     }
 
     return [];
+  }
+
+  async loadChatbotSearchSuggestions(term) {
+    if (!this.chatbotSuggestions || !this.searchInput) return;
+
+    const searchTerm = String(term || "").trim();
+    if (searchTerm.length < 1) {
+      this.chatbotSuggestions.innerHTML = "";
+      this.chatbotSuggestions.style.display = "none";
+      this.chatbotSuggestionIndex = -1;
+      return;
+    }
+
+    try {
+      const response = await API.get(
+        `/api/admin/chatbots?search=${encodeURIComponent(searchTerm)}&per_page=6`,
+      );
+      const chatbots = Array.isArray(response?.data) ? response.data : [];
+      if (chatbots.length === 0) {
+        this.chatbotSuggestions.innerHTML = "";
+        this.chatbotSuggestions.style.display = "none";
+        this.chatbotSuggestionIndex = -1;
+        return;
+      }
+
+      this.chatbotSuggestions.innerHTML = chatbots
+        .map((bot) => {
+          const name = String(bot.name || "").trim();
+          const eventName = String(bot.event_name || "").trim();
+          const label = name
+            ? `${name}${eventName ? ` (${eventName})` : ""}`
+            : eventName;
+          return `<button type="button" class="chatbot-search-suggestion" data-name="${this.escapeHtml(name)}">${this.escapeHtml(label)}</button>`;
+        })
+        .join("");
+
+      this.chatbotSuggestions.style.display = "block";
+      const inputRect = this.searchInput.getBoundingClientRect();
+      this.chatbotSuggestions.style.width = `${inputRect.width}px`;
+      this.chatbotSuggestions.style.left = `${this.searchInput.offsetLeft}px`;
+
+      const items = Array.from(
+        this.chatbotSuggestions.querySelectorAll(
+          "button.chatbot-search-suggestion",
+        ),
+      );
+
+      items.forEach((button) => {
+        button.addEventListener("click", () => {
+          const selectedName = button.getAttribute("data-name") || "";
+          this.searchInput.value = selectedName;
+          this.chatbotSuggestions.innerHTML = "";
+          this.chatbotSuggestions.style.display = "none";
+          this.chatbotSuggestionIndex = -1;
+          this.applyFilters(true);
+        });
+      });
+
+      this.chatbotSuggestionIndex = -1;
+    } catch (error) {
+      console.error("Failed to load chatbot search suggestions:", error);
+      this.chatbotSuggestions.innerHTML = "";
+      this.chatbotSuggestions.style.display = "none";
+      this.chatbotSuggestionIndex = -1;
+    }
   }
 
   applyFilters(resetPage = false) {

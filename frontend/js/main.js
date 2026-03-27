@@ -206,8 +206,6 @@ class ChatInterface {
     this.imageLightboxPreview = DomUtils.$("#chat-image-lightbox-preview");
     this.imageLightboxClose = DomUtils.$("#chat-image-lightbox-close");
     this.imageLightboxSend = DomUtils.$("#chat-image-lightbox-send");
-    this.imageLightboxDrive = DomUtils.$("#chat-image-lightbox-drive");
-    this.imageLightboxDownload = DomUtils.$("#chat-image-lightbox-download");
     this.guestModeIcon = DomUtils.$(
       '.chat-mode-option[data-mode="guest"] .chat-mode-icon-img',
     );
@@ -305,8 +303,8 @@ class ChatInterface {
             const initial = this.escapeHtml(
               (c.title || "N").charAt(0).toUpperCase(),
             );
-            return `<div class="conversation-item ${this.currentConversationId === c.id ? "active" : ""}" data-id="${c.id}" title="${title}">
-        <button type="button" class="conversation-main" title="${title}" aria-label="Open ${title}">
+            return `<div class="conversation-item ${this.currentConversationId === c.id ? "active" : ""}" data-id="${c.id}">
+          <button type="button" class="conversation-main" aria-label="Open ${title}">
           <span class="conv-avatar" aria-hidden="true">${initial}</span>
           <span class="conv-title text">${title}</span>
         </button>
@@ -1683,24 +1681,6 @@ class ChatInterface {
           String(!canSendFromLightbox),
         );
       }
-      if (this.imageLightboxDrive) {
-        this.imageLightboxDrive.style.display = canDriveFromLightbox
-          ? "inline-flex"
-          : "none";
-        this.imageLightboxDrive.setAttribute(
-          "aria-hidden",
-          String(!canDriveFromLightbox),
-        );
-      }
-      if (this.imageLightboxDownload) {
-        this.imageLightboxDownload.style.display = canDriveFromLightbox
-          ? "inline-flex"
-          : "none";
-        this.imageLightboxDownload.setAttribute(
-          "aria-hidden",
-          String(!canDriveFromLightbox),
-        );
-      }
 
       this.imageLightbox.classList.add("active");
       this.imageLightbox.setAttribute("aria-hidden", "false");
@@ -1722,18 +1702,8 @@ class ChatInterface {
       const isDesktop = window.matchMedia("(min-width: 769px)").matches;
       const clickedPreview = clickedEl.closest(".chat-image-lightbox-preview");
       const clickedSend = clickedEl.closest(".chat-image-lightbox-send");
-      const clickedDrive = clickedEl.closest(".chat-image-lightbox-drive");
-      const clickedDownload = clickedEl.closest(
-        ".chat-image-lightbox-download",
-      );
 
-      if (
-        isDesktop &&
-        !clickedPreview &&
-        !clickedSend &&
-        !clickedDrive &&
-        !clickedDownload
-      ) {
+      if (isDesktop && !clickedPreview && !clickedSend) {
         closeLightbox();
         return;
       }
@@ -1749,21 +1719,6 @@ class ChatInterface {
       ).trim();
       closeLightbox();
       this.openContactModal(focusedImageUrl);
-    });
-
-    this.imageLightboxDrive?.addEventListener("click", () => {
-      const focusedImageUrl = String(
-        this.imageLightboxPreview?.src || "",
-      ).trim();
-      closeLightbox();
-      this.uploadGeneratedImageToDriveDirect(focusedImageUrl);
-    });
-
-    this.imageLightboxDownload?.addEventListener("click", () => {
-      const focusedImageUrl = String(
-        this.imageLightboxPreview?.src || "",
-      ).trim();
-      this.downloadGeneratedImage(focusedImageUrl);
     });
 
     document.addEventListener("keydown", (event) => {
@@ -1991,7 +1946,9 @@ class ChatInterface {
           <div class="message-image-loader-glow"></div>
           <div class="message-image-loader-sheen"></div>
         </div>
-        <div class="message-image-loader-label">Generating image...</div>
+        <div class="message-image-loader-label">
+          <span class="loader-text">Generating image...</span>
+        </div>
         <div class="message-time">${timestamp}</div>
       </div>
     `;
@@ -2020,6 +1977,9 @@ class ChatInterface {
     }
 
     if (loaderState.element.isConnected) {
+      // Add fade-out animation
+      loaderState.element.classList.add("fade-out");
+      await new Promise((resolve) => setTimeout(resolve, 400));
       loaderState.element.remove();
     }
   }
@@ -2500,11 +2460,17 @@ class ChatInterface {
         }
         await this.preloadMessageImages(responseImageUrls);
         await this.clearImageGenerationLoader(imageLoaderState);
-        this.addMessage("", "bot", botResponse?.timestamp, responseImageUrls, {
-          showImageContactCta: true,
-          showDriveUploadCta: true,
-          fadeInMessage: true,
-        });
+        this.addMessage(
+          botText || "",
+          "bot",
+          botResponse?.timestamp,
+          responseImageUrls,
+          {
+            showImageContactCta: true,
+            showDriveUploadCta: true,
+            fadeInMessage: true,
+          },
+        );
         this.setContactCtaVisible(true);
       } else if (botText || responseImageUrls.length > 0) {
         const shouldEnableContactCta =
@@ -2755,6 +2721,7 @@ class ChatInterface {
     const captureBtn = DomUtils.$("#chat-camera-capture");
     const switchBtn = DomUtils.$("#chat-camera-switch");
     const closeBtn = DomUtils.$("#chat-camera-close");
+    const backBtn = DomUtils.$("#chat-camera-back");
 
     if (captureBtn) {
       captureBtn.onclick = async () => {
@@ -2773,6 +2740,12 @@ class ChatInterface {
         this.closeCameraModal();
       };
     }
+
+    if (backBtn) {
+      backBtn.onclick = () => {
+        this._returnToChatFromCamera();
+      };
+    }
   }
 
   closeCameraModal() {
@@ -2781,6 +2754,19 @@ class ChatInterface {
     modal.classList.remove("active");
     modal.setAttribute("aria-hidden", "true");
     this._stopCameraStream();
+  }
+
+  _returnToChatFromCamera() {
+    this.closeCameraModal();
+    const inputField = DomUtils.$(".input-field");
+    if (inputField) {
+      inputField.focus();
+      return;
+    }
+
+    if (!/chat\.html$/i.test(window.location.pathname)) {
+      window.location.href = "chat.html";
+    }
   }
 
   async _startCameraStream() {
@@ -3108,22 +3094,6 @@ class ChatInterface {
             </button>`
                 : ""
             }
-            ${
-              showDriveUploadCta
-                ? `<button type="button" class="message-image-drive-btn" data-image-url="${this.escapeHtml(imageSources[0])}" aria-label="Upload generated image to Google Drive manually">
-              <i class="fab fa-google-drive" aria-hidden="true"></i>
-              <span>Upload to Drive</span>
-            </button>`
-                : ""
-            }
-            ${
-              showDriveUploadCta
-                ? `<button type="button" class="message-image-download-btn" data-image-url="${this.escapeHtml(imageSources[0])}" aria-label="Download generated image">
-              <i class="fas fa-download" aria-hidden="true"></i>
-              <span>Download</span>
-            </button>`
-                : ""
-            }
           </div>
         `
       : "";
@@ -3146,28 +3116,6 @@ class ChatInterface {
           messageContactBtn.dataset.imageUrl || "",
         ).trim();
         this.openContactModal(selectedImage);
-      });
-    }
-
-    const messageDriveBtn = messageEl.querySelector(".message-image-drive-btn");
-    if (messageDriveBtn) {
-      messageDriveBtn.addEventListener("click", () => {
-        const selectedImage = String(
-          messageDriveBtn.dataset.imageUrl || "",
-        ).trim();
-        this.uploadGeneratedImageToDriveDirect(selectedImage, messageDriveBtn);
-      });
-    }
-
-    const messageDownloadBtn = messageEl.querySelector(
-      ".message-image-download-btn",
-    );
-    if (messageDownloadBtn) {
-      messageDownloadBtn.addEventListener("click", () => {
-        const selectedImage = String(
-          messageDownloadBtn.dataset.imageUrl || "",
-        ).trim();
-        this.downloadGeneratedImage(selectedImage);
       });
     }
 
@@ -3220,6 +3168,7 @@ class ChatInterface {
   }
 
   async getGoogleDriveAuthStatus() {
+    if (this.isVolunteerUser()) return false;
     try {
       const response = await API.get("/api/google/auth/status");
       return Boolean(response?.data?.connected);
@@ -3228,13 +3177,30 @@ class ChatInterface {
     }
   }
 
-  connectGoogleDriveWithPopup(authUrl) {
+  connectGoogleDriveWithPopup(authUrl, existingPopup = null) {
     return new Promise((resolve, reject) => {
-      const popup = window.open(
-        authUrl,
-        "googleDriveOAuth",
-        "popup=yes,width=560,height=720,noopener,noreferrer",
-      );
+      let popup = existingPopup;
+      if (popup && !popup.closed) {
+        try {
+          popup.location.href = authUrl;
+          popup.focus();
+        } catch (_) {
+          try {
+            popup.close();
+          } catch (_) {
+            // no-op
+          }
+          popup = null;
+        }
+      }
+
+      if (!popup) {
+        popup = window.open(
+          authUrl,
+          "googleDriveOAuth",
+          "popup=yes,width=560,height=720",
+        );
+      }
 
       if (!popup) {
         reject(new Error("Popup blocked. Please allow popups and try again."));
@@ -3287,7 +3253,7 @@ class ChatInterface {
     });
   }
 
-  async connectGoogleDrive() {
+  async connectGoogleDrive(existingPopup = null) {
     const returnTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
     const response = await API.get(
       `/api/google/auth/login?mode=json&popup=1&return_to=${encodeURIComponent(returnTo)}`,
@@ -3297,8 +3263,38 @@ class ChatInterface {
       throw new Error("Unable to start Google Drive connection.");
     }
 
-    await this.connectGoogleDriveWithPopup(authUrl);
+    await this.connectGoogleDriveWithPopup(authUrl, existingPopup);
     return this.getGoogleDriveAuthStatus();
+  }
+
+  preopenGoogleDrivePopup() {
+    let popup = null;
+    try {
+      popup = window.open(
+        "about:blank",
+        "googleDriveOAuth",
+        "popup=yes,width=560,height=720",
+      );
+
+      if (popup && !popup.closed) {
+        popup.document.write(
+          "<title>Connecting to Google Drive</title>" +
+            '<body style="font-family:Arial,sans-serif;padding:16px;">Connecting to Google Drive...</body>',
+        );
+      }
+    } catch (_) {
+      // Ignore DOM setup errors
+    }
+    return popup;
+  }
+
+  closeDrivePopupSafely(popup) {
+    if (!popup || popup.closed) return;
+    try {
+      popup.close();
+    } catch (_) {
+      // no-op
+    }
   }
 
   async uploadGeneratedImageToDrive(imageUrl = "") {
@@ -3334,7 +3330,10 @@ class ChatInterface {
     const actionButton =
       triggerButton instanceof HTMLElement ? triggerButton : null;
     const actionLabel = actionButton?.querySelector("span");
-    const defaultLabel = actionLabel?.textContent || "Upload to Drive";
+    const defaultLabel =
+      actionLabel?.textContent ||
+      (this.isVolunteerUser() ? "Choose Drive & Upload" : "Upload to Drive");
+    const preopenedPopup = this.preopenGoogleDrivePopup();
 
     try {
       if (actionButton) {
@@ -3346,7 +3345,9 @@ class ChatInterface {
 
       let isConnected = await this.getGoogleDriveAuthStatus();
       if (!isConnected) {
-        isConnected = await this.connectGoogleDrive();
+        isConnected = await this.connectGoogleDrive(preopenedPopup);
+      } else if (preopenedPopup && !preopenedPopup.closed) {
+        this.closeDrivePopupSafely(preopenedPopup);
       }
 
       if (!isConnected) {
@@ -3356,10 +3357,12 @@ class ChatInterface {
       await this.uploadGeneratedImageToDrive(selectedImage);
       NotificationManager.success("Image uploaded to your Google Drive.");
     } catch (error) {
+      this.closeDrivePopupSafely(preopenedPopup);
       NotificationManager.error(
         error?.message || "Failed to upload image to Google Drive.",
       );
     } finally {
+      this.closeDrivePopupSafely(preopenedPopup);
       if (actionButton) {
         actionButton.disabled = false;
       }

@@ -240,6 +240,34 @@ def ensure_chatbot_folder(chatbot_name: str) -> Dict[str, str]:
     return create_folder(folder_name, parent_id=root_folder_id or None)
 
 
+def get_or_create_chatbot_folder(chatbot_name: str) -> Dict[str, str]:
+    """Return chatbot folder metadata; create folder named exactly as chatbot name when missing."""
+    folder_name = str(chatbot_name or "").strip() or "chatbot"
+    root_folder_id = _get_config_value("GOOGLE_DRIVE_ROOT_FOLDER_ID")
+
+    existing = list_folders(parent_id=root_folder_id or None)
+    for folder in existing:
+        if str(folder.get("name") or "").strip().lower() == folder_name.lower():
+            return folder
+
+    return create_folder(folder_name, parent_id=root_folder_id or None)
+
+
+def upload_image_to_folder(file_path: str, folder_id: str, filename: str) -> Dict[str, str]:
+    """Upload an image file into a specific Drive folder using admin credentials."""
+    uploaded = upload_file(
+        local_file_path=file_path,
+        drive_folder_id=folder_id,
+        desired_filename=filename,
+    )
+    return {
+        "file_id": str(uploaded.get("file_id") or "").strip(),
+        "link": str(uploaded.get("link") or "").strip(),
+        "name": str(uploaded.get("name") or filename).strip(),
+        "folder_id": str(folder_id or "").strip(),
+    }
+
+
 def upload_file(local_file_path: str, drive_folder_id: str, desired_filename: Optional[str] = None) -> Dict[str, str]:
     if not local_file_path or not os.path.isfile(local_file_path):
         raise GoogleDriveServiceError("Image file not found for Drive upload.", status_code=400)
@@ -396,7 +424,7 @@ def _get_valid_user_access_token(user) -> str:
     return str(refreshed.access_token or "").strip()
 
 
-def upload_to_drive(user, file_path: str, filename: str, folder_id: Optional[str] = None) -> Dict[str, str]:
+def upload_user_file_to_drive(user, file_path: str, filename: str, folder_id: Optional[str] = None) -> Dict[str, str]:
     local_file_path = os.path.abspath(str(file_path or "").strip())
     if not os.path.isfile(local_file_path):
         raise GoogleDriveServiceError("Image file not found for upload.", status_code=400)
@@ -471,3 +499,95 @@ def upload_to_drive(user, file_path: str, filename: str, folder_id: Optional[str
         "drive_link": link,
         "folder_id": resolved_folder_id or "root",
     }
+
+
+def _get_or_create_convergeai_backup_folder() -> str:
+    env_root_id = _get_config_value("GOOGLE_DRIVE_ROOT_FOLDER_ID")
+    if env_root_id:
+        import re
+        # If user pasted a whole URL, pull out the ID
+        match = re.search(r'folders/([a-zA-Z0-9_-]+)', env_root_id)
+        if match:
+            env_root_id = match.group(1)
+        # remove spaces or quotes
+        env_root_id = str(env_root_id).strip(" '\"=")
+        return env_root_id
+
+    service = _build_drive_client()
+    query = "name='ConvergeAI_Backup' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents"
+    result = service.files().list(q=query, fields="files(id, name)").execute()
+    files = result.get('files', [])
+    if files:
+        return files[0]['id']
+    
+    body = {"name": "ConvergeAI_Backup", "mimeType": "application/vnd.google-apps.folder"}
+    res = service.files().create(body=body, fields="id").execute()
+    return res.get('id')
+
+
+def _get_or_create_chatbot_auto_folder(chatbot, root_id: str) -> str:
+    chatbot_folder_name = f"chatbot_{chatbot.id}"
+    query = f"name='{chatbot_folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false and '{root_id}' in parents"
+    service = _build_drive_client()
+    result = service.files().list(q=query, fields="files(id, name)").execute()
+    files = result.get('files', [])
+    if files:
+        folder_id = files[0]['id']
+    else:
+        body = {"name": chatbot_folder_name, "mimeType": "application/vnd.google-apps.folder", "parents": [root_id]}
+        res = service.files().create(body=body, fields="id", supportsAllDrives=True).execute()
+        folder_id = res.get('id')
+    
+    try:
+        chatbot.drive_folder_id = folder_id
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.warning(f"Failed to save drive folder id to db: {e}")
+        
+    return folder_id
+
+
+def upload_to_drive(image_bytes: bytes, chatbot_id: int, username: str) -> Dict[str, str]:
+    """
+    Auto-upload generated AI image to Google Drive with structured folder organization.
+    Uses admin user OAuth natively to bypass restrictive Service Account storage quotas.
+    """
+    try:
+        from models import Chatbot
+        import io
+        from googleapiclient.http import MediaIoBaseUpload
+        from datetime import datetime
+
+        chatbot = Chatbot.query.get(chatbot_id)
+        if not chatbot:
+            raise ValueError(f"Chatbot not found: {chatbot_id}")
+            
+        folder_id = str(chatbot.drive_folder_id or "").strip()
+        if not folder_id:
+            root_id = _get_or_create_convergeai_backup_folder()
+            folder_id = _get_or_create_chatbot_auto_folder(chatbot, root_id)
+
+        filename = f"{username}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.png"
+
+        service = _build_drive_client()
+        metadata = {
+            "name": filename,
+            "parents": [folder_id],
+        }
+        
+        fh = io.BytesIO(image_bytes)
+        media = MediaIoBaseUpload(fh, mimetype='image/png', resumable=False)
+        
+        result = service.files().create(body=metadata, media_body=media, fields="id,name,webViewLink", supportsAllDrives=True).execute()
+        
+        return {
+            "file_id": result.get("id"),
+            "link": result.get("webViewLink"),
+            "name": result.get("name"),
+            "folder_id": folder_id,
+        }
+    except Exception as e:
+        current_app.logger.warning(f"Failed to auto-upload generated image to drive: {e}")
+        # Attach the error to the response temporarily for debugging
+        return {"error": str(e)}

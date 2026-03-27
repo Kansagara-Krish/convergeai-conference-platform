@@ -10,7 +10,7 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js?v=12"></script>
-    <script src="../js/admin.js?v=12"></script>
+    <script src="../js/admin.js?v=13"></script>
 </head>
 
 <body>
@@ -159,13 +159,20 @@
                             <option value="true">Active</option>
                             <option value="false">Deactive</option>
                         </select>
+                        <select id="user-year-filter" class="users-filter-select" title="Filter users by registration year" aria-label="Filter users by registration year">
+                            <option value="">Filter by year</option>
+                        </select>
                         <select id="user-chatbot-filter" class="users-filter-select" title="Filter users by chatbot/event" aria-label="Filter users by chatbot/event">
                             <option value="">Filter by chatbot</option>
                         </select>
                     </div>
                     <div class="users-bulk-actions" id="users-bulk-actions">
                         <span id="users-selected-count">0 users selected</span>
-                        <button type="button" id="users-bulk-delete-btn" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Delete Selected</button>
+                        <div class="users-bulk-buttons">
+                            <button type="button" id="users-bulk-activate-btn" class="btn btn-sm btn-success" title="Activate selected users"><i class="fas fa-check"></i> Activate</button>
+                            <button type="button" id="users-bulk-deactivate-btn" class="btn btn-sm btn-warning" title="Deactivate selected users"><i class="fas fa-times"></i> Deactivate</button>
+                            <button type="button" id="users-bulk-delete-btn" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Delete Selected</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table class="table" data-table="users">

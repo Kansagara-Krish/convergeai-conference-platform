@@ -189,6 +189,22 @@ Requirements:
                 """
             ))
 
+        if 'allow_previous_year_users' not in columns:
+            db.session.execute(text(
+                """
+                ALTER TABLE chatbots
+                ADD COLUMN allow_previous_year_users BOOLEAN NOT NULL DEFAULT FALSE
+                """
+            ))
+
+        if 'drive_folder_id' not in columns:
+            db.session.execute(text(
+                """
+                ALTER TABLE chatbots
+                ADD COLUMN drive_folder_id VARCHAR(255)
+                """
+            ))
+
         db.session.commit()
 
     def remove_unused_model_columns():
@@ -275,6 +291,57 @@ Requirements:
             ))
             db.session.commit()
 
+    def apply_yearly_user_rollover_deactivation():
+        """
+        Once per calendar year, deactivate all user/volunteer accounts by default.
+        Admins can reactivate accounts from user management as needed.
+        """
+        current_year = datetime.utcnow().year
+
+        db.session.execute(text(
+            """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key VARCHAR(128) PRIMARY KEY,
+                value VARCHAR(255) NOT NULL
+            )
+            """
+        ))
+
+        row = db.session.execute(text(
+            "SELECT value FROM app_settings WHERE key = 'yearly_user_rollover_year'"
+        )).first()
+
+        last_processed_year = None
+        if row and row[0] is not None:
+            try:
+                last_processed_year = int(str(row[0]).strip())
+            except (TypeError, ValueError):
+                last_processed_year = None
+
+        if last_processed_year == current_year:
+            return
+
+        db.session.execute(text(
+            """
+            UPDATE users
+            SET active = FALSE
+            WHERE lower(coalesce(role, '')) IN ('user', 'volunteer', 'vol')
+              AND active = TRUE
+            """
+        ))
+
+        db.session.execute(text(
+            "DELETE FROM app_settings WHERE key = 'yearly_user_rollover_year'"
+        ))
+        db.session.execute(text(
+            """
+            INSERT INTO app_settings (key, value)
+            VALUES ('yearly_user_rollover_year', :year)
+            """
+        ), {'year': str(current_year)})
+
+        db.session.commit()
+
     should_bootstrap_db = not (
         len(sys.argv) > 1 and sys.argv[1] == 'db'
     )
@@ -288,6 +355,7 @@ Requirements:
             ensure_messages_schema()
             ensure_users_schema()
             remove_unused_model_columns()
+            # Disabled: apply_yearly_user_rollover_deactivation()
     
     return app
 

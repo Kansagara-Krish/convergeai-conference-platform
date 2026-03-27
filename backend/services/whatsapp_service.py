@@ -172,7 +172,8 @@ def _build_image_message_payload(to_number: str, image_payload: Dict[str, Any], 
         }
     ]
     
-    if caption:
+    username = str(caption).strip()
+    if username:
         # Note: If the template has NO body variables defined in Meta, passing a body parameter might cause an error.
         # We assume the template was created with 1 body variable for the caption (e.g. {{1}}).
         components.append({
@@ -180,7 +181,7 @@ def _build_image_message_payload(to_number: str, image_payload: Dict[str, Any], 
             "parameters": [
                 {
                     "type": "text",
-                    "text": str(caption).strip()
+                    "text": username
                 }
             ]
         })
@@ -448,14 +449,19 @@ def send_whatsapp_template_image(
         }
     ]
 
-    clean_body_vars = [str(item).strip() for item in (body_variables or []) if str(item).strip()]
-    if clean_body_vars:
+    username = ""
+    if body_variables and len(body_variables) > 0:
+        username = str(body_variables[0]).strip()
+
+    if username:
         components.append(
             {
                 "type": "body",
                 "parameters": [
-                    {"type": "text", "text": body_var}
-                    for body_var in clean_body_vars
+                    {
+                        "type": "text",
+                        "text": username
+                    }
                 ],
             }
         )

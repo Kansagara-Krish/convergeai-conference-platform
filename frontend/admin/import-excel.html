@@ -138,8 +138,9 @@
 
                             <ul class="import-instruction-list">
                                 <li>Upload an Excel file (.xlsx) using only the required columns shown above.</li>
-                                <li>Use this exact header row order to avoid mismatch: <code>email,username,whatsapp_number</code></li>
-                                <li>WhatsApp number must be in Indian format and start with <code>+91</code> (example: <code>+919876543210</code>).</li>
+                                <li>Column order can be any sequence. Headers are matched by name (for example: <code>email</code>, <code>username</code>, <code>whatsapp_number</code>).</li>
+                                <li>For WhatsApp number, enter normal 10-digit Indian mobile numbers (example: <code>9876543210</code>). The system auto-adds <code>+91</code>.</li>
+                                <li>Duplicate emails are allowed and will be auto-adjusted by the system if needed. Usernames must be unique.</li>
                                 <li>System creates accounts and assigns default password <code>123</code>.</li>
                                 <li>Credentials are sent to each user's email address and can be downloaded/printed after import.</li>
                             </ul>
@@ -171,8 +172,8 @@
                                     <label for="event-select">
                                         Assign to Event
                                     </label>
-                                    <select id="event-select" name="event_id">
-                                        <option value="">Select an event...</option>
+                                    <select id="event-select" name="event_id" required>
+                                        <option value="" selected disabled>Select an event...</option>
                                     </select>
                                 </div>
 

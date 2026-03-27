@@ -113,10 +113,12 @@ class Chatbot(db.Model):
     
     # Media
     background_image = db.Column(db.String(255))
+    drive_folder_id = db.Column(db.String(255), index=True)
     
     # Settings
     public = db.Column(db.Boolean, default=True)
     active = db.Column(db.Boolean, default=True)
+    allow_previous_year_users = db.Column(db.Boolean, default=False, nullable=False)
     
     # Admin tracking
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -150,6 +152,13 @@ class Chatbot(db.Model):
         """Calculate days until event"""
         delta = self.start_date - datetime.now().date()
         return delta.days
+
+    @property
+    def event_year(self):
+        """Calendar year used for participant access policy."""
+        if self.start_date:
+            return int(self.start_date.year)
+        return None
     
     def to_dict(self):
         """Convert to dictionary"""
@@ -158,16 +167,19 @@ class Chatbot(db.Model):
             'name': self.name,
             'event_name': self.event_name,
             'description': self.description,
+            'event_year': self.event_year,
             'start_date': self.start_date.isoformat(),
             'end_date': None if self.is_infinite_end_date else self.end_date.isoformat(),
             'has_infinite_end_date': self.is_infinite_end_date,
             'status': self.status,
             'active': self.active,
+            'allow_previous_year_users': bool(self.allow_previous_year_users),
             'system_prompt': self.system_prompt,
             'single_person_prompt': self.single_person_prompt,
             'multiple_person_prompt': self.multiple_person_prompt,
             'gemini_api_key': self.gemini_api_key,
             'background_image': self.background_image,
+            'drive_folder_id': self.drive_folder_id,
             'guests_count': len(self.guests),
             'participants_count': len(self.participants),
             'messages_count': len(self.messages),

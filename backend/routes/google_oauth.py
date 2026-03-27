@@ -83,6 +83,10 @@ def _build_google_auth_url(*, user, popup=False, return_to=""):
 
     state = _oauth_serializer().dumps(payload)
 
+    prompt_value = "consent"
+    if hasattr(user, "role") and str(user.role).strip().lower() == "volunteer":
+        prompt_value = "select_account consent"
+
     params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
@@ -90,7 +94,7 @@ def _build_google_auth_url(*, user, popup=False, return_to=""):
         "scope": GOOGLE_DRIVE_SCOPE,
         "access_type": "offline",
         "include_granted_scopes": "true",
-        "prompt": "consent",
+        "prompt": prompt_value,
         "state": state,
     }
 

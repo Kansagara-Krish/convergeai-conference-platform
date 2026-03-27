@@ -11,7 +11,7 @@ try:
         GoogleDriveServiceError,
         ensure_chatbot_folder,
         get_folder_options,
-        upload_to_drive,
+        upload_user_file_to_drive,
         upload_file,
     )
 except ImportError:
@@ -21,7 +21,7 @@ except ImportError:
         GoogleDriveServiceError,
         ensure_chatbot_folder,
         get_folder_options,
-        upload_to_drive,
+        upload_user_file_to_drive,
         upload_file,
     )
 
@@ -263,7 +263,7 @@ def upload_generated_image_to_user_drive(user):
     normalized_image_path = _normalize_local_image_path(image_value)
 
     try:
-        uploaded = upload_to_drive(
+        uploaded = upload_user_file_to_drive(
             user=user,
             file_path=absolute_image_path,
             filename=os.path.basename(absolute_image_path),

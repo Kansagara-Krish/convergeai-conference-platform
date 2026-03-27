@@ -9,10 +9,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/user.css?v=3">
-    <link rel="stylesheet" href="../css/chat.css?v=31">
+    <link rel="stylesheet" href="../css/chat.css?v=41">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="../js/utils.js?v=3"></script>
-        <script src="../js/main.js?v=30"></script>
+        <script src="../js/main.js?v=33"></script>
 </head>
 <body>
     <div class="user-container">
@@ -176,13 +176,28 @@
     <!-- camera modal for capturing photos -->
     <div class="camera-modal" id="chat-camera-modal" aria-hidden="true">
         <div class="camera-modal-content">
+            <div class="camera-modal-topbar">
+                <button type="button" id="chat-camera-back" class="camera-icon-btn camera-back-btn" aria-label="Back to chat">
+                    <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+                    <span>Back to chat</span>
+                </button>
+            </div>
             <div class="camera-modal-instructions">Please make sure you're photographing a person before capturing.</div>
             <video id="chat-camera-video" autoplay playsinline></video>
             <canvas id="chat-camera-canvas"></canvas>
             <div class="camera-actions">
-                <button type="button" id="chat-camera-switch" class="btn btn-secondary btn-sm">Switch Camera</button>
-                <button type="button" id="chat-camera-capture" class="btn btn-primary btn-sm">Capture</button>
-                <button type="button" id="chat-camera-close" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="button" id="chat-camera-switch" class="camera-icon-btn" aria-label="Switch camera">
+                    <span class="material-symbols-outlined" aria-hidden="true">cameraswitch</span>
+                    <span>Switch</span>
+                </button>
+                <button type="button" id="chat-camera-capture" class="camera-icon-btn camera-capture-btn" aria-label="Capture image">
+                    <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
+                    <span>Capture</span>
+                </button>
+                <button type="button" id="chat-camera-close" class="camera-icon-btn" aria-label="Close camera">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                    <span>Close</span>
+                </button>
             </div>
         </div>
     </div>
@@ -228,14 +243,6 @@
                 <button type="button" id="chat-image-lightbox-send" class="chat-image-lightbox-send" aria-label="Send details from image preview">
                     <i class="fab fa-whatsapp" aria-hidden="true"></i>
                     <span>Send</span>
-                </button>
-                <button type="button" id="chat-image-lightbox-drive" class="chat-image-lightbox-drive" aria-label="Upload to Google Drive from image preview">
-                    <i class="fab fa-google-drive drive-brand-icon" aria-hidden="true"></i>
-                    <span>Upload to Drive</span>
-                </button>
-                <button type="button" id="chat-image-lightbox-download" class="chat-image-lightbox-download" aria-label="Download generated image from preview">
-                    <i class="fas fa-download" aria-hidden="true"></i>
-                    <span>Download</span>
                 </button>
             </div>
         </div>

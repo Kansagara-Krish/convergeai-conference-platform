@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Analytics - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css?v=18">
+    <link rel="stylesheet" href="../css/analytics.css?v=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="../js/utils.js?v=12"></script>
+    <script src="../js/admin.js?v=13"></script>
+    <script src="../js/analytics.js?v=1" defer></script>
+</head>
+
+<body>
+    <div class="admin-container">
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="admin-sidebar-header">
+                    <div class="brand-icon"><i class="fas fa-robot"></i></div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-chart-line"></i></span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-plus-circle"></i></span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-list"></i></span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
+                        <span>Guest Management</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-users-cog"></i></span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-file-import"></i></span>
+                        <span>Import Users</span>
+                    </a>
+                    <a href="analytics.html" class="menu-item active">
+                        <span class="menu-icon"><i class="fas fa-chart-pie"></i></span>
+                        <span>Analytics</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Settings</div>
+                    <a href="profile.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
+                        <span>My Profile</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <div class="admin-sidebar-footer">
+                    <button class="btn btn-ghost analytics-logout-btn" data-action="logout"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </div>
+        </aside>
+
+        <div class="admin-main">
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>Analytics</h1>
+                </div>
+                <div class="header-actions">
+                    <div class="header-user-menu">
+                        <button class="header-user-btn">
+                            <span class="analytics-header-avatar">A</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                            <a href="profile.html#security-settings" class="dropdown-item"><i class="fas fa-lock"></i>
+                                Security</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i>
+                                Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="admin-content">
+                <section class="analytics-filters card fade-in-up">
+                    <div class="analytics-filters-grid">
+                        <div class="form-group">
+                            <label for="analytics-chatbot-select">Select Chatbot</label>
+                            <select id="analytics-chatbot-select" class="form-control">
+                                <option value="">Loading chatbots...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="analytics-username-search">Search by Username</label>
+                            <input id="analytics-username-search" class="form-control" type="text"
+                                placeholder="Type username to filter">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="analytics-summary" class="analytics-summary-grid loading fade-in-up">
+                    <article class="analytics-summary-card">
+                        <div class="analytics-summary-label">Total Images Generated</div>
+                        <div class="analytics-summary-value" id="summary-total-images">0</div>
+                    </article>
+                    <article class="analytics-summary-card">
+                        <div class="analytics-summary-label">Total by Users</div>
+                        <div class="analytics-summary-value" id="summary-user-images">0</div>
+                    </article>
+                    <article class="analytics-summary-card">
+                        <div class="analytics-summary-label">Total by Volunteers</div>
+                        <div class="analytics-summary-value" id="summary-volunteer-images">0</div>
+                    </article>
+                </section>
+
+                <section class="analytics-content-grid fade-in-up" id="analytics-content-grid">
+                    <article class="analytics-chart-card chart-card-pie">
+                        <div class="analytics-card-header">
+                            <h2>Users vs Volunteers</h2>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <canvas id="analytics-pie-chart" aria-label="Image distribution chart"></canvas>
+                            <div class="analytics-spinner" id="analytics-pie-loading" aria-hidden="true"></div>
+                        </div>
+                    </article>
+
+                    <article class="analytics-chart-card chart-card-line">
+                        <div class="analytics-card-header">
+                            <h2>Images Generated Over Time</h2>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <canvas id="analytics-line-chart" aria-label="Timeline chart"></canvas>
+                            <div class="analytics-spinner" id="analytics-line-loading" aria-hidden="true"></div>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="analytics-breakdown-card card fade-in-up">
+                    <div class="analytics-card-header">
+                        <h2>User Image Counts</h2>
+                    </div>
+                    <div id="analytics-breakdown-list" class="analytics-breakdown-list loading"></div>
+                </section>
+
+                <section id="analytics-empty-state" class="analytics-empty-state" hidden>
+                    <div class="analytics-empty-icon"><i class="fas fa-image"></i></div>
+                    <h3>No image analytics data found</h3>
+                    <p>Try selecting a different chatbot or clear the username search.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

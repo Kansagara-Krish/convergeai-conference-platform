@@ -444,6 +444,7 @@ def create_chatbot(user):
             background_image=background_image_path,
             public=to_bool(data.get('public'), True),
             active=to_bool(data.get('active'), True),
+            allow_previous_year_users=to_bool(data.get('allow_previous_year_users'), False),
             created_by_id=user.id
         )
 
@@ -574,6 +575,11 @@ def update_chatbot(user, chatbot_id):
         chatbot.public = to_bool(data['public'], chatbot.public)
     if 'active' in data:
         chatbot.active = to_bool(data['active'], chatbot.active)
+    if 'allow_previous_year_users' in data:
+        chatbot.allow_previous_year_users = to_bool(
+            data.get('allow_previous_year_users'),
+            chatbot.allow_previous_year_users,
+        )
 
     if is_form_data:
         background_image = request.files.get('background_image')
@@ -760,7 +766,8 @@ def get_chatbot_settings(user, chatbot_id):
             'single_person_prompt': chatbot.single_person_prompt or DEFAULT_SINGLE_PERSON_PROMPT,
             'multiple_person_prompt': chatbot.multiple_person_prompt or DEFAULT_MULTIPLE_PERSON_PROMPT,
             'public': chatbot.public,
-            'active': chatbot.active
+            'active': chatbot.active,
+            'allow_previous_year_users': bool(chatbot.allow_previous_year_users),
         }
     }), 200
 
