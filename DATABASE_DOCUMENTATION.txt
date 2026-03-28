@@ -1,0 +1,509 @@
+================================================================================
+DATABASE TABLES INFORMATION - ConvergeAI Conference Chatbot System
+================================================================================
+
+This document provides a detailed overview of all database tables in the system,
+including their columns, data types, relationships, and purposes.
+
+================================================================================
+1. USERS TABLE
+================================================================================
+TABLE NAME: users
+PURPOSE: Stores user account information and authentication details
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique identifier for each user
+  
+  - username (String(120), Unique, Indexed)
+      * Unique username for login
+  
+  - email (String(255), Unique, Indexed)
+      * Unique email address for user
+  
+  - password_hash (String(255), Not Null)
+      * Hashed password for authentication
+  
+  - name (String(255), Not Null)
+      * User's full name
+  
+  - whatsapp_number (String(20), Indexed)
+      * WhatsApp number for OTP authentication
+  
+  - role (String(50), Default: 'user', Not Null)
+      * User role: admin, user, speaker, volunteer
+  
+  - active (Boolean, Default: True)
+      * Whether the user account is active
+  
+  - created_at (DateTime, Default: current time)
+      * Account creation timestamp
+  
+  - last_login (DateTime)
+      * Last login timestamp
+
+RELATIONSHIPS:
+  - Has many: Chatbots (created by user via created_by_id)
+  - Has many: Messages (sent by user)
+  - Has many: Conversations (user's chats)
+  - Has many: Guests (created by user)
+  - Has many: LoginOTPs (OTP records for user)
+  - Has many: WhatsAppSendHistory (messages sent via WhatsApp)
+  - Has many: DriveImageBackups (images backed up by user)
+  - Has one: UserGoogleToken (Google OAuth token)
+
+INDEXES: id, username, email, whatsapp_number
+UNIQUE CONSTRAINTS: username, email
+
+================================================================================
+2. CHATBOTS TABLE
+================================================================================
+TABLE NAME: chatbots
+PURPOSE: Stores information about event chatbots
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique chatbot identifier
+  
+  - name (String(255), Not Null, Indexed)
+      * Chatbot name/title
+  
+  - event_name (String(255), Not Null)
+      * Associated event name
+  
+  - description (Text)
+      * Chatbot description
+  
+  - start_date (Date, Not Null)
+      * Event start date
+  
+  - end_date (Date, Not Null)
+      * Event end date (default: 9999-12-31 for infinite duration)
+  
+  - system_prompt (Text, Not Null)
+      * AI system prompt for the chatbot
+  
+  - single_person_prompt (Text, Not Null)
+      * Prompt for generating single person images
+  
+  - multiple_person_prompt (Text, Not Null)
+      * Prompt for generating group images
+  
+  - gemini_api_key (String(255))
+      * API key for Gemini AI service
+  
+  - background_image (String(255))
+      * Path to background image for generations
+  
+  - drive_folder_id (String(255), Indexed)
+      * Google Drive folder ID for image storage
+  
+  - public (Boolean, Default: True)
+      * Whether chatbot is publicly accessible
+  
+  - active (Boolean, Default: True)
+      * Whether chatbot is active
+  
+  - allow_previous_year_users (Boolean, Default: False, Not Null)
+      * Whether to allow previous year event participants
+  
+  - created_by_id (Integer, Foreign Key to users, Not Null)
+      * User who created the chatbot
+  
+  - created_at (DateTime, Default: current time)
+      * Chatbot creation timestamp
+
+RELATIONSHIPS:
+  - Belongs to: User (creator via created_by_id)
+  - Has many: Guests (invited guests)
+  - Has many: Messages (chat messages)
+  - Has many: Conversations (user conversations)
+  - Has many: ChatbotParticipants (users who joined)
+  - Has many: DriveImageBackups (generated images)
+
+INDEXES: id, name, drive_folder_id
+
+================================================================================
+3. GUESTS TABLE
+================================================================================
+TABLE NAME: guests
+PURPOSE: Stores information about event guests/experts
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique guest identifier
+  
+  - chatbot_id (Integer, Foreign Key to chatbots, Not Null)
+      * Associated chatbot
+  
+  - user_id (Integer, Foreign Key to users)
+      * Associated user (if applicable)
+  
+  - name (String(255), Not Null)
+      * Guest's full name
+  
+  - photo (String(255))
+      * Path to guest's photo
+  
+  - active (Boolean, Default: True, Not Null)
+      * Whether guest is active
+  
+  - created_at (DateTime, Default: current time)
+      * Record creation timestamp
+
+RELATIONSHIPS:
+  - Belongs to: Chatbot (guest list owner)
+  - Belongs to: User (guest user if applicable)
+
+INDEXES: id, chatbot_id, user_id
+
+================================================================================
+4. CONVERSATIONS TABLE
+================================================================================
+TABLE NAME: conversations
+PURPOSE: Stores per-user conversation sessions with chatbots
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique conversation identifier
+  
+  - chatbot_id (Integer, Foreign Key to chatbots, Not Null, Indexed)
+      * Associated chatbot
+  
+  - user_id (Integer, Foreign Key to users, Not Null, Indexed)
+      * User who owns the conversation
+  
+  - title (String(255), Not Null, Default: 'New chat')
+      * Conversation title/name
+  
+  - created_at (DateTime, Default: current time, Not Null)
+      * Conversation start timestamp
+  
+  - updated_at (DateTime, Default & Updated: current time, Not Null, Indexed)
+      * Last message timestamp in conversation
+
+RELATIONSHIPS:
+  - Belongs to: Chatbot
+  - Belongs to: User
+  - Has many: Messages (messages in conversation)
+
+INDEXES: id, chatbot_id, user_id, updated_at
+UNIQUE CONSTRAINTS: None (user can have multiple conversations with same chatbot)
+
+================================================================================
+5. MESSAGES TABLE
+================================================================================
+TABLE NAME: messages
+PURPOSE: Stores chat messages between users and chatbots
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique message identifier
+  
+  - chatbot_id (Integer, Foreign Key to chatbots, Not Null)
+      * Associated chatbot
+  
+  - user_id (Integer, Foreign Key to users, Not Null)
+      * User who sent the message
+  
+  - conversation_id (Integer, Foreign Key to conversations, Indexed)
+      * Associated conversation
+  
+  - content (Text)
+      * Message text content
+  
+  - is_user_message (Boolean, Default: True)
+      * True if user sent, False if bot sent
+  
+  - message_type (String(32), Default: 'text', Not Null)
+      * Type: text, image, etc.
+  
+  - image_url (String(512))
+      * URL to image (if message contains image)
+  
+  - created_at (DateTime, Default: current time, Indexed)
+      * Message timestamp
+
+RELATIONSHIPS:
+  - Belongs to: Chatbot
+  - Belongs to: User
+  - Belongs to: Conversation
+
+INDEXES: id, chatbot_id, user_id, conversation_id, is_user_message, created_at
+
+================================================================================
+6. CHATBOT_PARTICIPANTS TABLE
+================================================================================
+TABLE NAME: chatbot_participants
+PURPOSE: Tracks which users have joined which chatbots
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique participant record identifier
+  
+  - chatbot_id (Integer, Foreign Key to chatbots, Not Null)
+      * Associated chatbot
+  
+  - user_id (Integer, Foreign Key to users, Not Null)
+      * Participating user
+  
+  - joined_at (DateTime, Default: current time)
+      * When user joined the chatbot
+  
+  - last_active (DateTime, Default: current time)
+      * Last activity timestamp
+  
+  - message_count (Integer, Default: 0)
+      * Total messages sent by user in this chatbot
+
+RELATIONSHIPS:
+  - Belongs to: Chatbot
+  - Belongs to: User
+
+INDEXES: id, chatbot_id, user_id
+UNIQUE CONSTRAINTS: (chatbot_id, user_id) - Each user can join a chatbot only once
+
+================================================================================
+7. SESSION_TOKENS TABLE
+================================================================================
+TABLE NAME: session_tokens
+PURPOSE: Manages API session tokens for authentication
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique token record identifier
+  
+  - user_id (Integer, Foreign Key to users, Not Null)
+      * User who owns the token
+  
+  - token (String(255), Unique, Indexed, Not Null)
+      * Unique session token
+  
+  - expires_at (DateTime, Not Null)
+      * Token expiration timestamp
+  
+  - created_at (DateTime, Default: current time)
+      * Token generation timestamp
+
+RELATIONSHIPS:
+  - Belongs to: User
+
+INDEXES: id, token, user_id
+
+================================================================================
+8. LOGIN_OTPS TABLE
+================================================================================
+TABLE NAME: login_otps
+PURPOSE: Stores OTP codes for username + WhatsApp OTP login flow
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique OTP record identifier
+  
+  - user_id (Integer, Foreign Key to users, Not Null, Indexed)
+      * User requesting login
+  
+  - username (String(120), Not Null, Indexed)
+      * Username for the login attempt
+  
+  - whatsapp_number (String(20), Not Null, Indexed)
+      * WhatsApp number for OTP delivery
+  
+  - otp_code (String(12), Not Null)
+      * The OTP code sent to user
+  
+  - expires_at (DateTime, Not Null, Indexed)
+      * OTP expiration time (usually 10 minutes)
+  
+  - is_used (Boolean, Default: False, Not Null, Indexed)
+      * Whether OTP has been used for login
+  
+  - created_at (DateTime, Default: current time, Not Null, Indexed)
+      * OTP generation timestamp
+
+RELATIONSHIPS:
+  - Belongs to: User
+
+INDEXES: id, user_id, username, whatsapp_number, expires_at, is_used, created_at
+
+================================================================================
+9. WHATSAPP_SEND_HISTORY TABLE
+================================================================================
+TABLE NAME: whatsapp_send_history
+PURPOSE: Tracks WhatsApp message sends and delivery status
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique send record identifier
+  
+  - user_id (Integer, Foreign Key to users, Indexed)
+      * User who sent the message
+  
+  - whatsapp_number (String(32), Not Null, Indexed)
+      * Recipient WhatsApp number
+  
+  - image_url (String(1024))
+      * Image URL sent via WhatsApp
+  
+  - status (String(100), Not Null, Indexed)
+      * Message status: queued, sent, delivered, read, failed, etc.
+  
+  - provider_message_id (String(255), Indexed)
+      * Message ID from WhatsApp provider
+  
+  - response_payload (Text)
+      * Full response from WhatsApp API
+  
+  - created_at (DateTime, Default: current time, Not Null, Indexed)
+      * Send timestamp
+
+RELATIONSHIPS:
+  - Belongs to: User (optional)
+
+INDEXES: id, user_id, whatsapp_number, status, provider_message_id, created_at
+
+================================================================================
+10. DRIVE_IMAGE_BACKUPS TABLE
+================================================================================
+TABLE NAME: drive_image_backups
+PURPOSE: Tracks generated images backed up to Google Drive
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique backup record identifier
+  
+  - chatbot_id (Integer, Foreign Key to chatbots, Not Null, Indexed)
+      * Associated chatbot
+  
+  - user_id (Integer, Foreign Key to users, Indexed)
+      * User who generated the image
+  
+  - image_path (String(1024), Not Null)
+      * Local path to the image file
+  
+  - drive_file_id (String(255), Not Null, Indexed)
+      * Google Drive file ID
+  
+  - drive_folder_id (String(255), Not Null, Indexed)
+      * Google Drive folder ID
+  
+  - drive_link (String(1024), Not Null)
+      * Shareable Google Drive link
+  
+  - created_at (DateTime, Default: current time, Not Null, Indexed)
+      * Upload timestamp
+
+RELATIONSHIPS:
+  - Belongs to: Chatbot
+  - Belongs to: User
+
+INDEXES: id, chatbot_id, user_id, drive_file_id, drive_folder_id, created_at
+
+================================================================================
+11. USER_GOOGLE_TOKENS TABLE
+================================================================================
+TABLE NAME: user_google_tokens
+PURPOSE: Stores per-user Google OAuth tokens for Drive uploads
+
+COLUMNS:
+  - id (Integer, Primary Key)
+      * Unique token record identifier
+  
+  - user_id (Integer, Foreign Key to users, Not Null, Unique, Indexed)
+      * User who owns the Google token (one token per user)
+  
+  - access_token (Text, Not Null)
+      * Google OAuth access token
+  
+  - refresh_token (Text)
+      * Google OAuth refresh token (for token renewal)
+  
+  - token_expiry (DateTime, Indexed)
+      * Access token expiration timestamp
+  
+  - scope (String(512))
+      * OAuth scopes granted by user
+  
+  - created_at (DateTime, Default: current time, Not Null)
+      * Token generation timestamp
+  
+  - updated_at (DateTime, Default & Updated: current time, Not Null)
+      * Last token update timestamp
+
+RELATIONSHIPS:
+  - Belongs to: User
+
+INDEXES: id, user_id, token_expiry
+UNIQUE CONSTRAINTS: user_id
+
+================================================================================
+RELATIONSHIP DIAGRAM
+================================================================================
+
+users (1) ----has many----> (M) chatbots
+users (1) ----has many----> (M) messages
+users (1) ----has many----> (M) conversations
+users (1) ----has many----> (M) guests
+users (1) ----has many----> (M) chatbot_participants
+users (1) ----has one-----> (1) user_google_tokens
+
+chatbots (1) ----has many----> (M) guests
+chatbots (1) ----has many----> (M) messages
+chatbots (1) ----has many----> (M) conversations
+chatbots (1) ----has many----> (M) chatbot_participants
+chatbots (1) ----has many----> (M) drive_image_backups
+
+conversations (1) ----has many----> (M) messages
+conversations (M) ----belongs to----> (1) chatbots
+conversations (M) ----belongs to----> (1) users
+
+messages (M) ----belongs to----> (1) conversations
+messages (M) ----belongs to----> (1) users
+messages (M) ----belongs to----> (1) chatbots
+
+chatbot_participants (M) ----belongs to----> (1) chatbots
+chatbot_participants (M) ----belongs to----> (1) users
+
+guest (M) ----belongs to----> (1) chatbots
+guest (M) ----belongs to----> (1) users
+
+session_tokens (M) ----belongs to----> (1) users
+
+login_otps (M) ----belongs to----> (1) users
+
+whatsapp_send_history (M) ----belongs to----> (1) users
+
+drive_image_backups (M) ----belongs to----> (1) chatbots
+drive_image_backups (M) ----belongs to----> (1) users
+
+================================================================================
+KEY INFORMATION
+================================================================================
+
+TOTAL TABLES: 11
+
+AUTHENTICATION:
+  - Users authenticate via username/password or WhatsApp OTP
+  - Session tokens generate API authentication tokens
+  - Google OAuth tokens used for Drive integration
+
+IMAGE STORAGE:
+  - Images generated by AI are stored locally and on Google Drive
+  - DriveImageBackups table tracks all backups
+  - WhatsAppSendHistory tracks delivery via WhatsApp
+
+CONVERSATION FLOW:
+  - Users join chatbots (tracked in chatbot_participants)
+  - Each user has multiple conversations with each chatbot
+  - Each conversation contains multiple messages
+  - Messages can be text or images
+
+EVENT MANAGEMENT:
+  - Each chatbot represents one event
+  - Guests (experts/speakers) can be assigned to events
+  - Users with matching year can participate (based on allow_previous_year_users flag)
+
+DELETED TABLES:
+  - admin_notifications (Removed - notification system deprecated)
+
+================================================================================

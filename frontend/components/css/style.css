@@ -1531,41 +1531,35 @@ select option:checked {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--spacing-sm);
-  font-size: 0.9rem;
   min-height: 22px;
   margin-top: 0;
-  margin-bottom: var(--spacing-sm);
-  width: 100%;
 }
 
 .otp-status-row .form-help {
   margin: 0;
-  line-height: 1.4;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.9rem;
+  line-height: 1.3;
 }
 
 #otp-meta {
   min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 #otp-timer {
-  min-width: 110px;
-  text-align: right;
-  color: var(--accent-blue);
-  font-weight: 600;
   white-space: nowrap;
+  text-align: right;
 }
 
 .otp-actions-row {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--spacing-sm);
   margin-top: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .otp-actions-row-single .btn {
@@ -1575,34 +1569,44 @@ select option:checked {
 .otp-actions-row .btn {
   flex: 1;
   min-height: 44px;
-  min-width: 120px;
+  min-width: 140px;
+  max-width: 280px;
+  text-align: center;
 }
 
 #otp-resend-btn {
   width: auto;
-  flex: 0 0 auto;
 }
 
-@media (max-width: 640px) {
-  .otp-status-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-
-  #otp-timer {
-    text-align: left;
-  }
-
-  .otp-actions-row {
-    flex-direction: column;
-  }
-
-  .otp-actions-row .btn,
-  #otp-resend-btn {
-    width: 100%;
-    min-width: 0;
-  }
+/* Force better label color contrast in OTP timer text */
+.otp-status-row .form-help,
+#otp-timer,
+#otp-meta {
+  color: var(--text-primary);
+  font-weight: 500;
 }
+
+/* Forgot-password OTP resend row: ensure aligned and readable */
+.forgot-resend-row {
+  margin-top: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.forgot-resend-row .btn {
+  min-width: 140px;
+  height: 44px;
+}
+
+.forgot-resend-row .forgot-timer {
+  color: var(--text-primary);
+  min-width: 120px;
+  text-align: left;
+}
+
 
 @media (max-width: 640px) {
   .otp-status-row {

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Chatbot - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../js/utils.js?v=5"></script>
+    <script src="../js/admin.js?v=13"></script>
+</head>
+
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="admin-sidebar-header">
+                    <div class="brand-icon"><i class="fas fa-robot"></i></div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-chart-line"></i></span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item active">
+                        <span class="menu-icon"><i class="fas fa-plus-circle"></i></span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-list"></i></span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
+                        <span>Guest Management</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-users-cog"></i></span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-file-import"></i></span>
+                        <span>Import Users</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Settings</div>
+                    <a href="profile.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
+                        <span>My Profile</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <div class="admin-sidebar-footer">
+                    <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>Create New Chatbot</h1>
+                </div>
+                <div class="header-actions">
+                    <div class="header-user-menu">
+                        <button class="header-user-btn">
+                            <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                            <a href="profile.html#security-settings" class="dropdown-item"><i class="fas fa-lock"></i> Security</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="admin-content">
+                <div class="form-layout">
+                    <form data-form="chatbot" data-action="create">
+                        <!-- Basic Information -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">Basic Information</h3>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="chatbot-name">
+                                        Chatbot Name
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="chatbot-name" name="name" placeholder="e.g., AI Summit 2024"
+                                        data-rules="required" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="event-name">
+                                        Event Name
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="event-name" name="event_name" placeholder="e.g., ICAI 2024"
+                                        data-rules="required" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="event-start">
+                                        Event Start Date
+                                        <span class="required">*</span>
+                                    </label>
+                                    <input type="date" id="event-start" name="start_date" data-rules="required"
+                                        required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="event-end">
+                                        Event End Date
+                                    </label>
+                                    <input type="date" id="event-end" name="end_date">
+                                </div>
+                            </div>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="description">
+                                        Description
+                                    </label>
+                                    <textarea id="description" name="description"
+                                        placeholder="Enter a detailed description of the event and chatbot purpose..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI Configuration -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">AI Configuration</h3>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="single-person-prompt">
+                                        Single Person Prompt
+                                        <span class="required">*</span>
+                                    </label>
+                                    <textarea id="single-person-prompt" name="single_person_prompt"
+                                        placeholder="Enter prompt for single person mode..."
+                                        rows="12" style="min-height: 300px; resize: vertical;"
+                                        data-rules="required" required>Generate a high-quality professional conference photo using the provided images.
+
+The uploaded images include:
+- A user photo containing one person.
+- One guest image.
+- A background image of a conference stage or professional event environment.
+
+Instructions:
+- Detect the person from the user photo and the person from the guest image.
+- Place both individuals together naturally as if they are attending a conference event.
+- Position them standing side by side in the provided background scene.
+- Ensure both people appear balanced and properly aligned in the frame.
+
+Requirements:
+- Preserve the original facial features of both the user and the guest.
+- Maintain natural body proportions and realistic posture.
+- Ensure no facial distortion or identity changes.
+- Avoid overlapping faces or unnatural spacing between the two people.
+- Blend lighting, shadows, and perspective so both people match the background environment.
+
+Important rules:
+- Do not create additional people.
+- Do not change facial identity or facial structure.
+- Do not merge or distort faces.
+- Ensure both individuals are clearly visible and properly framed.
+
+Style:
+Professional conference photo, realistic lighting, high resolution, sharp focus, cohesive composition.</textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="multiple-person-prompt">
+                                        Multiple Person Prompt
+                                        <span class="required">*</span>
+                                    </label>
+                                    <textarea id="multiple-person-prompt" name="multiple_person_prompt"
+                                        placeholder="Enter prompt for multiple person mode..."
+                                        rows="12" style="min-height: 300px; resize: vertical;"
+                                        data-rules="required" required>Generate a high-quality professional conference group photo using the provided images.
+
+The uploaded images may include:
+- A user photo that may contain one or multiple people.
+- One or more guest images.
+- A background image of a conference stage or professional environment.
+
+Instructions:
+- Detect all people present in the user photo and keep them in the final image.
+- Include the selected guest(s) together with the people from the user photo.
+- Arrange everyone naturally in a group as if attending a conference event.
+- Place the selected guest(s) in the middle of the group composition when possible while keeping natural spacing and visibility.
+- Place the group inside the provided background scene.
+
+Requirements:
+- Preserve the original facial features of all people from the user image and guest images.
+- Maintain correct body proportions and natural positioning.
+- Ensure no faces are cut or distorted.
+- Avoid overlapping faces or unnatural spacing between people.
+- Blend lighting, shadows, and perspective so all people match the background.
+
+Important rules:
+- Do not create additional people.
+- Do not change or merge identities.
+- Do not distort faces.
+- Ensure all individuals are clearly visible.
+
+Style:
+Professional conference group photo, realistic lighting, high resolution, sharp focus, cohesive composition.</textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="gemini-api-key">Gemini API Key <span class="required">*</span></label>
+                                    <input type="text" id="gemini-api-key" name="gemini_api_key"
+                                        placeholder="Enter Gemini API key" data-rules="required" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Chatbot Status</label>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="chatbot-active" name="active" value="1" checked style="display: none;">
+                                        <label for="chatbot-active" class="toggle-label">
+                                            <span class="toggle-slider"></span>
+                                            <span class="toggle-text" data-active="Active" data-inactive="Inactive">Active</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Media & Assets -->
+                        <div class="form-section">
+                            <h3 class="form-section-title">Media & Assets</h3>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="background-image">Background Image <span class="required">*</span></label>
+                                    <div class="file-upload background-upload">
+                                        <input type="file" id="background-image" name="background_image"
+                                            accept="image/*" style="display: none;">
+                                        <div class="file-upload-icon"><span class="material-symbols-outlined">image</span></div>
+                                        <div class="file-upload-text">Click or drag image here</div>
+                                        <div class="file-upload-hint">Recommended: 1920x1080px, PNG or JPG</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label class="guest-list-title">Guest List</label>
+                                    <small class="guest-list-subtitle">Add guests using either method below.</small>
+
+                                    <div class="guest-method-card">
+                                        <div class="guest-method-header">
+                                            <strong>1) Add guests one by one</strong>
+                                            <button type="button" id="add-guest-btn" class="btn btn-secondary btn-sm">
+                                                <i class="fas fa-plus"></i> Add Guest
+                                            </button>
+                                        </div>
+                                        <div id="manual-guests-container" class="manual-guests-container"></div>
+                                    </div>
+
+                                    <div class="guest-method-card">
+                                        <strong class="guest-method-heading">2) Import from Excel</strong>
+
+                                        <div class="file-upload guest-import-upload">
+                                            <input type="file" id="guest-list" name="guest_list" accept=".xlsx,.csv" style="display: none;">
+                                            <div class="file-upload-icon"><span class="material-symbols-outlined">description</span></div>
+                                            <div class="file-upload-text">Click or drag guest Excel/CSV here</div>
+                                            <div class="file-upload-hint">Excel/CSV should include a guest name column (image names are optional)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="form-actions form-actions-chatbot">
+                            <a href="chatbot-list.html" class="btn btn-secondary">Cancel</a>
+                            <button type="reset" class="btn btn-secondary btn-reset-chatbot">Reset</button>
+                            <button type="submit" class="btn btn-primary btn-lg btn-create-chatbot">
+                                <span class="material-symbols-outlined icon-inline">auto_awesome</span>Create Chatbot
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -14,10 +14,10 @@ import uuid
 from openpyxl import load_workbook
 
 try:
-    from models import db, Chatbot, Guest, Message, AdminNotification
+    from models import db, Chatbot, Guest, Message
     from routes.auth import token_required, admin_required
 except ImportError:
-    from backend.models import db, Chatbot, Guest, Message, AdminNotification
+    from backend.models import db, Chatbot, Guest, Message
     from backend.routes.auth import token_required, admin_required
 
 chatbot_bp = Blueprint('chatbot', __name__)
@@ -480,15 +480,6 @@ def create_chatbot(user):
                 photo=photo_path
             )
             db.session.add(guest)
-
-        notification = AdminNotification(
-            title='New chatbot created',
-            message=f'"{chatbot.name}" for event "{chatbot.event_name}" was created.',
-            entity_type='chatbot',
-            entity_id=chatbot.id,
-            is_read=False
-        )
-        db.session.add(notification)
 
         db.session.commit()
         created_successfully = True

@@ -8,6 +8,7 @@ from datetime import datetime
 import base64
 import json
 import os
+import time
 from pathlib import Path
 import re
 import requests
@@ -15,7 +16,7 @@ import uuid
 from werkzeug.utils import secure_filename
 
 try:
-    from models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification, DriveImageBackup
+    from models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, DriveImageBackup
     from routes.auth import token_required
     from services.google_drive_service import (
         GoogleDriveServiceError,
@@ -23,7 +24,7 @@ try:
         upload_image_to_folder,
     )
 except ImportError:
-    from backend.models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, AdminNotification, DriveImageBackup
+    from backend.models import db, Chatbot, Message, ChatbotParticipant, User, Conversation, Guest, DriveImageBackup
     from backend.routes.auth import token_required
     from backend.services.google_drive_service import (
         GoogleDriveServiceError,
@@ -66,6 +67,23 @@ MIME_TO_EXTENSION = {
 
 def _is_limited_image_generation_user(user):
     return str(getattr(user, 'role', '') or '').strip().lower() == 'user'
+
+
+def _do_gemini_post(endpoint, payload, timeout, retries=3, backoff=1.5):
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.post(endpoint, json=payload, timeout=timeout)
+            return response
+        except requests.exceptions.RequestException as exc:
+            last_exc = exc
+            if attempt == retries:
+                raise
+            sleep_time = backoff * (2 ** (attempt - 1))
+            current_app.logger.warning(
+                f"Gemini request timeout or network error (attempt {attempt}/{retries}), retrying in {sleep_time}s: {exc}"
+            )
+            time.sleep(sleep_time)
 
 
 def _count_generated_images_for_user(user_id):
@@ -607,22 +625,31 @@ def _generate_image_with_genai(chatbot, user, user_text, image_payloads=None, ge
             })
 
     endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_IMAGE_MODEL}:generateContent?key={api_key}"
-    response = requests.post(
-        endpoint,
-        json={
-            'contents': [{
-                'role': 'user',
-                'parts': parts
-            }],
-            'generationConfig': {
-                'temperature': 0.2,
-                'topP': 0.9,
-                'maxOutputTokens': 1024,
-                'responseModalities': ['IMAGE', 'TEXT']
-            }
-        },
-        timeout=60
-    )
+    timeout_value = float(current_app.config.get('GEMINI_REQUEST_TIMEOUT', 90))
+    retries = int(current_app.config.get('GEMINI_REQUEST_RETRIES', 3))
+
+    payload = {
+        'contents': [{
+            'role': 'user',
+            'parts': parts
+        }],
+        'generationConfig': {
+            'temperature': 0.2,
+            'topP': 0.9,
+            'maxOutputTokens': 1024,
+            'responseModalities': ['IMAGE', 'TEXT']
+        }
+    }
+
+    try:
+        response = _do_gemini_post(endpoint, payload, timeout=timeout_value, retries=retries)
+    except requests.exceptions.ReadTimeout as rt:
+        raise RuntimeError(
+            f'Gemini image generation timed out after {timeout_value}s and {retries} tries: {rt}'
+        )
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError(f'Gemini image generation request failed: {exc}')
+
 
     if response.status_code >= 400:
         try:
@@ -986,17 +1013,8 @@ def submit_image_contact(user, chatbot_id):
         f'Image URL: {image_url}'
     )
     if conversation_id:
-        notification_message += f'\nConversation ID: {conversation_id}'
+        pass
 
-    notification = AdminNotification(
-        title='Generated image details submitted',
-        message=notification_message,
-        entity_type='image_contact',
-        entity_id=chatbot.id,
-        is_read=False,
-    )
-
-    db.session.add(notification)
     db.session.commit()
 
     return jsonify({
@@ -1163,7 +1181,7 @@ def create_conversation(user, chatbot_id):
         return jsonify({'success': False, 'message': 'Not joined this chatbot'}), 403
 
     data = request.get_json(silent=True) or {}
-    title = str(data.get('title', '')).strip() or 'New chat'
+    title = str(data.get('title', '')).strip() or datetime.now().strftime('%Y-%m-%d')
 
     conversation = Conversation(
         chatbot_id=chatbot_id,
@@ -1326,7 +1344,7 @@ def send_message(user, chatbot_id):
         conversation = Conversation(
             chatbot_id=chatbot_id,
             user_id=user.id,
-            title='New chat',
+            title=datetime.now().strftime('%Y-%m-%d'),
             updated_at=datetime.utcnow(),
         )
         db.session.add(conversation)

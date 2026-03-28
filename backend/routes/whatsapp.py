@@ -61,7 +61,8 @@ def _is_template_param_mismatch_error(exc: WhatsAppServiceError) -> bool:
     code = None
     if isinstance(error_obj, dict):
         code = error_obj.get("code")
-    return code == 132000 or "132000" in str(exc.message or "")
+    # Meta codes: 132000 (Param mismatch), 100 (Invalid parameter)
+    return code in (100, 132000) or "132000" in str(exc.message or "") or "parameter" in str(exc.message or "").lower()
 
 
 def _is_path_within(candidate_path: Path, root_path: Path) -> bool:

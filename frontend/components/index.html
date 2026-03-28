@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Professional Conference Chatbot Management System">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Conference Chatbot Management System - Login</title>
+
+    <!-- CSS - Correct relative paths -->
+    <link rel="stylesheet" href="css/style.css?v=4">
+    <link rel="stylesheet" href="css/user.css?v=5">
+
+    <!-- Favicon -->
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="login-page-body">
+    <div class="login-page">
+        <!-- Skip to main content (accessibility) -->
+        <a href="#login-form" class="skip-link">Skip to login form</a>
+
+        <!-- Background Bubbles -->
+        <div class="bubbles-container">
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+        </div>
+
+        <!-- Login Form Section -->
+        <section class="login-form-section" aria-label="Login form section">
+            <div class="login-form-container">
+                <form class="login-form" id="login-form" data-form="login" novalidate>
+                    <!-- Username -->
+                    <div class="login-form-group">
+                        <label for="username">Username <span aria-label="required">*</span></label>
+                        <input type="text" id="username" name="username" placeholder="e.g., admin or user" required
+                            aria-required="true" aria-describedby="username-error" autocomplete="username">
+                        <span id="username-error" class="form-error"></span>
+                    </div>
+
+                    <div id="password-login-fields" class="login-auth-panel is-active" aria-hidden="false">
+
+                    <!-- Password -->
+                    <div class="login-form-group">
+                        <label for="password">Password <span aria-label="required">*</span></label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="password" name="password" placeholder="Enter your password"
+                                required aria-required="true" aria-describedby="password-error"
+                                autocomplete="current-password">
+                            <button type="button" class="password-toggle" id="password-toggle"
+                                aria-label="Show password" tabindex="0">
+                                <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+                            </button>
+                        </div>
+                        <span id="password-error" class="form-error"></span>
+                    </div>
+
+                    <!-- Remember & Forgot -->
+                    <div class="login-form-options">
+                        <label class="checkbox">
+                            <input type="checkbox" name="remember">
+                            <span>Remember me</span>
+                        </label>
+                    </div>
+
+                    </div>
+
+                    <div id="otp-login-fields" class="login-auth-panel otp-login-fields" aria-hidden="true">
+                        <div class="otp-actions-row otp-actions-row-single">
+                            <button type="button" id="otp-request-btn" class="btn btn-secondary">Send OTP</button>
+                        </div>
+                        <div class="login-form-group otp-entry-group" id="otp-entry-group">
+                            <label for="otp-code">One-Time Password <span aria-label="required">*</span></label>
+                            <input type="text" id="otp-code" name="otp" inputmode="numeric" maxlength="6"
+                                placeholder="Enter 6-digit OTP" autocomplete="one-time-code" aria-describedby="otp-error">
+                            <span id="otp-error" class="form-error"></span>
+                        </div>
+                        <div class="otp-status-row">
+                            <small id="otp-meta" class="form-help"></small>
+                            <small id="otp-timer" class="form-help"></small>
+                        </div>
+                        <div class="otp-actions-row">
+                            <button type="button" id="otp-resend-btn" class="btn btn-secondary" disabled>Resend OTP</button>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-primary btn-lg login-form-btn" id="login-submit-btn" aria-busy="false">
+                        <span class="btn-text">Sign In</span>
+                        <span class="btn-loader">
+                            <span class="spinner"></span>
+                        </span>
+                    </button>
+
+                    <div class="login-secondary-actions">
+                        <a href="forgot-password.html" class="login-secondary-btn login-secondary-btn-forgot" id="forgot-password-link" tabindex="0">
+                            <i class="fas fa-key" aria-hidden="true"></i>
+                            <span>Forgot password</span>
+                        </a>
+                        <button type="button" id="otp-login-link" class="login-secondary-btn login-secondary-btn-otp">
+                            <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                            <span>Sign in with OTP</span>
+                        </button>
+                        <button type="button" id="password-login-link" class="login-secondary-btn login-secondary-btn-back">
+                            <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                            <span>Back</span>
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <!-- Scripts - Load at end for performance -->
+    <script src="js/utils.js?v=8" defer></script>
+    <script src="js/main.js?v=10" defer></script>
+
+    <!-- Inline script for password visibility toggle -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const toggle = document.getElementById('password-toggle');
+            const passwordInput = document.getElementById('password');
+
+            if (toggle && passwordInput) {
+                toggle.addEventListener('click', function () {
+                    const isPassword = passwordInput.type === 'password';
+                    passwordInput.type = isPassword ? 'text' : 'password';
+
+                    const icon = this.querySelector('.material-symbols-outlined');
+                    if (icon) {
+                        icon.textContent = isPassword ? 'visibility_off' : 'visibility';
+                    }
+
+                    this.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+                });
+            }
+        });
+    </script>
+
+    <noscript>
+        <p style="padding: 20px; background: #ff6b6b; color: white; border-radius: 8px; margin: 20px;">
+            This application requires JavaScript to be enabled. Please enable JavaScript in your browser settings.
+        </p>
+    </noscript>
+</body>
+
+</html>

@@ -409,15 +409,6 @@ class AdminPanel {
     if (!stats) return;
   }
 
-  async loadSidebarCounts() {
-    try {
-      const response = await API.get("/api/admin/dashboard/stats");
-      this.updateSidebarBadges(response.data);
-    } catch (error) {
-      console.error("Error loading sidebar counts:", error);
-    }
-  }
-
   startSidebarBadgeRefresh() {
     this.loadSidebarCounts();
 

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - Conference Chatbot System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/user.css?v=3">
+    <link rel="stylesheet" href="../css/chat.css?v=41">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../js/utils.js?v=3"></script>
+        <script src="../js/main.js?v=33"></script>
+</head>
+<body>
+    <div class="user-container">
+        <!-- Header -->
+        <header class="user-header">
+            <div class="user-header-content">
+                <button type="button" id="chat-history-toggle" class="chat-history-toggle-btn" aria-label="Toggle conversation history" aria-expanded="false">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+                <div class="user-logo">
+                    <div class="chat-top-logo" id="chatbot-top-avatar" aria-hidden="true">C</div>
+                    <span id="chatbot-top-title">ConvergeAI</span>
+                </div>
+
+                <nav class="user-nav">
+                    <div class="header-user-menu">
+                        <button class="header-user-btn">
+                            <span class="chat-top-user-avatar" data-user-avatar>U</span>
+                            <span class="material-symbols-outlined chat-user-chevron" aria-hidden="true">expand_more</span>
+                        </button>
+                        <div class="dropdown-menu chat-header-dropdown">
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> Profile</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <div class="chat-main app-container">
+            <aside id="sidebar" class="chat-conversations sidebar expanded" aria-label="Conversations">
+                <div class="chat-conversations-header top-bar">
+                    <span class="chat-conversations-title chat-title text">Chats</span>
+                    <button type="button" id="toggleSidebar" class="chat-history-close-btn" aria-label="Collapse sidebar" title="Collapse sidebar">
+                        <span class="material-symbols-outlined">menu</span>
+                    </button>
+                    <button type="button" id="new-chat-btn" title="New Chat" data-tooltip="New Chat" class="new-chat-btn" aria-label="Create new conversation">
+                        <span class="material-symbols-outlined">edit_square</span>
+                        <span class="new-chat-btn-label text">New Chat</span>
+                    </button>
+                </div>
+                <div class="chat-conversations-list" id="chat-conversations-list">
+                    <!-- Skeleton loaders for conversations -->
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    <div class="skeleton-conversation"></div>
+                    
+                    <div class="chat-conversations-empty">No conversations yet. Start a new chat!</div>
+                </div>
+                <div class="chat-usage-panel" id="chat-usage-panel" aria-live="polite">
+                    <div class="chat-usage-title">Workspace usage</div>
+                    <div class="chat-usage-group">
+                        <div class="chat-usage-row">
+                            <span>Image generations</span>
+                            <span id="chat-usage-steps-label">0 / 3</span>
+                        </div>
+                        <div class="chat-usage-bar">
+                            <span id="chat-usage-steps-bar"></span>
+                        </div>
+                    </div>
+                    <div class="chat-usage-note" id="chat-usage-note">Resets based on your plan.</div>
+                </div>
+            </aside>
+
+            <div class="chat-history-backdrop" id="chat-history-backdrop" aria-hidden="true"></div>
+
+            <main id="chat-area" class="chat-wrapper chat-area">
+
+                <!-- Messages Area -->
+                <div class="messages-area">
+                    <!-- Skeleton loaders for messages -->
+                    <div class="skeleton-message assistant">
+                        <div class="skeleton-message-bubble"></div>
+                    </div>
+                    <div class="skeleton-message user">
+                        <div class="skeleton-message-bubble"></div>
+                    </div>
+                    <div class="skeleton-message assistant">
+                        <div class="skeleton-message-bubble"></div>
+                    </div>
+                    
+                    <div class="message-group assistant">
+                        <div class="message-bubble">
+                            <div class="message-text">Loading chat history...</div>
+                            <div class="message-time">--:--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area">
+                    <div class="chat-composer">
+                        <div class="composer-preview-row" id="composer-preview-row">
+                            <div class="file-preview" id="chat-file-preview"></div>
+                        </div>
+                        <div class="composer-input-row">
+                                                <div class="composer-left-controls">
+                                                <div class="attach-wrap">
+                          <button class="input-action-btn input-plus-btn" id="chat-attach-btn" aria-haspopup="true" aria-expanded="false" title="Attachments">
+                              <span class="material-symbols-outlined">add</span>
+                          </button>
+
+                          <div class="attach-menu" id="chat-attach-menu" aria-hidden="true">
+                              <button type="button" class="attach-option" id="chat-attach-upload">
+                                  <span class="material-symbols-outlined">attach_file</span>
+                                  <span class="attach-text">Upload image</span>
+                              </button>
+                              <button type="button" class="attach-option" id="chat-attach-camera">
+                                  <span class="material-symbols-outlined">photo_camera</span>
+                                  <span class="attach-text">Take photo</span>
+                              </button>
+                          </div>
+                        </div>
+                        <div class="chat-mode-wrap">
+                            <button class="input-action-btn chat-mode-btn" id="chat-mode-btn" aria-haspopup="true" aria-expanded="false" title="Modes">
+                                <span class="material-symbols-outlined">tune</span>
+                            </button>
+                            <div class="chat-mode-menu" id="chat-mode-menu" aria-hidden="true">
+                                <button type="button" class="chat-mode-option" data-mode="guest" title="Guest mode" aria-label="Guest mode">
+                                    <img class="chat-mode-icon-img" src="/uploads/guest_icon.jpg" alt="Guest icon" onerror="this.onerror=null;this.src='../assets/images/guest-mode-icon.svg';">
+                                    <span class="material-symbols-outlined" aria-hidden="true">person</span>
+                                    <span class="chat-mode-text">Guest</span>
+                                </button>
+                                <button type="button" class="chat-mode-option" data-mode="single" title="Single person mode" aria-label="Single person mode">
+                                    <span class="material-symbols-outlined">account_circle</span>
+                                    <span class="chat-mode-text">Single Person</span>
+                                </button>
+                                <button type="button" class="chat-mode-option" data-mode="multiple" title="Multiple person mode" aria-label="Multiple person mode">
+                                    <span class="material-symbols-outlined">groups</span>
+                                    <span class="chat-mode-text">Multiple Person</span>
+                                </button>
+                            </div>
+                        </div>
+                        </div>
+
+                        <div class="input-wrapper">
+                            <textarea class="input-field" placeholder="Message ConvergeAI..." rows="1"></textarea>
+                        </div>
+
+                        <div class="composer-right-actions">
+                            <!-- mic removed per design -->
+                            <button class="send-btn" title="Send message">
+                                <span class="material-symbols-outlined">arrow_upward</span>
+                            </button>
+                        </div>
+                        </div>
+
+                        <input type="file" id="chat-image-input" class="chat-hidden-file-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" multiple aria-label="Upload image">
+                    </div>
+                    <div class="chat-guest-selector-panel" id="chat-guest-selector-panel" aria-hidden="true">
+                        <div class="chat-guest-selector-list" id="chat-guest-selector-list"></div>
+                    </div>
+                    <p class="chat-input-info">Image responses may take a few seconds to generate.</p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- camera modal for capturing photos -->
+    <div class="camera-modal" id="chat-camera-modal" aria-hidden="true">
+        <div class="camera-modal-content">
+            <div class="camera-modal-topbar">
+                <button type="button" id="chat-camera-back" class="camera-icon-btn camera-back-btn" aria-label="Back to chat">
+                    <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+                    <span>Back to chat</span>
+                </button>
+            </div>
+            <div class="camera-modal-instructions">Please make sure you're photographing a person before capturing.</div>
+            <video id="chat-camera-video" autoplay playsinline></video>
+            <canvas id="chat-camera-canvas"></canvas>
+            <div class="camera-actions">
+                <button type="button" id="chat-camera-switch" class="camera-icon-btn" aria-label="Switch camera">
+                    <span class="material-symbols-outlined" aria-hidden="true">cameraswitch</span>
+                    <span>Switch</span>
+                </button>
+                <button type="button" id="chat-camera-capture" class="camera-icon-btn camera-capture-btn" aria-label="Capture image">
+                    <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
+                    <span>Capture</span>
+                </button>
+                <button type="button" id="chat-camera-close" class="camera-icon-btn" aria-label="Close camera">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                    <span>Close</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-contact-modal" id="chat-contact-modal" aria-hidden="true">
+        <div class="chat-contact-modal-card">
+            <h3 class="chat-contact-title">Send Your Details</h3>
+            <p class="chat-contact-subtitle">Share your details to receive this generated image on WhatsApp.</p>
+            <form id="chat-contact-form" class="chat-contact-form" novalidate>
+                <div class="chat-contact-field">
+                    <label for="chat-contact-name">Name</label>
+                    <input type="text" id="chat-contact-name" name="name" placeholder="Enter your full name" autocomplete="name" required>
+                    <p class="chat-contact-error" id="chat-contact-name-error" aria-live="polite"></p>
+                </div>
+
+                <div class="chat-contact-field">
+                    <label for="chat-contact-whatsapp">WhatsApp Number</label>
+                    <div class="chat-contact-phone-group">
+                        <input type="text" id="chat-contact-country-code" name="country_code" class="chat-contact-phone-prefix" inputmode="numeric" maxlength="5" placeholder="+91" value="+91" autocomplete="tel-country-code" required>
+                        <input type="tel" id="chat-contact-whatsapp" name="whatsapp" inputmode="numeric" pattern="[0-9]{6,12}" maxlength="12" placeholder="Enter mobile number" autocomplete="tel-national" required>
+                    </div>
+                    <p class="chat-contact-helper-text">Edit country code (for example +1, +44, +971) and enter the mobile number.</p>
+                    <p class="chat-contact-error" id="chat-contact-whatsapp-error" aria-live="polite"></p>
+                </div>
+
+                <div class="chat-contact-meta" id="chat-contact-meta"></div>
+
+                <div class="chat-contact-actions">
+                    <button type="button" id="chat-contact-cancel" class="btn btn-secondary chat-contact-cancel-btn">Cancel</button>
+                    <button type="submit" id="chat-contact-submit" class="btn btn-primary chat-contact-submit-btn" disabled>Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="chat-image-lightbox" id="chat-image-lightbox" aria-hidden="true">
+        <div class="chat-image-lightbox-card">
+            <button type="button" id="chat-image-lightbox-close" class="chat-image-lightbox-close" aria-label="Close full screen image">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <img id="chat-image-lightbox-preview" class="chat-image-lightbox-preview" src="" alt="Full screen preview">
+            <div class="chat-image-lightbox-actions">
+                <button type="button" id="chat-image-lightbox-send" class="chat-image-lightbox-send" aria-label="Send details from image preview">
+                    <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                    <span>Send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

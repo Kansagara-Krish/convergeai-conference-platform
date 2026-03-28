@@ -144,6 +144,7 @@ def _create_and_send_login_otp(user):
     try:
         from services.whatsapp_service import send_whatsapp_text
         if otp_template_name:
+            # Primary path: template-based OTP for structured messaging and better delivery.
             send_whatsapp_text_template(
                 to_number=user.whatsapp_number,
                 template_name=otp_template_name,
@@ -154,16 +155,38 @@ def _create_and_send_login_otp(user):
             # Fallback to free-form text message if no dedicated OTP template is configured.
             send_whatsapp_text(
                 to_number=user.whatsapp_number,
-                text=f"Your ConvergeAI login OTP is {otp_code}. It expires in 60 seconds."
+                text=f"Your ConvergeAI login OTP is {otp_code}. It expires in {LOGIN_OTP_EXPIRY_SECONDS} seconds."
             )
     except WhatsAppServiceError as exc:
+        # If template send fails, attempt free-form text as second chance
+        if otp_template_name:
+            try:
+                send_whatsapp_text(
+                    to_number=user.whatsapp_number,
+                    text=f"Your ConvergeAI login OTP is {otp_code}. It expires in {LOGIN_OTP_EXPIRY_SECONDS} seconds."
+                )
+            except WhatsAppServiceError as exc2:
+                exc = exc2
+        
         otp_record.is_used = True
         db.session.commit()
         
+        # Log the exact WhatsApp failure so operators can diagnose 10054/502 events.
+        current_app.logger.warning(
+            'WhatsApp login OTP send failed for user %s: %s (status %s)',
+            user.username,
+            exc.message,
+            getattr(exc, 'status_code', None),
+        )
+
         # Friendly error message for free-form fallback 24h window issue
         error_msg = exc.message or 'Failed to send OTP on WhatsApp'
-        if not otp_template_name and "more than 24 hours" in error_msg.lower():
+        if "more than 24 hours" in error_msg.lower():
             error_msg = "Cannot send OTP because you haven't messaged the bot recently. Please reply to the bot on WhatsApp and try again, or configure WHATSAPP_LOGIN_OTP_TEMPLATE_NAME."
+
+        # When backend is overloaded or API connection reset is frequent, direct user to retry after 30 secs.
+        if exc.status_code in (502, 503, 504) or 'connection reset' in error_msg.lower():
+            error_msg = "Temporary WhatsApp service issue (network/server). Please wait 30 seconds and try again."
 
         return None, {
             'status_code': exc.status_code if getattr(exc, 'status_code', None) else 502,

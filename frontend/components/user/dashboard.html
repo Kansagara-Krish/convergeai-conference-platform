@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/user.css?v=3">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../js/utils.js?v=2"></script>
+    <script src="../js/main.js?v=4"></script>
+</head>
+
+<body>
+    <div class="user-container">
+        <!-- Header -->
+        <header class="user-header">
+            <div class="user-header-content">
+                <div class="user-logo">
+                    <div class="chat-top-logo"><span class="material-symbols-outlined">smart_toy</span></div>
+                    <span id="chatbot-top-title">ConvergeAI</span>
+                </div>
+
+                <nav class="user-nav">
+                    <div class="header-user-menu">
+                        <button class="header-user-btn" type="button" aria-label="Open account menu">
+                            <span class="chat-top-user-avatar" data-user-avatar>U</span>
+                            <span class="material-symbols-outlined chat-user-chevron" aria-hidden="true">expand_more</span>
+                        </button>
+                        <div class="dropdown-menu chat-header-dropdown">
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> Profile</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i>
+                                Logout</a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="user-main">
+            <!-- Hero Section -->
+            <div class="dashboard-hero">
+                <h1 class="dashboard-hero-title">Welcome to Conference Chatbot Platform</h1>
+                <p class="dashboard-hero-subtitle">Connect with experts, join discussions, and experience intelligent
+                    conversations powered by AI</p>
+                <div class="dashboard-search" style="margin-top: var(--spacing-xl);">
+                    <div class="dashboard-search-input">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" placeholder="Search for events or chatbots...">
+                    </div>
+                    <div class="dashboard-filters">
+                        <select class="btn-ghost" style="padding: var(--spacing-md); border-radius: var(--radius-md);">
+                            <option>All Events</option>
+                            <option>Active Only</option>
+                            <option>Upcoming</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Chatbots -->
+            <section>
+                <h2 style="margin-bottom: var(--spacing-xl); margin-top: var(--spacing-2xl);">Available Chatbots</h2>
+                <div class="chatbot-grid"></div>
+            </section>
+
+            <!-- Empty State (hidden by JS) -->
+            <div class="empty-state" style="display: none;">
+                <div class="empty-state-icon"><i class="fas fa-search"></i></div>
+                <h3 class="empty-state-title">No Chatbots Found</h3>
+                <p class="empty-state-text">There are no available chatbots at the moment. Please check back later.</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

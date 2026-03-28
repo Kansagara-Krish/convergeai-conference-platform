@@ -18,6 +18,10 @@ class ForgotPasswordHandler {
 
     this.resendTimer = null;
     this.secondsLeft = 0;
+    this.otpInputGroup = this.otpInput?.closest(".login-form-group");
+    this.newPasswordGroup = this.newPasswordInput?.closest(".login-form-group");
+    this.confirmPasswordGroup =
+      this.confirmPasswordInput?.closest(".login-form-group");
 
     this.init();
   }
@@ -35,43 +39,6 @@ class ForgotPasswordHandler {
 
       event.preventDefault();
       this.submitActiveStep();
-    });
-
-    // Add direct Enter key handlers to request step inputs
-    this.usernameInput?.addEventListener("keypress", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        this.requestOtp(false);
-      }
-    });
-
-    this.emailInput?.addEventListener("keypress", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        this.requestOtp(false);
-      }
-    });
-
-    // Add direct Enter key handlers to reset step inputs
-    this.otpInput?.addEventListener("keypress", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        this.resetPassword();
-      }
-    });
-
-    this.newPasswordInput?.addEventListener("keypress", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        this.resetPassword();
-      }
-    });
-
-    this.confirmPasswordInput?.addEventListener("keypress", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        this.resetPassword();
-      }
     });
 
     this.sendOtpBtn?.addEventListener("click", () => this.requestOtp(false));
@@ -160,11 +127,19 @@ class ForgotPasswordHandler {
       this.resendTimer = null;
     }
 
+    // Ensure user can verify while timer is active
+    this.resetPasswordBtn.disabled = false;
+    this.otpInput.disabled = false;
+    this.restoreOtpRowVisibility();
+
     const tick = () => {
       if (this.secondsLeft <= 0) {
         this.resendOtpBtn.disabled = false;
         if (this.otpTimerEl)
-          this.otpTimerEl.textContent = "You can resend OTP now";
+          this.otpTimerEl.textContent = "OTP expired. Please resend OTP.";
+
+        this.markOtpExpired();
+
         clearInterval(this.resendTimer);
         this.resendTimer = null;
         return;
@@ -182,6 +157,30 @@ class ForgotPasswordHandler {
 
   validateEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+  }
+
+  markOtpExpired() {
+    if (this.otpInputGroup) this.otpInputGroup.style.display = "none";
+    if (this.otpInput) {
+      this.otpInput.value = "";
+      this.otpInput.disabled = true;
+    }
+    if (this.resetPasswordBtn) this.resetPasswordBtn.disabled = true;
+
+    if (this.otpBanner) {
+      this.otpBanner.textContent = "OTP expired. Please resend OTP.";
+      this.otpBanner.style.color = "var(--danger)";
+    }
+  }
+
+  restoreOtpRowVisibility() {
+    if (this.otpInputGroup) this.otpInputGroup.style.display = "";
+    if (this.otpInput) this.otpInput.disabled = false;
+    if (this.resetPasswordBtn) this.resetPasswordBtn.disabled = false;
+
+    if (this.otpBanner) {
+      this.otpBanner.style.color = "";
+    }
   }
 
   async requestOtp(isResend) {
@@ -212,6 +211,7 @@ class ForgotPasswordHandler {
       this.emailInput.readOnly = true;
 
       this.switchToResetStep(response?.message || "OTP sent to your email");
+      this.restoreOtpRowVisibility();
       this.startResendCountdown(response?.resend_in_seconds || 60);
       NotificationManager.success("OTP sent successfully");
     } catch (error) {

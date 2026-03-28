@@ -23,7 +23,7 @@ def _get_config_value(name: str, default: str = "") -> str:
 
 
 def _get_graph_api_base_url() -> str:
-    api_version = _get_config_value("WHATSAPP_API_VERSION", "v23.0")
+    api_version = _get_config_value("WHATSAPP_API_VERSION", "v21.0")
     return f"https://graph.facebook.com/{api_version}"
 
 
@@ -79,14 +79,13 @@ def _post_json(endpoint_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     headers = {
         "Authorization": f"Bearer {cfg['access_token']}",
         "Content-Type": "application/json",
-        "Connection": "close",
     }
 
     response = _post_with_retry(
         endpoint_url,
         headers=headers,
         json_payload=payload,
-        timeout=45,
+        timeout=60,
     )
 
     parsed_payload: Any
@@ -117,30 +116,51 @@ def _post_with_retry(
     files: Dict[str, Any] = None,
 ) -> requests.Response:
     """Retry transient network errors (connection reset, timeout, etc.)."""
-    max_attempts = 3
+    max_attempts = 5
     backoff_seconds = 0.8
     last_exception: Any = None
 
+    if "User-Agent" not in headers:
+        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
     for attempt in range(1, max_attempts + 1):
         try:
-            return requests.post(
+            response = requests.post(
                 endpoint_url,
                 headers=headers,
                 json=json_payload,
                 data=form_data,
                 files=files,
-                timeout=timeout,
+                timeout=timeout if timeout else 60,
             )
+
+            if response.status_code >= 500 and attempt < max_attempts:
+                # Retry transient server errors (502/503/504 etc.)
+                time.sleep(backoff_seconds * attempt)
+                continue
+
+            return response
+
         except requests.RequestException as exc:
             last_exception = exc
-            if attempt >= max_attempts:
-                break
-            time.sleep(backoff_seconds * attempt)
+            if attempt < max_attempts:
+                time.sleep(backoff_seconds * attempt)
+                continue
+            raise WhatsAppServiceError(
+                f"Unable to reach WhatsApp API: {exc}",
+                status_code=502,
+            ) from exc
+
+    if last_exception is not None:
+        raise WhatsAppServiceError(
+            f"Unable to reach WhatsApp API: {last_exception}",
+            status_code=502,
+        ) from last_exception
 
     raise WhatsAppServiceError(
-        f"Unable to reach WhatsApp API: {last_exception}",
+        "Unable to reach WhatsApp API: Unknown error",
         status_code=502,
-    ) from last_exception
+    )
 
 
 def _build_image_message_payload(to_number: str, image_payload: Dict[str, Any], caption: str = "") -> Dict[str, Any]:
@@ -174,8 +194,8 @@ def _build_image_message_payload(to_number: str, image_payload: Dict[str, Any], 
     
     username = str(caption).strip()
     if username:
-        # Note: If the template has NO body variables defined in Meta, passing a body parameter might cause an error.
-        # We assume the template was created with 1 body variable for the caption (e.g. {{1}}).
+        # Pass the caption as the first body variable.
+        # Note: If the template has NO body variables defined in Meta, this will result in error 100/132000.
         components.append({
             "type": "body",
             "parameters": [
@@ -247,7 +267,6 @@ def upload_whatsapp_media(file_path: str) -> Dict[str, Any]:
 
     headers = {
         "Authorization": f"Bearer {cfg['access_token']}",
-        "Connection": "close",
     }
 
     with open(normalized_path, "rb") as file_handle:
@@ -264,7 +283,7 @@ def upload_whatsapp_media(file_path: str) -> Dict[str, Any]:
             headers=headers,
             form_data=data,
             files=files,
-            timeout=90,
+            timeout=120,
         )
 
     try:
@@ -449,19 +468,14 @@ def send_whatsapp_template_image(
         }
     ]
 
-    username = ""
-    if body_variables and len(body_variables) > 0:
-        username = str(body_variables[0]).strip()
-
-    if username:
+    clean_body_vars = [str(item).strip() for item in (body_variables or []) if str(item).strip()]
+    if clean_body_vars:
         components.append(
             {
                 "type": "body",
                 "parameters": [
-                    {
-                        "type": "text",
-                        "text": username
-                    }
+                    {"type": "text", "text": body_var}
+                    for body_var in clean_body_vars
                 ],
             }
         )

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Excel - Conference Chatbot System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css?v=11">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../js/utils.js?v=11"></script>
+    <script src="../js/admin.js?v=12"></script>
+</head>
+
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="admin-sidebar-header">
+                    <div class="brand-icon"><i class="fas fa-robot"></i></div>
+                    <div>ConvergeAI</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-section">
+                    <div class="menu-label">Main</div>
+                    <a href="dashboard.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-chart-line"></i></span>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Chatbots</div>
+                    <a href="create-chatbot.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-plus-circle"></i></span>
+                        <span>Create Chatbot</span>
+                    </a>
+                    <a href="chatbot-list.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-list"></i></span>
+                        <span>All Chatbots</span>
+                        <span class="menu-badge">12</span>
+                    </a>
+                    <a href="guest-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-friends"></i></span>
+                        <span>Guest Management</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Users & Data</div>
+                    <a href="user-management.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-users-cog"></i></span>
+                        <span>Users</span>
+                        <span class="menu-badge">847</span>
+                    </a>
+                    <a href="import-excel.html" class="menu-item active">
+                        <span class="menu-icon"><i class="fas fa-file-import"></i></span>
+                        <span>Import Users</span>
+                    </a>
+                </div>
+
+                <div class="menu-section">
+                    <div class="menu-label">Settings</div>
+                    <a href="profile.html" class="menu-item">
+                        <span class="menu-icon"><i class="fas fa-user-tie"></i></span>
+                        <span>My Profile</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">A</div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrator</div>
+                    </div>
+                </div>
+                <div class="admin-sidebar-footer">
+                    <button class="btn btn-ghost" data-action="logout" style="width: 100%;"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-title">
+                    <h1>Import Users from Excel</h1>
+                </div>
+                <div class="header-actions">
+                    <div class="header-user-menu">
+                        <button class="header-user-btn">
+                            <span style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem;">A</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="profile.html" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                            <a href="profile.html#security-settings" class="dropdown-item"><i class="fas fa-lock"></i> Security</a>
+                            <a href="#" class="dropdown-item" data-action="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="admin-content">
+                <div class="form-layout">
+                    <!-- Instructions -->
+                    <div class="card mb-lg">
+                        <div class="card-body">
+                            <h3><i class="fas fa-clipboard-list"></i> Import Instructions</h3>
+                            <div class="import-column-guide">
+                                <div class="import-column-group required">
+                                    <div class="import-column-title"><i class="fas fa-check-circle"></i> Required Columns</div>
+                                    <div class="import-column-tags">
+                                        <span class="column-tag required">email</span>
+                                        <span class="column-tag required">username</span>
+                                        <span class="column-tag required">whatsapp_number</span>
+                                    </div>
+                                </div>
+                                <div class="import-column-group blocked">
+                                    <div class="import-column-title"><i class="fas fa-ban"></i> Do Not Include</div>
+                                    <div class="import-column-tags">
+                                        <span class="column-tag blocked">password</span>
+                                        <span class="column-tag blocked">role</span>
+                                        <span class="column-tag blocked">active</span>
+                                        <span class="column-tag blocked">name</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <ul class="import-instruction-list">
+                                <li>Upload an Excel file (.xlsx) using only the required columns shown above.</li>
+                                <li>Column order can be any sequence. Headers are matched by name (for example: <code>email</code>, <code>username</code>, <code>whatsapp_number</code>).</li>
+                                <li>For WhatsApp number, enter normal 10-digit Indian mobile numbers (example: <code>9876543210</code>). The system auto-adds <code>+91</code>.</li>
+                                <li>Duplicate emails are allowed and will be auto-adjusted by the system if needed. Usernames must be unique.</li>
+                                <li>System creates accounts and assigns default password <code>123</code>.</li>
+                                <li>Credentials are sent to each user's email address and can be downloaded/printed after import.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Import Form -->
+                    <form data-form="import-excel">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Upload File</h3>
+
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="excel-file">Excel File (.xlsx)</label>
+                                    <div class="file-upload">
+                                        <input type="file" id="excel-file" name="excel_file" accept=".xlsx"
+                                            style="display: none;" required>
+                                        <div class="file-upload-icon"><i class="fas fa-file-excel"></i></div>
+                                        <div class="file-upload-text">Click or drag Excel file here</div>
+                                        <div class="file-upload-hint">Maximum file size: 10 MB</div>
+                                    </div>
+                                    <div id="uploaded-user-count" class="import-preview" style="margin-top: 10px; display: none;"></div>
+                                </div>
+                            </div>
+
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="event-select">
+                                        Assign to Event
+                                    </label>
+                                    <select id="event-select" name="event_id" required>
+                                        <option value="" selected disabled>Select an event...</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="role-select">Default User Role</label>
+                                    <select id="role-select" name="default_role">
+                                        <option value="user">User</option>
+                                        <option value="volunteer">Volunteer</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <a href="user-management.html" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-file-import"></i> Import & Generate Credentials
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Previous Imports -->
+                <div class="card mt-2xl">
+                    <div class="card-header">
+                        <h2>Recent Imports</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Event</th>
+                                    <th>Users Imported</th>
+                                    <th>File</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-imports-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">No recent imports in this session.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
