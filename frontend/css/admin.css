@@ -388,7 +388,7 @@
   gap: 0;
 }
 
-.admin-container.sidebar-collapsed .admin-sidebar-header > div:not(.brand-icon),
+.admin-container.sidebar-collapsed .admin-sidebar-header>div:not(.brand-icon),
 .admin-container.sidebar-collapsed .menu-item span:not(.menu-icon),
 .admin-container.sidebar-collapsed .sidebar-footer .user-info {
   opacity: 0;
@@ -476,7 +476,7 @@
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 5000;
+  z-index: 20000 !important;
   background: rgba(15, 23, 42, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-top: none;
@@ -522,6 +522,7 @@
   color: #ffffff;
   transition: all 0.15s ease;
 }
+
 .users-search-suggestions button.users-search-suggestion:hover,
 .users-search-suggestions button.users-search-suggestion.active {
   background: rgba(148, 163, 184, 0.18);
@@ -532,7 +533,7 @@
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 1002;
+  z-index: 11000;
   background: rgba(15, 23, 42, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-top: none;
@@ -1160,35 +1161,54 @@
   pointer-events: none;
 }
 
-.admin-content.page-skeleton-loading .card > *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(p):not(.card-header),
-.admin-content.page-skeleton-loading .form-section > *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(p),
-.admin-content.page-skeleton-loading .table-container > *,
-.admin-content.page-skeleton-loading #chatbot-grid > *,
-.admin-content.page-skeleton-loading .stats-grid .stat-card > *,
-.admin-content.page-skeleton-loading .form-layout > *,
-.admin-content.page-skeleton-loading .analytics-filters > *,
-.admin-content.page-skeleton-loading .analytics-summary-card > *:not(h1):not(h2),
-.admin-content.page-skeleton-loading .analytics-chart-card > *,
-.admin-content.page-skeleton-loading .analytics-breakdown-card > *,
-.admin-content.page-skeleton-loading section > * {
+.admin-content.page-skeleton-loading .card>*:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(p):not(.card-header),
+.admin-content.page-skeleton-loading .form-section>*:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(p),
+.admin-content.page-skeleton-loading .table-container>*,
+.admin-content.page-skeleton-loading #chatbot-grid>*,
+.admin-content.page-skeleton-loading .stats-grid .stat-card>*,
+.admin-content.page-skeleton-loading .form-layout>*,
+.admin-content.page-skeleton-loading .analytics-filters>*,
+.admin-content.page-skeleton-loading .analytics-summary-card>*:not(h1):not(h2),
+.admin-content.page-skeleton-loading .analytics-chart-card>*,
+.admin-content.page-skeleton-loading .analytics-breakdown-card>*,
+.admin-content.page-skeleton-loading section>* {
   opacity: 0;
+  pointer-events: none;
+  /* Prevent interaction while hidden */
+}
+
+/* Allow buttons to stay visible even during loading as requested */
+.admin-content.page-skeleton-loading .card>.btn,
+.admin-content.page-skeleton-loading .card-header .btn,
+.admin-content.page-skeleton-loading .form-actions .btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.admin-content .card>*,
+.admin-content .form-section>*,
+.admin-content .table-container>*,
+.admin-content #chatbot-grid>*,
+.admin-content .stats-grid .stat-card>*,
+.admin-content .form-layout>*,
+.admin-content .analytics-filters>*,
+.admin-content .analytics-summary-card>*,
+.admin-content .analytics-chart-card>*,
+.admin-content .analytics-breakdown-card>*,
+.admin-content section>* {
   transition: opacity 0.5s ease-in-out;
 }
 
-.admin-content .card > *,
-.admin-content .form-section > *,
-.admin-content .table-container > *,
-.admin-content #chatbot-grid > *,
-.admin-content .stats-grid .stat-card > *,
-.admin-content .form-layout > *,
-.admin-content .analytics-filters > *,
-.admin-content .analytics-summary-card > *,
-.admin-content .analytics-chart-card > *,
-.admin-content .analytics-breakdown-card > *,
-.admin-content section > * {
-  transition: opacity 0.5s ease-in-out;
+.admin-header.page-skeleton-loading,
+.admin-sidebar.page-skeleton-loading,
+.admin-content.page-skeleton-loading {
+  position: relative;
+  pointer-events: none;
 }
 
+.admin-header.page-skeleton-loading::after,
+.admin-sidebar.page-skeleton-loading::after,
+.admin-content.page-skeleton-loading::after,
 .admin-content.page-skeleton-loading .card::after,
 .admin-content.page-skeleton-loading .form-section::after,
 .admin-content.page-skeleton-loading .table-container::after,
@@ -1201,29 +1221,31 @@
 .admin-content.page-skeleton-loading .analytics-breakdown-card::after {
   content: '';
   position: absolute;
-  top: var(--spacing-lg);
-  left: var(--spacing-lg);
-  right: var(--spacing-lg);
-  bottom: var(--spacing-lg);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius-md);
-  z-index: 4;
+  z-index: 9999;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)) 0 0 / 180px 24px no-repeat,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)) 0 40px / 100% 1px no-repeat,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)) 0 58px / 100% 20px no-repeat,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)) 0 88px / 88% 20px no-repeat,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)) 0 118px / 78% 20px no-repeat;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.06)) 0 0 / 180px 24px no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.06)) 0 40px / 100% 1px no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.06)) 0 58px / 100% 20px no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.06)) 0 88px / 88% 20px no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.06)) 0 118px / 78% 20px no-repeat;
   animation: skeletonPulse 1.4s ease-in-out infinite;
 }
 
 /* Header Skeleton Loading */
 .admin-header.page-skeleton-loading .header-title h1 {
-  opacity: 0;
-  width: 220px;
-  height: 28px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
-  border-radius: 6px;
-  animation: skeletonPulse 1.4s ease-in-out infinite;
+  opacity: 1;
+  /* Was 0, ensure text stays visible */
+  color: var(--text-primary) !important;
+  background: none;
+  /* Remove skeleton background */
+  width: auto;
+  height: auto;
+  animation: none;
 }
 
 .admin-header .header-title h1 {
@@ -1231,9 +1253,12 @@
 }
 
 .admin-header.page-skeleton-loading .header-user-btn span {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)) !important;
-  color: transparent !important;
-  animation: skeletonPulse 1.4s ease-in-out infinite;
+  opacity: 1 !important;
+  color: #fff !important;
+  /* Keep initial visible */
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)) !important;
+  /* Keep original bg */
+  animation: none;
 }
 
 .admin-header .header-user-btn span {
@@ -1258,11 +1283,20 @@
   pointer-events: none;
 }
 
-.admin-sidebar.page-skeleton-loading .menu-item > *,
+.admin-sidebar.page-skeleton-loading .menu-item>*,
 .admin-sidebar.page-skeleton-loading .menu-label,
-.admin-sidebar.page-skeleton-loading .sidebar-user > *,
-.admin-sidebar.page-skeleton-loading .sidebar-footer .btn > * {
+.admin-sidebar.page-skeleton-loading .sidebar-user>* {
   opacity: 0;
+}
+
+.admin-sidebar.page-skeleton-loading .sidebar-footer .btn>* {
+  opacity: 1;
+  /* Keep logout text/icon visible */
+}
+
+.admin-sidebar.page-skeleton-loading .sidebar-footer .btn {
+  pointer-events: auto;
+  /* Allow logout during load */
 }
 
 .admin-sidebar.page-skeleton-loading .menu-item::before,
@@ -1549,7 +1583,7 @@
   pointer-events: none;
 }
 
-.admin-content.page-skeleton-loading .analytics-summary-card > * {
+.admin-content.page-skeleton-loading .analytics-summary-card>* {
   opacity: 0;
 }
 
@@ -1568,7 +1602,7 @@
   animation: skeletonPulse 1.4s ease-in-out infinite;
 }
 
-.admin-content .analytics-summary-card > * {
+.admin-content .analytics-summary-card>* {
   transition: opacity 0.5s ease-in-out;
 }
 
@@ -2162,7 +2196,7 @@
   line-height: 1.5;
 }
 
-.import-preview p + p {
+.import-preview p+p {
   margin-top: var(--spacing-xs);
 }
 
@@ -2551,7 +2585,7 @@ table[data-table="users"] .table-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .admin-content > *,
+  .admin-content>*,
   .card,
   .table-container,
   .form-section,
@@ -3145,11 +3179,11 @@ table[data-table="users"] .table-actions {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-input[type="checkbox"][name="active"]:checked + .toggle-label .toggle-slider {
+input[type="checkbox"][name="active"]:checked+.toggle-label .toggle-slider {
   background-color: var(--accent-green, #4fc3f7);
 }
 
-input[type="checkbox"][name="active"]:checked + .toggle-label .toggle-slider::after {
+input[type="checkbox"][name="active"]:checked+.toggle-label .toggle-slider::after {
   left: 24px;
 }
 
@@ -3159,7 +3193,7 @@ input[type="checkbox"][name="active"]:checked + .toggle-label .toggle-slider::af
   color: var(--text-secondary);
 }
 
-input[type="checkbox"][name="active"]:checked + .toggle-label .toggle-text {
+input[type="checkbox"][name="active"]:checked+.toggle-label .toggle-text {
   color: var(--text-primary);
 }
 
@@ -3388,4 +3422,7 @@ select#chatbot-status-filter option:checked,
 .password-visibility-toggle:hover {
   color: var(--text-primary);
   background: rgba(79, 70, 229, 0.12);
+}
+
+background: rgba(79, 70, 229, 0.12);
 }

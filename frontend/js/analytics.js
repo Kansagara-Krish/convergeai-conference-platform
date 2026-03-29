@@ -47,8 +47,12 @@ class AdminAnalyticsPage {
 
     if (this.usernameInput) {
       this.usernameInput.parentElement.style.position = "relative";
+      this.usernameInput.parentElement.style.overflow = "visible";
       this.usernameSuggestions = document.createElement("div");
       this.usernameSuggestions.className = "analytics-search-suggestions";
+      this.usernameSuggestions.style.position = "absolute";
+      this.usernameSuggestions.style.zIndex = "20000";
+      this.usernameSuggestions.style.overflow = "visible";
       this.usernameInput.parentElement.appendChild(this.usernameSuggestions);
       this.usernameSuggestionIndex = -1;
 

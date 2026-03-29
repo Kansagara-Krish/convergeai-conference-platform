@@ -1082,11 +1082,14 @@ class ChatInterface {
 
     // Handle unavailable chatbot
     if (this.chatUnavailable) {
-      this.renderChatUnavailableNotice();
       this.clearInitialChatLoading();
-      this.setInputVisible(false);
+      this.setInputVisible(true);
+      this.setChatUnavailableState(true);
+      this.clearMessagesIfUnavailable();
       return;
     }
+
+    this.setChatUnavailableState(false);
 
     // Load message history for selected conversation
     if (this.currentConversationId && !hasLoadedInitialConversationMessages) {
@@ -2194,6 +2197,15 @@ class ChatInterface {
   }
 
   updateSendButtonState() {
+    if (this.chatUnavailable) {
+      if (this.sendBtn) {
+        this.sendBtn.disabled = true;
+        this.sendBtn.style.opacity = "0.45";
+        this.sendBtn.classList.add("send-disabled");
+      }
+      return;
+    }
+
     if (this.isGenerationLocked) {
       if (this.sendBtn) {
         this.sendBtn.disabled = true;
@@ -3780,17 +3792,60 @@ class ChatInterface {
     }, 280);
   }
 
+  clearMessagesIfUnavailable() {
+    if (!this.messagesArea) return;
+    this.messagesArea.innerHTML = "";
+  }
+
   renderChatUnavailableNotice() {
-    const notice = DomUtils.create("div", "chat-empty-state");
-    notice.innerHTML = `
-      <div class="chat-empty-title">Chat is unavailable</div>
-      <div class="chat-empty-text">${this.escapeHtml(
-        this.chatUnavailableMessage ||
-          "This chatbot is inactive and cannot accept new messages.",
-      )}</div>
-    `;
-    this.messagesArea.appendChild(notice);
-    this.scrollToBottom();
+    // Keep this for possible alternate usage; not used in current unavailable handling.
+  }
+
+  setChatUnavailableState(disabled) {
+    this.chatUnavailable = Boolean(disabled);
+
+    const btns = [this.sendBtn, this.attachBtn, this.modeBtn, this.newChatBtn];
+    btns.forEach((button) => {
+      if (!button) return;
+      button.disabled = this.chatUnavailable;
+      button.style.opacity = this.chatUnavailable ? "0.45" : "";
+      button.style.pointerEvents = this.chatUnavailable ? "none" : "";
+    });
+
+    if (this.inputField) {
+      this.inputField.disabled = this.chatUnavailable;
+      this.inputField.style.opacity = this.chatUnavailable ? "0.65" : "";
+      this.inputField.style.backgroundColor = this.chatUnavailable
+        ? "rgba(148, 163, 184, 0.15)"
+        : "";
+    }
+
+    const disabledElements = [
+      this.sendBtn,
+      this.attachBtn,
+      this.modeBtn,
+      this.newChatBtn,
+      this.chatModeMenu,
+      this.chatGuestWall,
+    ];
+    disabledElements.forEach((elem) => {
+      if (!elem) return;
+      elem.disabled = this.chatUnavailable;
+      elem.style.opacity = this.chatUnavailable ? "0.45" : "";
+      elem.style.pointerEvents = this.chatUnavailable ? "none" : "";
+    });
+
+    if (this.chatInputInfo) {
+      this.chatInputInfo.textContent = this.chatUnavailable
+        ? this.chatUnavailableMessage ||
+          "This chatbot is inactive and cannot accept new messages."
+        : this.defaultInputInfoText ||
+          "Image responses may take a few seconds to generate.";
+      this.chatInputInfo.classList.toggle(
+        "chat-input-info-unavailable",
+        this.chatUnavailable,
+      );
+    }
   }
 
   setInputVisible(visible) {

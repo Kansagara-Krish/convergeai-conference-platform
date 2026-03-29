@@ -2193,6 +2193,11 @@ body.drive-preview-modal-open {
   order: 3;
 }
 
+.chat-input-info.chat-input-info-unavailable {
+  color: #ffb547;
+  font-weight: 600;
+}
+
 .chat-guest-selector-panel {
   width: min(920px, 100%);
   order: 1;
@@ -2420,6 +2425,12 @@ body.drive-preview-modal-open {
   max-height: 160px;
   resize: none;
   overflow-y: auto;
+}
+
+.input-field:disabled {
+  cursor: not-allowed;
+  color: rgba(148, 163, 184, 0.95);
+  background: rgba(148, 163, 184, 0.08);
 }
 
 .input-field::placeholder {
