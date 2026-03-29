@@ -7,10 +7,10 @@ from flask import Blueprint, current_app, jsonify, redirect, request
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 try:
-    from models import User, UserGoogleToken, db
+    from models import User, db
     from routes.auth import token_required
 except ImportError:
-    from backend.models import User, UserGoogleToken, db
+    from backend.models import User, db
     from backend.routes.auth import token_required
 
 
@@ -128,10 +128,9 @@ def _popup_callback_html(success: bool, message: str):
 @google_bp.route("/auth/status", methods=["GET"])
 @token_required
 def google_auth_status(user):
-    token_row = UserGoogleToken.query.filter_by(user_id=user.id).first()
-
-    connected = bool(token_row and token_row.refresh_token)
-    expires_at = token_row.token_expiry.isoformat() if token_row and token_row.token_expiry else None
+    # UserGoogleToken table has been removed
+    connected = False
+    expires_at = None
 
     return jsonify({
         "success": True,
@@ -240,23 +239,11 @@ def google_auth_callback():
 
     expires_at = datetime.utcnow() + timedelta(seconds=max(expires_in - 60, 60))
 
-    row = UserGoogleToken.query.filter_by(user_id=user.id).first()
-    if not row:
-        row = UserGoogleToken(user_id=user.id)
-        db.session.add(row)
-
-    row.access_token = access_token
-    if refresh_token:
-        row.refresh_token = refresh_token
-    row.token_expiry = expires_at
-    row.scope = scope
-
-    db.session.commit()
-
-    current_app.logger.info("Google Drive connected for user_id=%s", user.id)
+    # UserGoogleToken table has been removed - tokens no longer stored in database
+    current_app.logger.info("Google OAuth processed for user_id=%s (tokens not stored)", user.id)
 
     if popup:
-        return _popup_callback_html(True, "Google Drive connected successfully."), 200
+        return _popup_callback_html(True, "Google OAuth connected. Note: Token storage has been disabled."), 200
 
     if return_to:
         redirect_url = _append_query_params(return_to, {"google_drive": "connected"})

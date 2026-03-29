@@ -448,37 +448,3 @@ class DriveImageBackup(db.Model):
         }
 
 
-# ============================================
-# User Google Token Model
-# ============================================
-
-class UserGoogleToken(db.Model):
-    """Store per-user Google OAuth tokens for Drive uploads."""
-    __tablename__ = 'user_google_tokens'
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True, index=True)
-    access_token = db.Column(db.Text, nullable=False)
-    refresh_token = db.Column(db.Text, nullable=True)
-    token_expiry = db.Column(db.DateTime, nullable=True, index=True)
-    scope = db.Column(db.String(512), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    def is_access_token_valid(self, buffer_seconds=60):
-        if not self.access_token:
-            return False
-        if not self.token_expiry:
-            return True
-        return self.token_expiry > (datetime.utcnow() + timedelta(seconds=max(int(buffer_seconds or 0), 0)))
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'connected': bool(self.access_token),
-            'scope': self.scope,
-            'token_expiry': self.token_expiry.isoformat() if self.token_expiry else None,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-        }
