@@ -1,0 +1,171 @@
+  async saveGuestChanges(id, data) {
+    return API.put(`/api/admin/guests/${id}`, data);
+  }
+
+  async openAddGuestModal() {
+    let chatbots = [];
+    try {
+      const botsResponse = await API.get(
+        "/api/admin/chatbots?page=1&per_page=200",
+      );
+      chatbots = Array.isArray(botsResponse?.data) ? botsResponse.data : [];
+    } catch (error) {
+      console.error("[AddGuest] Failed to load chatbots:", error);
+      NotificationManager.error("Failed to load events/chatbots");
+      return;
+    }
+
+    const chatbotOptions = chatbots
+      .map((bot) => {
+        const eventName = bot.event_name || "Unknown Event";
+        const chatbotName = bot.name || "Unnamed Chatbot";
+        return `<option value="${bot.id}">${eventName} • ${chatbotName}</option>`;
+      })
+      .join("");
+
+    const formHTML = `
+      <div class="form-group">
+        <label for="guest-name-add">Name <span class="text-danger">*</span></label>
+        <input type="text" id="guest-name-add" class="form-control" placeholder="Guest name" required>
+      </div>
+      <div class="form-group">
+        <label for="guest-chatbot-add">Event / Chatbot <span class="text-danger">*</span></label>
+        <select id="guest-chatbot-add" class="form-control" required>
+          <option value="">Select event/chatbot</option>
+          ${chatbotOptions}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="guest-photo-add">Image (Optional)</label>
+        <div class="guest-edit-file-wrap">
+          <input type="file" id="guest-photo-add" class="guest-edit-file-input" accept="image/*">
+          <button type="button" id="guest-photo-pick-add" class="btn btn-secondary btn-sm">
+            <i class="fas fa-upload"></i> Choose Image
+          </button>
+          <span id="guest-photo-picked-name-add" class="guest-edit-file-name">No image selected</span>
+        </div>
+      </div>
+    `;
+
+    const self = this;
+    const modal = ModalManager.create("Add New Guest", formHTML, [
+      {
+        id: "cancel",
+        label: "Cancel",
+        class: "btn-secondary",
+        callback: () => {},
+      },
+      {
+        id: "add",
+        label: "Add Guest",
+        class: "btn-primary",
+        callback: async () => {
+          const guestName = document
+            .getElementById("guest-name-add")
+            .value.trim();
+          const chatbotId = document.getElementById("guest-chatbot-add").value;
+          const selectedPhoto =
+            document.getElementById("guest-photo-add").files?.[0];
+
+          if (!guestName) {
+            NotificationManager.error("Please enter a guest name");
+            return;
+          }
+
+          if (!chatbotId) {
+            NotificationManager.error("Please select event/chatbot");
+            return;
+          }
+
+          const guestData = new FormData();
+          guestData.append("name", guestName);
+          guestData.append("chatbot_id", chatbotId);
+          if (selectedPhoto) {
+            guestData.append("photo", selectedPhoto);
+          }
+
+          try {
+            console.log("[AddGuest] Creating guest");
+            const response = await API.post("/api/admin/guests", guestData);
+            console.log("[AddGuest] Response:", response);
+            NotificationManager.success("Guest added successfully");
+            self.loadGuests();
+          } catch (error) {
+            console.error("[AddGuest] Error:", error);
+            NotificationManager.error(
+              "Failed to add guest: " + (error.message || "Unknown error"),
+            );
+          }
+        },
+      },
+    ]);
+
+    const photoInput = document.getElementById("guest-photo-add");
+    const photoPickBtn = document.getElementById("guest-photo-pick-add");
+    const photoPickedName = document.getElementById(
+      "guest-photo-picked-name-add",
+    );
+
+    if (photoInput && photoPickBtn && photoPickedName) {
+      photoPickBtn.addEventListener("click", () => photoInput.click());
+      photoInput.addEventListener("change", () => {
+        const selected = photoInput.files?.[0];
+        photoPickedName.textContent = selected
+          ? selected.name
+          : "No image selected";
+      });
+    }
+  }
+
+  async setupGoogleIntegration() {
+    const btnConnect = document.getElementById("btn-connect-google");
+    const statusText = document.getElementById("google-status-text");
+    const substatusText = document.getElementById("google-substatus-text");
+    if (!btnConnect) return;
+
+    const updateStatus = async () => {
+      try {
+        const response = await API.get("/api/google/auth/status");
+        if (response.connected) {
+          statusText.textContent = "Connected";
+          statusText.style.color = "#4caf50";
+          substatusText.textContent = `Linked to: ${response.email || "Google Account"}`;
+          btnConnect.innerHTML = '<i class="fas fa-sync"></i> Reconnect';
+          btnConnect.classList.replace("btn-primary", "btn-secondary");
+        } else {
+          statusText.textContent = "Not Connected";
+          statusText.style.color = "#f44336";
+          substatusText.textContent = "Connect to enable Drive & Sheets backup";
+          btnConnect.innerHTML = '<i class="fab fa-google"></i> Connect Google';
+          btnConnect.classList.replace("btn-secondary", "btn-primary");
+        }
+      } catch (error) {
+        statusText.textContent = "Error checking status";
+      }
+    };
+
+    btnConnect.addEventListener("click", () => {
+      const width = 600, height = 700;
+      const left = (window.innerWidth - width) / 2;
+      const top = (window.innerHeight - height) / 2;
+      
+      const token = Storage.getToken();
+      window.open(
+        `/api/google/auth/login?token=${token}`,
+        "GoogleLogin",
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      const messageListener = (event) => {
+        if (event.data === "google-oauth-success") {
+          NotificationManager.success("Google Account connected successfully!");
+          updateStatus();
+          window.removeEventListener("message", messageListener);
+        }
+      };
+      window.addEventListener("message", messageListener);
+    });
+
+    await updateStatus();
+  }
+}

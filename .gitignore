@@ -1,11 +1,13 @@
 # Environment Variables
 .env
 .env.*
-
 .env.local
 .env.*.local
 
+# Sensitive Files
+convergence-internship-1-af5ff99abec1.json
 info_text.txt
+
 # Python
 __pycache__/
 *.py[cod]
@@ -30,8 +32,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-convergence-internship-1-af5ff99abec1.json
 
 # Virtual Environments
 venv/
@@ -63,8 +63,7 @@ venv3/
 *.sqlite3
 chat_system.db
 
-# Uploads
-uploads/
+# Temporary Files
 temp/
 tmp/
 
