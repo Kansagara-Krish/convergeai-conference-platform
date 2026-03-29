@@ -60,7 +60,6 @@ def create_app(config_name=None):
         from routes.chatbot import chatbot_bp
         from routes.whatsapp import whatsapp_bp
         from routes.drive import drive_bp
-        from routes.google_oauth import google_bp
     except ImportError:
         from backend.routes.auth import auth_bp
         from backend.routes.admin import admin_bp
@@ -68,7 +67,6 @@ def create_app(config_name=None):
         from backend.routes.chatbot import chatbot_bp
         from backend.routes.whatsapp import whatsapp_bp
         from backend.routes.drive import drive_bp
-        from backend.routes.google_oauth import google_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
@@ -76,7 +74,6 @@ def create_app(config_name=None):
     app.register_blueprint(chatbot_bp, url_prefix='/api/chatbots')
     app.register_blueprint(whatsapp_bp, url_prefix='/api/whatsapp')
     app.register_blueprint(drive_bp, url_prefix='/api/drive')
-    app.register_blueprint(google_bp, url_prefix='/api/google')
     
     # Error handlers
     @app.errorhandler(404)

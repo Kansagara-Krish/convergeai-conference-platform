@@ -30,7 +30,8 @@ DEFAULT_SINGLE_PERSON_PROMPT = (
     'Details:\n'
     '- Focus on one person only.\n'
     '- Center the person in the frame.\n'
-    '- Use a given background image\n'
+    '- Do not change the user image.\n'
+    '- Use the given background image.\n'
     '- Maintain realistic facial features.\n'
     '- Proper lighting and sharp focus.\n'
     '- Business or formal attire.\n'
@@ -47,7 +48,7 @@ DEFAULT_MULTIPLE_PERSON_PROMPT = (
     '- Ensure no unnatural gaps between group members.\n'
     '- If people are close together, blend them naturally without visual separation.\n'
     '- Avoid cutting faces or overlapping distortions.\n'
-    '- Use a conference or stage background.\n'
+    '- Use the given background image.\n'
     '- Maintain uniform lighting and perspective.\n'
     '- Make the group appear cohesive and professionally composed.'
 )

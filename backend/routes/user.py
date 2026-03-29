@@ -1602,24 +1602,6 @@ def send_message(user, chatbot_id):
     db.session.add(bot_response)
     db.session.commit()
 
-    if bot_response.message_type == 'image' and bot_response.image_url:
-        try:
-            from services.auto_drive_uploader import upload_to_drive, log_metadata
-        except ImportError:
-            from backend.services.auto_drive_uploader import upload_to_drive, log_metadata
-
-        absolute_path = _resolve_generated_static_file_path(bot_response.image_url)
-        username = getattr(user, 'username', 'user')
-
-        if absolute_path and absolute_path.exists() and absolute_path.is_file():
-            link, error_msg = upload_to_drive(str(absolute_path), username)
-            if link:
-                log_metadata(username, link)
-                bot_response.content = (bot_response.content or "") + f"\n\n*(✅ Successfully uploaded AI Image: [View]({link}))*"
-            else:
-                bot_response.content = (bot_response.content or "") + f"\n\n*(❌ Failed to upload image to Drive: {error_msg})*"
-            db.session.commit()
-    
     return jsonify({
         'success': True,
         'message': 'Message sent successfully',

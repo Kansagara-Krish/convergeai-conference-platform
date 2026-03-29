@@ -1386,6 +1386,35 @@ class ChatInterface {
   }
 
   validateSendRequirements() {
+    const text = String(this.inputField?.value || "").trim();
+    const hasImage = Boolean(
+      this.selectedImageFile || this.selectedImagePreviewUrl,
+    );
+    const hasGuest =
+      Array.isArray(this.selectedGuestIds) && this.selectedGuestIds.length > 0;
+
+    const requestIsImage = this.isLikelyImageRequest(
+      text,
+      this.selectedImageFile,
+    );
+
+    if (requestIsImage && (!hasImage || !hasGuest)) {
+      if (!hasImage && !hasGuest) {
+        NotificationManager.warning(
+          "Please upload your photo and select a guest before generating an image.",
+        );
+      } else if (!hasImage) {
+        NotificationManager.warning(
+          "Please upload your photo before generating an image.",
+        );
+      } else {
+        NotificationManager.warning(
+          "Please select at least one guest before generating an image.",
+        );
+      }
+      return false;
+    }
+
     return true;
   }
 
@@ -1473,6 +1502,9 @@ class ChatInterface {
     const fullWhatsappNumber = `${countryCode}${whatsappDigits}`;
     const isFullWhatsappValid = /^\+[1-9]\d{7,14}$/.test(fullWhatsappNumber);
 
+    // Check if user image is available (captured photo or generated image)
+    const hasUserImage = Boolean(this.selectedContactImageUrl);
+
     if (showErrors) {
       this.setContactFieldError(
         "name",
@@ -1491,10 +1523,12 @@ class ChatInterface {
         isNameValid &&
         isCountryCodeValid &&
         isWhatsappValid &&
-        isFullWhatsappValid,
+        isFullWhatsappValid &&
+        hasUserImage,
       isNameValid,
       isCountryCodeValid,
       isWhatsappValid,
+      hasUserImage,
       name,
       countryCode,
       whatsappDigits,
@@ -1607,9 +1641,10 @@ class ChatInterface {
 
   openContactModal(imageUrl = "") {
     if (!this.contactModal) return;
-    this.selectedContactImageUrl = String(
-      imageUrl || this.selectedContactImageUrl || "",
-    ).trim();
+    // If no new image provided, keep existing user image (captured or generated)
+    if (imageUrl) {
+      this.selectedContactImageUrl = String(imageUrl).trim();
+    }
     if (this.contactCountryCodeInput) {
       const normalizedCode = this.sanitizeCountryCode(
         this.contactCountryCodeInput.value || "+91",
@@ -1621,9 +1656,18 @@ class ChatInterface {
     this.clearContactValidationState();
     this.updateContactSubmitState();
     if (this.contactMeta) {
-      this.contactMeta.textContent = this.selectedContactImageUrl
-        ? "Selected image is ready to send."
-        : "Select a generated image first.";
+      if (this.selectedContactImageUrl) {
+        // Check if image is from camera capture or generated
+        const isCapturedImage = String(this.selectedContactImageUrl).startsWith(
+          "blob:",
+        );
+        this.contactMeta.textContent = isCapturedImage
+          ? "✓ Your captured photo is ready to send."
+          : "✓ Generated image is ready to send.";
+      } else {
+        this.contactMeta.textContent =
+          "No image available. Capture your photo or select a generated image first.";
+      }
       this.contactMeta.classList.remove("is-error", "is-success");
     }
     this.contactModal.classList.add("active");
@@ -1838,11 +1882,13 @@ class ChatInterface {
       if (!imageUrlToSend) {
         if (this.contactMeta) {
           this.contactMeta.textContent =
-            "No generated image selected. Please use Send under an image.";
+            "No image available. Please capture a photo or select a generated image.";
           this.contactMeta.classList.add("is-error");
           this.contactMeta.classList.remove("is-success");
         }
-        NotificationManager.error("Please select a generated image first");
+        NotificationManager.error(
+          "Please capture a photo or select a generated image",
+        );
         return;
       }
 
@@ -2152,6 +2198,8 @@ class ChatInterface {
     if (this.selectedGuestIds.length > 0) {
       this.closeGuestSelectorPanel();
     }
+
+    this.updateSendButtonState();
   }
 
   syncGuestCardSelection() {
@@ -2194,6 +2242,7 @@ class ChatInterface {
       ? this.resolveMediaUrl(primaryGuest.photo)
       : null;
     this.renderAttachmentPreview();
+    this.updateSendButtonState();
   }
 
   updateSendButtonState() {
@@ -2202,6 +2251,8 @@ class ChatInterface {
         this.sendBtn.disabled = true;
         this.sendBtn.style.opacity = "0.45";
         this.sendBtn.classList.add("send-disabled");
+        this.sendBtn.title =
+          "This chatbot is inactive and cannot accept new messages.";
       }
       return;
     }
@@ -2211,21 +2262,52 @@ class ChatInterface {
         this.sendBtn.disabled = true;
         this.sendBtn.style.opacity = "0.45";
         this.sendBtn.classList.add("send-disabled");
+        this.sendBtn.title =
+          "Image generation limit reached. Contact admin for volunteer access.";
       }
       return;
     }
 
-    const hasText = Boolean(this.inputField && this.inputField.value.trim());
-    const hasImage = Boolean(this.selectedImageFile);
+    const text = String(this.inputField?.value || "").trim();
+    const hasImage = Boolean(
+      this.selectedImageFile || this.selectedImagePreviewUrl,
+    );
+    const hasGuest =
+      Array.isArray(this.selectedGuestIds) && this.selectedGuestIds.length > 0;
+    const requestIsImage = this.isLikelyImageRequest(
+      text,
+      this.selectedImageFile,
+    );
+
+    const isImageGenerationFlow = requestIsImage;
+    const hasRequiredAssets = hasImage && hasGuest;
+    const canSendRaw = Boolean(text || hasImage || hasGuest);
+
+    const canSend = isImageGenerationFlow ? hasRequiredAssets : canSendRaw;
+
     if (!this.sendBtn) return;
-    if (hasText || hasImage) {
+    if (canSend) {
       this.sendBtn.disabled = false;
       this.sendBtn.style.opacity = "";
       this.sendBtn.classList.remove("send-disabled");
+      this.sendBtn.title = "";
     } else {
       this.sendBtn.disabled = true;
       this.sendBtn.style.opacity = "0.45";
       this.sendBtn.classList.add("send-disabled");
+      if (isImageGenerationFlow) {
+        if (!hasImage && !hasGuest) {
+          this.sendBtn.title =
+            "Upload your photo and select a guest to generate an image";
+        } else if (!hasImage) {
+          this.sendBtn.title = "Upload your photo to generate an image";
+        } else {
+          this.sendBtn.title = "Select at least one guest to generate an image";
+        }
+      } else {
+        this.sendBtn.title =
+          "Enter text, upload an image, or select a guest to send";
+      }
     }
   }
 
@@ -2864,7 +2946,15 @@ class ChatInterface {
           type: blob.type,
         });
         this.selectedImageFile = file;
+
+        // Store captured photo URL as user image for contact form
+        if (!this.selectedContactImageUrl) {
+          this.selectedImagePreviewUrl = URL.createObjectURL(file);
+          this.selectedContactImageUrl = this.selectedImagePreviewUrl;
+        }
+
         this.renderAttachmentPreview();
+        this.updateSendButtonState();
         this.closeCameraModal();
         resolve(file);
       }, "image/png");
@@ -3176,211 +3266,6 @@ class ChatInterface {
       setTimeout(() => URL.revokeObjectURL(objectUrl), 1200);
     } catch (_) {
       fallbackDownload();
-    }
-  }
-
-  async getGoogleDriveAuthStatus() {
-    if (this.isVolunteerUser()) return false;
-    try {
-      const response = await API.get("/api/google/auth/status");
-      return Boolean(response?.data?.connected);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  connectGoogleDriveWithPopup(authUrl, existingPopup = null) {
-    return new Promise((resolve, reject) => {
-      let popup = existingPopup;
-      if (popup && !popup.closed) {
-        try {
-          popup.location.href = authUrl;
-          popup.focus();
-        } catch (_) {
-          try {
-            popup.close();
-          } catch (_) {
-            // no-op
-          }
-          popup = null;
-        }
-      }
-
-      if (!popup) {
-        popup = window.open(
-          authUrl,
-          "googleDriveOAuth",
-          "popup=yes,width=560,height=720",
-        );
-      }
-
-      if (!popup) {
-        reject(new Error("Popup blocked. Please allow popups and try again."));
-        return;
-      }
-
-      let settled = false;
-      const timeoutMs = 120000;
-      const startedAt = Date.now();
-
-      const cleanup = () => {
-        window.removeEventListener("message", handleMessage);
-        window.clearInterval(pollTimer);
-      };
-
-      const finish = (ok, message = "") => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        if (ok) {
-          resolve({ success: true, message });
-        } else {
-          reject(new Error(message || "Google Drive connection failed."));
-        }
-      };
-
-      const handleMessage = (event) => {
-        if (event.origin !== window.location.origin) return;
-        const payload = event?.data || {};
-        if (payload?.type !== "google-drive-connected") return;
-        finish(Boolean(payload?.success), String(payload?.message || ""));
-      };
-
-      const pollTimer = window.setInterval(() => {
-        if (popup.closed) {
-          finish(false, "Google Drive connection window was closed.");
-          return;
-        }
-        if (Date.now() - startedAt > timeoutMs) {
-          try {
-            popup.close();
-          } catch (_) {
-            // no-op
-          }
-          finish(false, "Google Drive connection timed out. Please try again.");
-        }
-      }, 500);
-
-      window.addEventListener("message", handleMessage);
-    });
-  }
-
-  async connectGoogleDrive(existingPopup = null) {
-    const returnTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-    const response = await API.get(
-      `/api/google/auth/login?mode=json&popup=1&return_to=${encodeURIComponent(returnTo)}`,
-    );
-    const authUrl = String(response?.data?.auth_url || "").trim();
-    if (!authUrl) {
-      throw new Error("Unable to start Google Drive connection.");
-    }
-
-    await this.connectGoogleDriveWithPopup(authUrl, existingPopup);
-    return this.getGoogleDriveAuthStatus();
-  }
-
-  preopenGoogleDrivePopup() {
-    let popup = null;
-    try {
-      popup = window.open(
-        "about:blank",
-        "googleDriveOAuth",
-        "popup=yes,width=560,height=720",
-      );
-
-      if (popup && !popup.closed) {
-        popup.document.write(
-          "<title>Connecting to Google Drive</title>" +
-            '<body style="font-family:Arial,sans-serif;padding:16px;">Connecting to Google Drive...</body>',
-        );
-      }
-    } catch (_) {
-      // Ignore DOM setup errors
-    }
-    return popup;
-  }
-
-  closeDrivePopupSafely(popup) {
-    if (!popup || popup.closed) return;
-    try {
-      popup.close();
-    } catch (_) {
-      // no-op
-    }
-  }
-
-  async uploadGeneratedImageToDrive(imageUrl = "") {
-    const chatbotId = Number(this.chatbotId);
-    if (!Number.isFinite(chatbotId)) {
-      throw new Error(
-        "Chatbot context missing. Reload this chat and try again.",
-      );
-    }
-
-    const response = await API.post("/api/drive/upload-generated-image", {
-      chatbot_id: chatbotId,
-      image_url: String(imageUrl || "").trim(),
-    });
-
-    const driveLink = String(response?.data?.drive_link || "").trim();
-    if (!driveLink) {
-      throw new Error(
-        "Google Drive upload succeeded but no Drive link was returned.",
-      );
-    }
-
-    return driveLink;
-  }
-
-  async uploadGeneratedImageToDriveDirect(imageUrl = "", triggerButton = null) {
-    const selectedImage = String(imageUrl || "").trim();
-    if (!selectedImage) {
-      NotificationManager.error("Select a generated image first");
-      return;
-    }
-
-    const actionButton =
-      triggerButton instanceof HTMLElement ? triggerButton : null;
-    const actionLabel = actionButton?.querySelector("span");
-    const defaultLabel =
-      actionLabel?.textContent ||
-      (this.isVolunteerUser() ? "Choose Drive & Upload" : "Upload to Drive");
-    const preopenedPopup = this.preopenGoogleDrivePopup();
-
-    try {
-      if (actionButton) {
-        actionButton.disabled = true;
-      }
-      if (actionLabel) {
-        actionLabel.textContent = "Uploading...";
-      }
-
-      let isConnected = await this.getGoogleDriveAuthStatus();
-      if (!isConnected) {
-        isConnected = await this.connectGoogleDrive(preopenedPopup);
-      } else if (preopenedPopup && !preopenedPopup.closed) {
-        this.closeDrivePopupSafely(preopenedPopup);
-      }
-
-      if (!isConnected) {
-        throw new Error("Google Drive is not connected. Please try again.");
-      }
-
-      await this.uploadGeneratedImageToDrive(selectedImage);
-      NotificationManager.success("Image uploaded to your Google Drive.");
-    } catch (error) {
-      this.closeDrivePopupSafely(preopenedPopup);
-      NotificationManager.error(
-        error?.message || "Failed to upload image to Google Drive.",
-      );
-    } finally {
-      this.closeDrivePopupSafely(preopenedPopup);
-      if (actionButton) {
-        actionButton.disabled = false;
-      }
-      if (actionLabel) {
-        actionLabel.textContent = defaultLabel;
-      }
     }
   }
 

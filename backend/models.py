@@ -38,7 +38,6 @@ class User(db.Model):
     login_otps = db.relationship('LoginOTP', backref='user', lazy=True, cascade='all, delete-orphan')
     whatsapp_send_history = db.relationship('WhatsAppSendHistory', backref='user', lazy=True)
     drive_image_backups = db.relationship('DriveImageBackup', backref='user', lazy=True)
-    google_drive_token = db.relationship('UserGoogleToken', backref='user', uselist=False, lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         """Hash and set password"""
@@ -74,7 +73,8 @@ class Chatbot(db.Model):
         'Details:\n'
         '- Focus on one person only.\n'
         '- Center the person in the frame.\n'
-        '- Use a given background image\n'
+        '- Do not change the user image.\n'
+        '- Use the given background image.\n'
         '- Maintain realistic facial features.\n'
         '- Proper lighting and sharp focus.\n'
         '- Business or formal attire.\n'
@@ -91,7 +91,7 @@ class Chatbot(db.Model):
         '- Ensure no unnatural gaps between group members.\n'
         '- If people are close together, blend them naturally without visual separation.\n'
         '- Avoid cutting faces or overlapping distortions.\n'
-        '- Use a conference or stage background.\n'
+        '- Use the given background image.\n'
         '- Maintain uniform lighting and perspective.\n'
         '- Make the group appear cohesive and professionally composed.'
     )
