@@ -1,6 +1,67 @@
 # Development Dependencies
 # Install with: pip install -r requirements-dev.txt
 
+# ============================================
+# IMPORTANT: Environment Configuration (.env)
+# ============================================
+# Before running the application, configure the following in .env file:
+#
+# 1. DATABASE CONFIGURATION
+#    - DATABASE_URL: PostgreSQL connection string
+#      Format: postgresql+psycopg2://username:password@localhost:5432/database_name
+#
+# 2. SECURITY CREDENTIALS
+#    - SECRET_KEY: Generate a strong random string for production
+#    - JWT_SECRET_KEY: JWT token signing key
+#
+# 3. WHATSAPP CLOUD API (REQUIRED FOR MESSAGING)
+#    - WHATSAPP_ACCESS_TOKEN: Meta WhatsApp API access token
+#    - WHATSAPP_PHONE_NUMBER_ID: WhatsApp Business Account phone number ID
+#    - WHATSAPP_VERIFY_TOKEN: Webhook verification token
+#    - WHATSAPP_TEMPLATE_NAME: WhatsApp message template name
+#    - WHATSAPP_TEMPLATE_LANGUAGE: Template language code (e.g., 'en')
+#    - WHATSAPP_API_VERSION: Meta API version (e.g., 'v21.0')
+#    - PUBLIC_URL: Public ngrok/domain URL for webhook (required for Meta callbacks)
+#
+# 4. SMTP EMAIL CONFIGURATION (FOR EMAIL NOTIFICATIONS)
+#    - SMTP_SERVER: SMTP server address (e.g., smtp.gmail.com)
+#    - SMTP_PORT: SMTP port (e.g., 587 for TLS, 465 for SSL)
+#    - SMTP_USERNAME: Email account username/address
+#    - SMTP_PASSWORD: Email account password or app-specific password
+#    - SMTP_FROM_EMAIL: Sender email address
+#    - EMAIL_PROVIDER: Set to 'smtp' for SMTP or use 'sendgrid', 'mailgun', 'aws_ses'
+#
+# 5. GOOGLE OAUTH CONFIGURATION (FOR USER LOGIN)
+#    - GOOGLE_OAUTH_CLIENT_ID: OAuth client ID from Google Cloud Console
+#    - GOOGLE_OAUTH_CLIENT_SECRET: OAuth client secret
+#    - GOOGLE_OAUTH_REDIRECT_URI: Redirect URI (must match Google Console setup)
+#    - GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE: Path to service account JSON key file
+#    - GOOGLE_DRIVE_ROOT_FOLDER_ID: Google Drive folder ID for storing AI-generated images
+#
+# 6. AI SERVICE CONFIGURATION
+#    - GEMINI_API_KEY: Google Gemini API key (for image generation)
+#    - AI_PROVIDER: AI provider selection (openai, claude, gemini, huggingface)
+#
+# 7. FLASK CONFIGURATION
+#    - FLASK_ENV: Environment type (development, production, testing)
+#    - FLASK_DEBUG: Debug mode (True for development, False for production)
+#
+# 8. URL AND DOMAIN CONFIGURATION
+#    - FRONTEND_URL: Frontend application URL
+#    - API_URL: Backend API base URL
+#    - FORCE_HTTPS: Force HTTPS redirects (True for production)
+#
+# Quick Setup Instructions:
+# 1. Copy .env.example to .env (if available) or create .env from template
+# 2. Update database credentials in DATABASE_URL
+# 3. Add WhatsApp Cloud API credentials from Meta Business Console
+# 4. Configure SMTP settings for email delivery
+# 5. Add Google OAuth credentials from Google Cloud Console
+# 6. Set up Google Drive service account and folder ID
+# 7. Add Gemini API key for image generation features
+# 8. Set PUBLIC_URL to your ngrok tunnel or production domain
+# 9. Run migrations: flask db upgrade
+# 10. Start development server: python run.py or flask run
 # Base requirements
 -r backend/requirements.txt
 

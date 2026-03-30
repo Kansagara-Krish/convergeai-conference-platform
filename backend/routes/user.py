@@ -398,15 +398,15 @@ def _resolve_deletable_message_image_path(image_url):
     uploads_root = Path(current_app.root_path) / 'uploads' / 'messages'
     static_generated_root = Path(current_app.static_folder or (Path(current_app.root_path) / 'static')) / 'generated'
 
+    # Only delete user-uploaded message images, not AI-generated images
     if normalized.startswith('uploads/messages/'):
         candidate_path = Path(current_app.root_path) / normalized
         if _is_path_within_root(candidate_path, uploads_root):
             return candidate_path
 
+    # PRESERVE AI-generated images - do not delete them when conversation is deleted
     if normalized.startswith('static/generated/'):
-        candidate_path = Path(current_app.root_path) / normalized
-        if _is_path_within_root(candidate_path, static_generated_root):
-            return candidate_path
+        return None
 
     return None
 

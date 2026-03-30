@@ -52,6 +52,21 @@ def create_app(config_name=None):
     }})
     Migrate(app, db, compare_type=True)
     
+    # ============================================
+    # SECURITY MIDDLEWARE - Cache Control & Auth
+    # ============================================
+    
+    @app.after_request
+    def add_security_headers(response):
+        """Add security headers to prevent caching of protected content"""
+        # Disable caching for all responses to prevent browser caching issues
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0, private'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        return response
+    
     # Register blueprints
     try:
         from routes.auth import auth_bp

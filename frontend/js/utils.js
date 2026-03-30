@@ -635,6 +635,105 @@ class AppAuth {
 window.AppAuth = AppAuth;
 
 // ============================================
+// AUTHENTICATION PAGE GUARD
+// ============================================
+
+class PageGuard {
+  /**
+   * Determines if the current page requires authentication
+   */
+  static isProtectedPage() {
+    const pathname = window.location.pathname.toLowerCase();
+    // Protected pages: /admin/*, /user/*
+    return pathname.includes("/admin/") || pathname.includes("/user/");
+  }
+
+  /**
+   * Enforces authentication on protected pages
+   * Should be called on page load
+   */
+  static enforceAuthOnProtectedPage() {
+    if (!this.isProtectedPage()) {
+      return; // Page doesn't require auth
+    }
+
+    const token = Storage.getToken();
+    const user = Storage.getUser();
+
+    if (!token || !user) {
+      // User is not authenticated, show message and redirect to login
+      NotificationManager.error("Please log in to access this page");
+      setTimeout(() => {
+        AppAuth.redirectToLogin();
+      }, 1500);
+      return;
+    }
+
+    // Optional: Verify token validity with backend
+    this.verifyTokenWithBackend();
+  }
+
+  /**
+   * Verify token with backend to ensure it's still valid
+   */
+  static async verifyTokenWithBackend() {
+    try {
+      const response = await API.get("/api/auth/verify");
+      if (!response?.success) {
+        // Token is invalid, redirect to login
+        NotificationManager.error(
+          "Your session has expired. Please log in again.",
+        );
+        Storage.clear();
+        setTimeout(() => {
+          AppAuth.redirectToLogin();
+        }, 1500);
+      }
+    } catch (error) {
+      // If verification fails (invalid token, expired, etc), redirect to login
+      if (error?.status === 401) {
+        NotificationManager.error(
+          "Your session has expired. Please log in again.",
+        );
+        Storage.clear();
+        setTimeout(() => {
+          AppAuth.redirectToLogin();
+        }, 1500);
+      }
+    }
+  }
+}
+
+window.PageGuard = PageGuard;
+
+// ============================================
+// BACK BUTTON HANDLER - Force Reload
+// ============================================
+
+class BackButtonHandler {
+  /**
+   * Initialize back button detection
+   * Forces page reload when user navigates back to prevent cached pages
+   */
+  static init() {
+    window.onpageshow = function (event) {
+      // event.persisted is true if page was loaded from cache (back button)
+      if (event.persisted) {
+        location.reload();
+      }
+    };
+
+    // Also handle unload to clear any stale data
+    window.addEventListener("unload", () => {
+      // This helps ensure the page isn't cached
+      sessionStorage.setItem("_page_unload_time", Date.now().toString());
+    });
+  }
+}
+
+BackButtonHandler.init();
+
+// ============================================
 // 7. DEBOUNCE & THROTTLE
 // ============================================
 

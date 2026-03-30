@@ -149,7 +149,16 @@ class UserPanel {
       .join("");
   }
 
-  logout() {
+  async logout() {
+    try {
+      // Call backend logout endpoint
+      await API.post("/api/auth/logout");
+    } catch (error) {
+      // Continue with logout even if API call fails
+      console.warn("Logout API call failed:", error);
+    }
+
+    // Clear authentication data
     Storage.clear();
     NotificationManager.success("Logging out...");
     setTimeout(() => {
@@ -1598,13 +1607,14 @@ class ChatInterface {
     if (this.isVolunteerUser()) return;
 
     const saved = this.loadStoredContactDetails();
-    if (!saved) return;
 
     if (
       this.contactNameInput &&
       !String(this.contactNameInput.value || "").trim()
     ) {
-      this.contactNameInput.value = String(saved?.name || "").trim();
+      this.contactNameInput.value = String(
+        saved?.name || this.currentUser?.name || "",
+      ).trim();
     }
 
     if (this.contactCountryCodeInput) {
@@ -1620,9 +1630,41 @@ class ChatInterface {
       this.contactWhatsappInput &&
       !String(this.contactWhatsappInput.value || "").trim()
     ) {
-      this.contactWhatsappInput.value = this.sanitizeWhatsappDigits(
-        saved?.whatsappDigits || "",
-      );
+      // First try to use saved WhatsApp digits from localStorage
+      let whatsappValue = saved?.whatsappDigits || "";
+      let countryCode = saved?.countryCode || "+91";
+
+      // If no saved WhatsApp number, fetch from user's profile in database
+      if (!whatsappValue && this.currentUser?.whatsapp_number) {
+        const userWhatsappNumber = String(
+          this.currentUser.whatsapp_number,
+        ).trim();
+
+        // Extract all digits from the number
+        const allDigits = String(userWhatsappNumber).replace(/\D/g, "");
+
+        // Extract country code from the full WhatsApp number
+        const countryCodeMatch = userWhatsappNumber.match(/^\+?(\d{1,4})/);
+        if (countryCodeMatch) {
+          countryCode = `+${countryCodeMatch[1]}`;
+
+          // Update the country code field
+          if (this.contactCountryCodeInput) {
+            const currentCode = String(
+              this.contactCountryCodeInput.value || "",
+            ).trim();
+            if (!currentCode || currentCode === "+") {
+              this.contactCountryCodeInput.value = countryCode;
+            }
+          }
+        }
+
+        // Extract the last 10 digits (mobile number, excluding country code)
+        whatsappValue = allDigits.slice(-10);
+      }
+
+      this.contactWhatsappInput.value =
+        this.sanitizeWhatsappDigits(whatsappValue);
     }
   }
 
@@ -3951,13 +3993,22 @@ class LoginHandler {
       return;
     }
 
+    // Show message when authenticated user tries to access login page
+    NotificationManager.warning(
+      "You are already logged in. Redirecting to dashboard...",
+    );
+
     if (role === "admin") {
-      window.location.href = "admin/dashboard.html";
+      setTimeout(() => {
+        window.location.href = "admin/dashboard.html";
+      }, 1500);
       return;
     }
 
     const redirectUrl = await this.resolvePostLoginDestination(role);
-    window.location.href = redirectUrl;
+    setTimeout(() => {
+      window.location.href = redirectUrl;
+    }, 1500);
   }
 
   escapeHtml(value) {
@@ -4765,6 +4816,9 @@ window.downloadCredentials = function () {
 // ============================================
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Enforce authentication on protected pages
+  PageGuard.enforceAuthOnProtectedPage();
+
   // Initialize based on current page
   const page = window.location.pathname;
 

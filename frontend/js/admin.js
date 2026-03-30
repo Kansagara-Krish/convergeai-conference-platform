@@ -830,7 +830,16 @@ class AdminPanel {
     }
   }
 
-  logout() {
+  async logout() {
+    try {
+      // Call backend logout endpoint
+      await API.post("/api/auth/logout");
+    } catch (error) {
+      // Continue with logout even if API call fails
+      console.warn("Logout API call failed:", error);
+    }
+
+    // Clear authentication data
     Storage.clear();
     NotificationManager.success("Logging out...");
     setTimeout(() => {
@@ -3395,6 +3404,9 @@ class AdminSettingsHandler {
 // ============================================
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Enforce authentication on this protected page
+  PageGuard.enforceAuthOnProtectedPage();
+
   AdminPageSkeletonLoader.init();
 
   // Initialize admin panel

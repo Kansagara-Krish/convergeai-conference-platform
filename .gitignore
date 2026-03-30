@@ -1,8 +1,3 @@
-# Environment Variables
-.env
-.env.*
-.env.local
-.env.*.local
 
 # Sensitive Files
 convergence-internship-1-af5ff99abec1.json
@@ -32,27 +27,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Virtual Environments
-venv/
-ENV/
-env/
-.venv
-venv3/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-*.sublime-project
-*.sublime-workspace
-*.iml
-.project
-.pydevproject
-.settings/
 
 # IDE Cache
 .cache/
