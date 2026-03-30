@@ -44,7 +44,7 @@ tmp/
 # Logs
 logs/
 *.log
-
+.env
 # Node modules (if applicable)
 node_modules/
 package-lock.json
