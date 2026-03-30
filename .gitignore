@@ -86,6 +86,7 @@ secrets.json
 *.key
 private_key
 
+.env
 # Sensitive files
 credentials.json
 api_keys.json
