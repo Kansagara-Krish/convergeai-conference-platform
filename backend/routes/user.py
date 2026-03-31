@@ -1138,8 +1138,47 @@ def update_profile(user):
     
     data = request.get_json()
     
+    # All users can update their name
     if 'name' in data:
         user.name = data['name']
+    
+    # Only admins can update username, email, and whatsapp_number
+    is_admin = str(getattr(user, 'role', '') or '').strip().lower() == 'admin'
+    
+    if is_admin:
+        # Allow admins to update these fields
+        if 'username' in data:
+            # Check if username already exists and belongs to someone else
+            existing_user = User.query.filter(
+                User.username == data['username'],
+                User.id != user.id
+            ).first()
+            if existing_user:
+                return jsonify({
+                    'success': False,
+                    'message': 'Username already exists'
+                }), 400
+            user.username = data['username']
+        
+        if 'email' in data:
+            # Check if email already exists and belongs to someone else
+            existing_user = User.query.filter(
+                User.email == data['email'],
+                User.id != user.id
+            ).first()
+            if existing_user:
+                return jsonify({
+                    'success': False,
+                    'message': 'Email already exists'
+                }), 400
+            user.email = data['email']
+        
+        if 'whatsapp_number' in data:
+            user.whatsapp_number = data['whatsapp_number']
+    else:
+        # Non-admin users trying to update restricted fields - silently ignore
+        # to prevent unauthorized modifications
+        pass
     
     db.session.commit()
     

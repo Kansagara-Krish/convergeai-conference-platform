@@ -1,0 +1,9 @@
+id,chatbot_id,user_id,content,is_user_message,created_at,conversation_id,image_url,message_type
+208,6,26,"![](/uploads/guests/ganpat_dada.jpg)
+![](/uploads/backgrounds/ee0cf1c697784302b234b323f2b9a960_burj.jpg)",True,2026-03-30 09:38:51.460568,39,uploads/messages/a409e326c6404b39a24e50f3131757b7.jpg,image
+209,6,26,"![](/uploads/guests/ganpat_dada.jpg)
+![](/uploads/backgrounds/ee0cf1c697784302b234b323f2b9a960_burj.jpg)",True,2026-03-30 09:38:55.856552,39,uploads/messages/02b7fae19a9f4b6fb04275193f9b06f1.jpg,image
+210,6,26,,False,2026-03-30 09:39:24.813941,39,/static/generated/b6a33b4163cc4af9998fe38c772a7f8e.jpg,image
+211,6,46,"![](/uploads/guests/ganpat_dada.jpg)
+![](/uploads/backgrounds/ee0cf1c697784302b234b323f2b9a960_burj.jpg)",True,2026-03-30 09:41:45.274809,47,uploads/messages/c113768b49084b56bd9b78df1f9bcbf9.jpg,image
+212,6,46,,False,2026-03-30 09:42:14.346505,47,/static/generated/103e49e8735f4d0d89a4f0f3a9ae4c0b.jpg,image

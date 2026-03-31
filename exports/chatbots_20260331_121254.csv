@@ -1,0 +1,68 @@
+id,name,event_name,description,start_date,end_date,system_prompt,single_person_prompt,multiple_person_prompt,background_image,public,active,created_by_id,created_at,gemini_api_key,allow_previous_year_users,drive_folder_id
+6,test gemini api key,test,Testing chatbot and dtae expired ,2026-02-26,2026-04-09,"Generate a high-quality professional portrait image of the guest.
+
+Details:
+- Focus on one person only.
+- Center the person in the frame.
+- Use a given background image
+- Maintain realistic facial features.
+- Proper lighting and sharp focus.
+- Business or formal attire.
+- No extra people in the frame.
+- No distortion or overlapping elements.
+- Professional conference vibe.","Generate a high-quality professional conference photo using the provided images.
+
+The uploaded images include:
+- A user photo containing one person.
+- One guest image.
+- A background image is given to consider that image.
+
+Instructions:
+- Detect the person from the user photo and the person from the guest image.
+- Place both individuals together naturally as if they are attending a conference event.
+- Position them standing side by side in the provided background scene.
+- Ensure both people appear balanced and properly aligned in the frame.
+
+Requirements:
+- Preserve the original facial features of both the user and the guest.
+- Maintain natural body proportions and realistic posture.
+- Ensure no facial distortion or identity changes.
+- Avoid overlapping faces or unnatural spacing between the two people.
+- Blend lighting, shadows, and perspective so both people match the background environment.
+
+Important rules:
+- Do not create additional people.
+- Do not change facial identity or facial structure.
+- Do not merge or distort faces.
+- Ensure both individuals are clearly visible and properly framed.
+
+Style:
+Professional conference photo, realistic lighting, high resolution, sharp focus, cohesive composition.","Generate a high-quality professional conference group photo using the provided images.
+
+The uploaded images may include:
+- A user photo that may contain one or multiple people.
+- One or more guest images.
+- A background image is given consider that.
+
+Instructions:
+- Detect all people present in the user photo and keep them in the final image.
+- Include the selected guest(s) together with the people from the user photo.
+- Arrange everyone naturally in a group as if attending a conference event.
+- Place the selected guest(s) in the middle of the group composition when possible while keeping natural spacing and visibility.
+- Place the group inside the provided background scene.
+
+Requirements:
+- Preserve the original facial features of all people from the user image and guest images.
+- Maintain correct body proportions and natural positioning.
+- Ensure no faces are cut or distorted.
+- Avoid overlapping faces or unnatural spacing between people.
+- Blend lighting, shadows, and perspective so all people match the background.
+
+Important rules:
+- Do not create additional people.
+- Do not change or merge identities.
+- Do not distort faces.
+- Ensure all individuals are clearly visible.
+
+Style:
+Professional conference group photo, realistic lighting, high resolution, sharp focus, cohesive composition.",uploads/backgrounds/ee0cf1c697784302b234b323f2b9a960_burj.jpg,True,True,1,2026-02-26 09:30:50.548827,AIzaSyDIGtJE8GYnLPKuI7I7AXKNoMiZrVDGH6o,False,1K1e23x58_LsSl20q-1vB0XszooQuVven

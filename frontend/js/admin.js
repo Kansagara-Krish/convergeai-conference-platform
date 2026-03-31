@@ -3236,6 +3236,7 @@ class AdminProfileHandler {
     this.nameInput = this.form.querySelector('[name="name"]');
     this.usernameInput = this.form.querySelector('[name="username"]');
     this.emailInput = this.form.querySelector('[name="email"]');
+    this.whatsappInput = this.form.querySelector('[name="whatsapp_number"]');
 
     this.init();
   }
@@ -3253,6 +3254,8 @@ class AdminProfileHandler {
       if (this.nameInput) this.nameInput.value = profile.name || "";
       if (this.usernameInput) this.usernameInput.value = profile.username || "";
       if (this.emailInput) this.emailInput.value = profile.email || "";
+      if (this.whatsappInput)
+        this.whatsappInput.value = profile.whatsapp_number || "";
 
       const roleEl = DomUtils.$("#profile-role");
       if (roleEl) roleEl.textContent = profile.role || "Admin";
@@ -3281,10 +3284,18 @@ class AdminProfileHandler {
 
     const payload = {
       name: this.nameInput?.value?.trim() || "",
+      username: this.usernameInput?.value?.trim() || "",
+      email: this.emailInput?.value?.trim() || "",
+      whatsapp_number: this.whatsappInput?.value?.trim() || "",
     };
 
     if (!payload.name) {
       NotificationManager.error("Name is required");
+      return;
+    }
+
+    if (!payload.email) {
+      NotificationManager.error("Email is required");
       return;
     }
 
@@ -3296,6 +3307,9 @@ class AdminProfileHandler {
       Storage.setUser({
         ...currentUser,
         name: updatedUser.name || payload.name,
+        username: updatedUser.username || payload.username,
+        email: updatedUser.email || payload.email,
+        whatsapp_number: updatedUser.whatsapp_number || payload.whatsapp_number,
       });
 
       NotificationManager.success("Profile updated successfully");
