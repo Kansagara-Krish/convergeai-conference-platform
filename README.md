@@ -2,6 +2,8 @@
 
 A sophisticated event management platform with AI-powered image generation, WhatsApp integration, and real-time chat capabilities for conference attendees.
 
+![Conference Chatbot Banner](assets/images/chatbot.png)
+
 ## ✨ Key Features
 
 ### 🤖 AI Image Generation
@@ -11,12 +13,16 @@ A sophisticated event management platform with AI-powered image generation, What
 - **Gemini Integration**: Powered by Google Gemini API for high-quality image synthesis
 - **Google Drive Backup**: Automatic backup of all AI-generated images to Google Drive
 
+![AI Image Generation Features](assets/images/login_page.png)
+
 ### 💬 Real-Time Chat System
 - **Multi-conversation Support**: Users can manage multiple concurrent conversations
 - **Message Threading**: Organized conversation threads with full history
 - **Media Support**: Share images and attachments in chat
 - **Typing Indicators**: Real-time presence awareness
 - **Message Preservation**: AI-generated images are preserved when conversations are deleted
+
+![Real-Time Chat Interface](assets/images/chatbot.png)
 
 ### 📱 WhatsApp Integration
 - **Direct Messaging**: Send and receive messages via WhatsApp
@@ -39,11 +45,15 @@ A sophisticated event management platform with AI-powered image generation, What
 - **Guest Management**: Organize and track guest information
 - **Settings Management**: Configure chatbot behaviors and templates
 
+![Admin Dashboard Overview](assets/images/admin_dashborad.png)
+
 ### 📈 Analytics & Reporting
 - **Chart Visualizations**: Interactive charts for conference metrics
 - **Real-Time Updates**: Live data refresh without page reload
 - **Skeleton Loaders**: Smooth loading states for data visualization
 - **Export Capabilities**: Export analytics data for reports
+
+![Analytics Dashboard](assets/images/analytics.png)
 
 ### 📧 Email Integration
 - **SMTP Support**: Gmail, custom SMTP servers
@@ -109,6 +119,8 @@ A sophisticated event management platform with AI-powered image generation, What
 
 ### Frontend Pages & Components
 
+![Frontend UI Components](assets/images/user_management.png)
+
 #### User Interface
 | Page | Location | Features |
 |------|----------|----------|
@@ -131,6 +143,8 @@ A sophisticated event management platform with AI-powered image generation, What
 ## 🏗️ Architecture
 
 ### Database Models
+
+![System Architecture Diagram](assets/images/user_management.png)
 
 ```
 User
